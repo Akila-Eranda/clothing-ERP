@@ -339,8 +339,21 @@ function SearchableBrandSelect({
   );
 }
 
-export function GroceryProductForm() {
+export interface EmbeddedProductFormProps {
+  /** Pre-assign this supplier (e.g. when opened from a Purchase Order). */
+  defaultSupplierId?: string;
+  onCreated: (product: CreatedProduct) => void;
+  onCancel: () => void;
+}
+
+export interface CreatedProduct {
+  id: string;
+  variants?: { id: string }[];
+}
+
+export function GroceryProductForm({ embedded }: { embedded?: EmbeddedProductFormProps } = {}) {
   const router = useRouter();
+  const exitForm = () => (embedded ? embedded.onCancel() : router.push("/products"));
   const shopProfile = useShopProfile();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const activeBranchName = useBranchStore((s) => s.activeBranchName);
@@ -375,7 +388,11 @@ export function GroceryProductForm() {
   const [statusActive, setStatusActive] = useState(true);
 
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
-  const [supplierRows, setSupplierRows] = useState<SupplierRow[]>([]);
+  const [supplierRows, setSupplierRows] = useState<SupplierRow[]>(() =>
+    embedded?.defaultSupplierId
+      ? [{ supplierId: embedded.defaultSupplierId, buyingPrice: "", leadTime: "", moq: "", active: true, isDefault: true }]
+      : [],
+  );
   const [supplierPick, setSupplierPick] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
 
@@ -537,8 +554,12 @@ export function GroceryProductForm() {
     setBranchId("");
     setStatusActive(true);
     setVariantRows([]);
-    setSupplierRows([]);
-  }, [shopProfile.defaultUnit]);
+    setSupplierRows(
+      embedded?.defaultSupplierId
+        ? [{ supplierId: embedded.defaultSupplierId, buyingPrice: "", leadTime: "", moq: "", active: true, isDefault: true }]
+        : [],
+    );
+  }, [shopProfile.defaultUnit, embedded?.defaultSupplierId]);
 
   const validate = (): boolean => {
     if (!name.trim()) {
@@ -678,7 +699,7 @@ export function GroceryProductForm() {
     try {
       const created = await api.post<{
         id: string;
-        variants?: { supplierAssignments?: { supplierId: string }[] }[];
+        variants?: { id: string; supplierAssignments?: { supplierId: string }[] }[];
       }>("/products", {
         name: name.trim(),
         description: description || undefined,
@@ -729,7 +750,11 @@ export function GroceryProductForm() {
         );
       }
 
-      if (mode === "ADD_ANOTHER") {
+      if (embedded && created.data?.id) {
+        embedded.onCreated({ id: created.data.id, variants: created.data.variants?.map((v) => ({ id: v.id })) });
+        if (mode === "ADD_ANOTHER") resetForm();
+        else embedded.onCancel();
+      } else if (mode === "ADD_ANOTHER") {
         resetForm();
       } else {
         router.push("/products");
@@ -752,11 +777,11 @@ return (
       <div className={cn("px-4 sm:px-6 py-4 shrink-0", FORM_CARD_HEADER)}>
         <button
           type="button"
-          onClick={() => router.push("/products")}
+          onClick={exitForm}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Products
+          {embedded ? "Back to Purchase Order" : "Back to Products"}
         </button>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1170,7 +1195,7 @@ return (
             </SidebarCard>
 
             <SidebarCard>
-              <Button variant="ghost" className="w-full h-9 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/products")}>
+              <Button variant="ghost" className="w-full h-9 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={exitForm}>
                 Cancel
               </Button>
             </SidebarCard>

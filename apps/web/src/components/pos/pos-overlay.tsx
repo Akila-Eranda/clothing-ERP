@@ -82,7 +82,7 @@ import {
   needsPosWeightPopup,
   parseGramsInput,
 } from "@/lib/pos-weight";
-import type { Customer } from "@/types";
+import type { CartItem, Customer } from "@/types";
 import { parseApiList } from "@/lib/parse-api-list";
 
 interface POSOverlayProps {
@@ -1659,7 +1659,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       setPinLocked(false);
       setPinEntry("");
       setPinError(false);
-      if (data.shiftReady) setShiftReady(true);
+      setShiftReady(false);
       toast.success(`Cashier: ${data.cashier.name}`);
       void loadTodayStats();
     } catch (e: unknown) {
@@ -2232,6 +2232,76 @@ ${receiptSoftwareCreditHtml()}
       }
     } finally{setCheckoutLoading(false);}
   },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
+
+  /** Quick Pay reload: post as its own cash sale immediately — current cart is untouched. */
+  const recordQuickReloadSale = React.useCallback(async (item: CartItem): Promise<boolean> => {
+    const amount = Math.round(item.unitPrice * item.quantity * 100) / 100;
+    if (!(amount > 0)) { toast.error("Reload amount must be greater than 0"); return false; }
+    try {
+      const res = await api.post<{ invoiceNumber: string; total: number; changeDue: number }>("/pos/sale", {
+        customerId: customer?.id,
+        items: [{
+          isCustom: true,
+          productName: item.productName,
+          variantName: "",
+          sku: item.sku || "RELOAD",
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          costPrice: item.costPrice ?? 0,
+          discount: 0,
+          discountType: "FIXED",
+          taxRate: 0,
+          reloadType: item.reloadType,
+          reloadOperatorId: item.reloadOperatorId,
+          reloadDenominationId: item.reloadDenominationId,
+          reloadMsisdn: item.reloadMsisdn,
+          reloadFaceValue: item.reloadFaceValue ?? item.unitPrice,
+        }],
+        payments: [{ method: "CASH", amount }],
+        discountAmount: 0,
+        applyTierDiscount: false,
+        notes: "Quick Pay reload",
+      });
+      const s = res.data;
+      const saleTotal = Number(s.total) || amount;
+      setThankYouSale({
+        invoiceNumber: s.invoiceNumber,
+        total: saleTotal,
+        changeDue: 0,
+        paymentMethod: "CASH",
+        items: [item],
+        customerName: customer?.name,
+        cashTendered: saleTotal,
+      });
+      setTodayStats((prev) => ({ sales: prev.sales + saleTotal, orders: prev.orders + 1, items: prev.items + item.quantity }));
+      playPosSound("sale_ok", soundAlerts);
+      const receipt: SaleReceipt = {
+        invoiceNumber: s.invoiceNumber,
+        total: saleTotal,
+        changeDue: 0,
+        paymentMethod: "CASH",
+        customerName: customer?.name,
+        items: [cartLineToReceiptItem(item)],
+        subtotal: saleTotal,
+        discount: 0,
+        tax: 0,
+        cashTendered: saleTotal,
+      };
+      void executeReceiptPrint({
+        html: buildReceiptHtml(receipt),
+        printType: "SALE",
+        invoiceNumber: s.invoiceNumber,
+        settings: { ...receiptSettings, autoPrintAfterSale: true },
+        title: `Receipt ${s.invoiceNumber}`,
+      }).catch((e) => toast.error((e as Error).message ?? "Receipt print failed"));
+      void loadTodayStats();
+      toast.success(`Reload sale complete · ${s.invoiceNumber} — LKR ${formatNumber(saleTotal)}`, { duration: 3500 });
+      return true;
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Reload sale failed");
+      return false;
+    }
+  }, [customer, soundAlerts, receiptSettings, buildReceiptHtml, loadTodayStats]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -4070,7 +4140,7 @@ ${rows}
 
         {/* SHIFT GATE â€” opening cash required */}
         {posOpen && !pinLocked && !shiftReady && !showCashClose && (
-          <PosShiftGate onShiftReady={markShiftReady} onClose={closePos} />
+          <PosShiftGate onShiftReady={markShiftReady} onClose={closePos} cashierName={activeCashier?.name} />
         )}
 
         {showCashClose && (
@@ -5485,6 +5555,14 @@ ${rows}
                     addItem(item);
                     setShowReload(false);
                     setReloadPhone("");
+                  }}
+                  onQuickSale={async (item) => {
+                    const ok = await recordQuickReloadSale(item);
+                    if (ok) {
+                      setShowReload(false);
+                      setReloadPhone("");
+                    }
+                    return ok;
                   }}
                 />
               </div>

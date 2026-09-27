@@ -760,7 +760,19 @@ export class SupplierApService {
         },
       });
 
-      const cashAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'CASH');
+      // POS / counter: paid out of this cashier's open wallet; main cash only receives what is left at clear
+      const walletMovement = await recordSupplierCashOutflow(tx, {
+        tenantId: opts.tenantId,
+        branchId: opts.branchId,
+        cashierId: opts.userId,
+        paymentId: opts.paymentId,
+        amount,
+        description: desc,
+      });
+
+      const cashAcct = walletMovement
+        ? null
+        : await this.resolveTenderBankAccount(tx, opts.tenantId, 'CASH');
       if (cashAcct) {
         await tx.bankTransaction.create({
           data: {
@@ -780,16 +792,6 @@ export class SupplierApService {
           data: { currentBalance: { decrement: amount } },
         });
       }
-
-      // POS / counter: also deduct from this cashier's open cash drawer
-      await recordSupplierCashOutflow(tx, {
-        tenantId: opts.tenantId,
-        branchId: opts.branchId,
-        cashierId: opts.userId,
-        paymentId: opts.paymentId,
-        amount,
-        description: desc,
-      });
       return;
     }
 

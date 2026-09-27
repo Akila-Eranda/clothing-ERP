@@ -1866,6 +1866,8 @@ model ReloadOperator {
   name                   String
   digitalCommissionPct   Float                @default(2)
   physicalCommissionPct  Float                @default(3)
+  /// Operator web top-up page (e.g. Mobitel Quick Pay) opened from POS digital reload.
+  quickPayUrl            String?
   isActive               Boolean              @default(true)
   sortOrder              Int                  @default(0)
   createdAt              DateTime             @default(now())
@@ -4007,6 +4009,13 @@ model CashRegister {
   notes              String?
   approvedById       String?
   approvedAt         DateTime?
+  /// Cashier wallet cleared into main cash (day end); null until an admin clears it
+  clearedAt          DateTime?
+  clearedById        String?
+  clearedAmount      Float?
+  clearedToAccountId String?
+  /// Cash for this wallet posts to GL "Cash in Cashier Wallets"; false for wallets opened before that ledger existed
+  walletGl           Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -4020,6 +4029,7 @@ model CashRegister {
   @@index([tenantId, branchId, status])
   @@index([tenantId, counterId, status])
   @@index([tenantId, cashierId, status])
+  @@index([tenantId, clearedAt])
   @@index([openingTime])
   @@map("cash_registers")
 }

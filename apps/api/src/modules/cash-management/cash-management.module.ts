@@ -7,7 +7,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { IsString, IsOptional, IsNumber, IsEnum, IsObject, IsBoolean, Min, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CashMovementType, CashRegisterStatus, PaymentMethod, RoleType } from '@prisma/client';
+import { BankAccountType, BankTxnType, CashMovementType, CashRegisterStatus, PaymentMethod, RoleType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions, RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
@@ -19,6 +19,7 @@ import {
   findAnyOpenRegisterOnBranch,
   recordCashMovement,
   summarizeMovements,
+  walletFloatIssued,
 } from '@/shared/cash-register.helper';
 import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { WorkflowService } from '@/modules/workflow/workflow.module';
@@ -81,6 +82,12 @@ export class CloseCashRegisterDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }
 
+export class ClearWalletDto {
+  @ApiPropertyOptional({ description: 'Physically counted cash; defaults to expected / closing amount' })
+  @IsOptional() @IsNumber() @Min(0) countedCash?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) notes?: string;
+}
+
 export class CreatePosCounterDto {
   @ApiProperty({ example: 'Counter 4' }) @IsString() @MaxLength(80) name: string;
   @ApiPropertyOptional({ example: 'C4' }) @IsOptional() @IsString() @MaxLength(20) code?: string;
@@ -113,27 +120,11 @@ export class CashManagementService {
     tenantId: string,
     branchId: string | undefined,
     cashierId: string,
-    counterId?: string | null,
+    _counterId?: string | null,
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const own = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
-    if (own) {
-      if (!(counterId && own.counterId && own.counterId !== counterId)) {
-        return this.buildRegisterView(own);
-      }
-    }
-    const shared = await findAnyOpenRegisterOnBranch(
-      this.prisma,
-      tenantId,
-      resolvedBranchId,
-      counterId || undefined,
-    );
-    if (!shared) return null;
-    return {
-      ...this.buildRegisterView(shared),
-      sharedShift: true,
-      actingCashierId: cashierId,
-    };
+    return own ? this.buildRegisterView(own) : null;
   }
 
   async listCounters(
@@ -263,39 +254,21 @@ export class CashManagementService {
     dto: OpenCashRegisterDto,
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    await this.ensureDefaultCounters(tenantId, resolvedBranchId);
-    let counterId = dto.counterId?.trim();
-    if (!counterId) {
-      const first = await this.prisma.posCounter.findFirst({
-        where: { tenantId, branchId: resolvedBranchId, isActive: true },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      });
-      counterId = first?.id;
-    }
-    if (!counterId) throw new BadRequestException('Select a cashier counter');
-
-    const counter = await this.prisma.posCounter.findFirst({
-      where: { id: counterId, tenantId, branchId: resolvedBranchId, isActive: true },
-    });
-    if (!counter) throw new BadRequestException('Invalid or inactive cashier counter');
+    const requestedCounterId = dto.counterId?.trim();
+    const counter = requestedCounterId
+      ? await this.prisma.posCounter.findFirst({
+          where: { id: requestedCounterId, tenantId, branchId: resolvedBranchId, isActive: true },
+        })
+      : null;
+    if (requestedCounterId && !counter) throw new BadRequestException('Invalid or inactive cashier counter');
+    const counterId = counter?.id ?? null;
 
     const existing = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
     if (existing?.status === CashRegisterStatus.OPEN) {
-      throw new BadRequestException('You already have an open cash shift. Close it before starting a new one.');
+      throw new BadRequestException('You already have an open cash wallet. Continue with it or ask an admin to clear it.');
     }
     if (existing?.status === CashRegisterStatus.PENDING_APPROVAL) {
       throw new BadRequestException('Previous shift is pending manager approval. Contact your manager.');
-    }
-    const otherOpen = await findAnyOpenRegisterOnBranch(
-      this.prisma,
-      tenantId,
-      resolvedBranchId,
-      counterId,
-    );
-    if (otherOpen) {
-      throw new BadRequestException(
-        `${counter.name} already has an open shift. Unlock with your PIN to use that float, or close it first.`,
-      );
     }
 
     const register = await this.prisma.$transaction(async (tx) => {
@@ -315,7 +288,7 @@ export class CashManagementService {
         registerId: created.id,
         type: CashMovementType.OPENING,
         amount: dto.openingCash,
-        description: `Opening float · ${counter.name}`,
+        description: counter ? `Opening float · ${counter.name}` : 'Opening float',
         createdById: cashierId,
       });
       return created;
@@ -346,10 +319,12 @@ export class CashManagementService {
     tenantId: string,
     userId: string,
     dto: CloseCashRegisterDto,
+    opts: { actingCashierId?: string; roles?: string[] } = {},
   ) {
     const register = await this.getRegisterEntity(registerId, tenantId);
-    if (register.cashierId !== userId) {
-      throw new ForbiddenException('Only the cashier who opened this shift can close it');
+    const isOwner = register.cashierId === userId || register.cashierId === opts.actingCashierId;
+    if (!isOwner && !this.canManageCashTransfers(opts.roles ?? [])) {
+      throw new ForbiddenException('Only the wallet owner or a manager can close this shift');
     }
     if (register.status === CashRegisterStatus.CLOSED) {
       throw new BadRequestException('Shift already closed');
@@ -615,10 +590,11 @@ export class CashManagementService {
         openingCash: true,
         closingTime: true,
         variance: true,
+        clearedAt: true,
       },
     });
 
-    const raw = lastClosed?.actualCash ?? lastClosed?.closingCash ?? null;
+    const raw = lastClosed?.clearedAt ? null : (lastClosed?.actualCash ?? lastClosed?.closingCash ?? null);
     return {
       suggestedOpening: raw != null ? Math.round(raw * 100) / 100 : null,
       lastClosedAt: lastClosed?.closingTime ?? null,
@@ -893,6 +869,209 @@ export class CashManagementService {
     };
   }
 
+  // ── Cashier wallets → main cash (day end) ────────────────────────────────
+
+  private async resolveMainCashAccount(tenantId: string, branchId: string) {
+    const candidates = await this.prisma.bankAccount.findMany({
+      where: { tenantId, type: BankAccountType.CASH_IN_HAND, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const existing =
+      candidates.find((a) => a.branchId === branchId)
+      ?? candidates.find((a) => !a.branchId)
+      ?? candidates[0];
+    if (existing) return existing;
+
+    const gl = await this.prisma.account.findFirst({
+      where: { tenantId, code: { in: ['1100', '1000'] } },
+      orderBy: { code: 'desc' },
+      select: { id: true },
+    });
+    const codeTaken = await this.prisma.bankAccount.findFirst({ where: { tenantId, code: 'CASH-01' } });
+    return this.prisma.bankAccount.create({
+      data: {
+        tenantId,
+        code: codeTaken ? `CASH-${Date.now().toString().slice(-6)}` : 'CASH-01',
+        name: 'Main Cash',
+        type: BankAccountType.CASH_IN_HAND,
+        glAccountId: gl?.id,
+      },
+    });
+  }
+
+  private walletAmountToClear(register: {
+    status: CashRegisterStatus;
+    actualCash: number | null;
+    openingCash: number;
+    movements: { type: CashMovementType; amount: number }[];
+  }) {
+    const expected = computeExpectedCashFromMovements(register.openingCash, register.movements);
+    const amount = register.status === CashRegisterStatus.OPEN ? expected : (register.actualCash ?? expected);
+    return { expectedCash: expected, amountToClear: Math.round(amount * 100) / 100 };
+  }
+
+  async listCashierWallets(tenantId: string, branchId: string | undefined) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const [registers, mainCash] = await Promise.all([
+      this.prisma.cashRegister.findMany({
+        where: { tenantId, branchId: resolvedBranchId, clearedAt: null },
+        orderBy: [{ status: 'asc' }, { openingTime: 'asc' }],
+        include: {
+          movements: { orderBy: { createdAt: 'asc' } },
+          cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
+          counter: { select: { id: true, name: true, code: true } },
+        },
+      }),
+      this.resolveMainCashAccount(tenantId, resolvedBranchId),
+    ]);
+
+    const wallets = registers.map((r) => {
+      const { expectedCash, amountToClear } = this.walletAmountToClear(r);
+      return {
+        id: r.id,
+        status: r.status,
+        cashierId: r.cashierId,
+        cashierName: `${r.cashier.firstName} ${r.cashier.lastName}`.trim(),
+        cashierEmail: r.cashier.email,
+        counterName: r.counter?.name ?? null,
+        openingTime: r.openingTime,
+        closingTime: r.closingTime,
+        openingCash: r.openingCash,
+        actualCash: r.actualCash,
+        variance: r.variance,
+        expectedCash,
+        amountToClear,
+        summary: summarizeMovements(r.movements),
+      };
+    });
+
+    return {
+      mainCash: { id: mainCash.id, name: mainCash.name, code: mainCash.code, balance: mainCash.currentBalance },
+      wallets,
+      totalToClear: Math.round(wallets.reduce((s, w) => s + w.amountToClear, 0) * 100) / 100,
+    };
+  }
+
+  async clearCashierWallet(
+    tenantId: string,
+    branchId: string | undefined,
+    registerId: string,
+    adminId: string,
+    roles: string[],
+    dto: ClearWalletDto = {},
+  ) {
+    if (!this.canManageCashTransfers(roles)) {
+      throw new ForbiddenException('Only an admin or manager can clear cashier wallets');
+    }
+    const register = await this.getRegisterEntity(registerId, tenantId);
+    if (register.clearedAt) throw new BadRequestException('This wallet is already cleared');
+
+    const { expectedCash, amountToClear } = this.walletAmountToClear(register);
+    const counted = dto.countedCash != null ? Math.round(dto.countedCash * 100) / 100 : amountToClear;
+    if (counted < 0) throw new BadRequestException('Counted cash cannot be negative');
+
+    if (register.status === CashRegisterStatus.PENDING_APPROVAL) {
+      await this.approveRegister(registerId, tenantId, adminId, roles);
+    }
+
+    const mainCash = await this.resolveMainCashAccount(tenantId, register.branchId);
+    const cashierName = register.cashier
+      ? `${register.cashier.firstName} ${register.cashier.lastName}`.trim()
+      : 'cashier';
+    const now = new Date();
+    // Float and safe cash-in already belonged to main cash; only the rest is new money.
+    const floatIssued = walletFloatIssued(register.openingCash, register.movements);
+    const netToMain = Math.round((counted - floatIssued) * 100) / 100;
+
+    await this.prisma.$transaction(async (tx) => {
+      const closeData =
+        register.status === CashRegisterStatus.OPEN
+          ? {
+              closingCash: counted,
+              closingTime: now,
+              expectedCash,
+              actualCash: counted,
+              variance: Math.round((counted - expectedCash) * 100) / 100,
+              status: CashRegisterStatus.CLOSED,
+              approvedById: adminId,
+              approvedAt: now,
+            }
+          : {};
+      await tx.cashRegister.update({
+        where: { id: registerId },
+        data: {
+          ...closeData,
+          clearedAt: now,
+          clearedById: adminId,
+          clearedAmount: counted,
+          clearedToAccountId: mainCash.id,
+          ...(dto.notes ? { notes: [register.notes, dto.notes].filter(Boolean).join(' · ') } : {}),
+        },
+      });
+      if (Math.abs(netToMain) > 0.009) {
+        await tx.bankTransaction.create({
+          data: {
+            tenantId,
+            bankAccountId: mainCash.id,
+            type: netToMain > 0 ? BankTxnType.DEPOSIT : BankTxnType.WITHDRAWAL,
+            amount: Math.abs(netToMain),
+            reference: `WALLET-${registerId.slice(-8).toUpperCase()}`,
+            description:
+              floatIssued > 0.009
+                ? `Cashier wallet cleared · ${cashierName} (counted ${counted.toFixed(2)} less float ${floatIssued.toFixed(2)})`
+                : `Cashier wallet cleared · ${cashierName}`,
+            createdBy: adminId,
+          },
+        });
+        await tx.bankAccount.update({
+          where: { id: mainCash.id },
+          data: { currentBalance: { increment: netToMain } },
+        });
+      }
+    });
+
+    this.eventEmitter.emit('cash.wallet.cleared', {
+      tenantId,
+      branchId: register.branchId,
+      registerId,
+      cashierId: register.cashierId,
+      amount: counted,
+      expectedCash,
+      mainCashAccountId: mainCash.id,
+      clearedById: adminId,
+    });
+
+    return {
+      registerId,
+      cashierName,
+      amount: counted,
+      expectedCash,
+      variance: Math.round((counted - expectedCash) * 100) / 100,
+      mainCash: { id: mainCash.id, name: mainCash.name },
+    };
+  }
+
+  async clearAllCashierWallets(
+    tenantId: string,
+    branchId: string | undefined,
+    adminId: string,
+    roles: string[],
+  ) {
+    if (!this.canManageCashTransfers(roles)) {
+      throw new ForbiddenException('Only an admin or manager can clear cashier wallets');
+    }
+    const { wallets } = await this.listCashierWallets(tenantId, branchId);
+    const results = [];
+    for (const w of wallets) {
+      results.push(await this.clearCashierWallet(tenantId, branchId, w.id, adminId, roles));
+    }
+    return {
+      cleared: results.length,
+      total: Math.round(results.reduce((s, r) => s + r.amount, 0) * 100) / 100,
+      results,
+    };
+  }
+
   async getRegisterById(id: string, tenantId: string) {
     const register = await this.getRegisterEntity(id, tenantId);
     return this.buildRegisterView(register);
@@ -1078,8 +1257,12 @@ export class CashManagementController {
   @Get('opening-suggestion')
   @RequireAnyPermissions('cash:read', 'sales:read')
   @ApiOperation({ summary: 'Suggested opening float from last closed shift' })
-  getOpeningSuggestion(@CurrentUser() user: IAuthUser) {
-    return this.cashService.getOpeningSuggestion(user.tenantId, user.branchId, user.id);
+  getOpeningSuggestion(
+    @CurrentUser() user: IAuthUser,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.cashService.getOpeningSuggestion(user.tenantId, user.branchId, cashierId);
   }
 
   @Get('history')
@@ -1108,6 +1291,27 @@ export class CashManagementController {
     });
   }
 
+  @Get('wallets')
+  @RequireAnyPermissions('cash:read', 'accounting:read')
+  @ApiOperation({ summary: 'Cashier wallets not yet cleared into main cash' })
+  listWallets(@CurrentUser() user: IAuthUser) {
+    return this.cashService.listCashierWallets(user.tenantId, user.branchId);
+  }
+
+  @Post('wallets/clear-all')
+  @RequireAnyPermissions('cash:update', 'accounting:create')
+  @ApiOperation({ summary: 'Day end: clear every cashier wallet into main cash' })
+  clearAllWallets(@CurrentUser() user: IAuthUser) {
+    return this.cashService.clearAllCashierWallets(user.tenantId, user.branchId, user.id, user.roles ?? []);
+  }
+
+  @Post('wallets/:id/clear')
+  @RequireAnyPermissions('cash:update', 'accounting:create')
+  @ApiOperation({ summary: 'Clear one cashier wallet into main cash' })
+  clearWallet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: ClearWalletDto) {
+    return this.cashService.clearCashierWallet(user.tenantId, user.branchId, id, user.id, user.roles ?? [], dto);
+  }
+
   @Get(':id')
   @RequirePermissions('cash:read')
   @ApiOperation({ summary: 'Get cash shift by ID' })
@@ -1125,8 +1329,17 @@ export class CashManagementController {
   @Post(':id/close')
   @RequireAnyPermissions('cash:update', 'sales:create')
   @ApiOperation({ summary: 'Close cash shift with physical count' })
-  closeShift(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: CloseCashRegisterDto) {
-    return this.cashService.closeRegister(id, user.tenantId, user.id, dto);
+  closeShift(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() dto: CloseCashRegisterDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const actingCashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.cashService.closeRegister(id, user.tenantId, user.id, dto, {
+      actingCashierId,
+      roles: user.roles ?? [],
+    });
   }
 
   @Put(':id/approve')

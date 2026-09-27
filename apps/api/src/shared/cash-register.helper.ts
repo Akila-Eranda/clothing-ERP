@@ -46,6 +46,22 @@ export function summarizeMovements(movements: { type: CashMovementType; amount: 
   };
 }
 
+/**
+ * Cash the wallet got from main cash rather than from customers: opening float and manual / safe
+ * cash-in, less cash dropped back out. Only the rest of the wallet is new money for main cash.
+ */
+export function walletFloatIssued(
+  openingCash: number,
+  movements: { type: CashMovementType; amount: number }[],
+): number {
+  let issued = openingCash;
+  for (const m of movements) {
+    if (m.type === CashMovementType.DEPOSIT || m.type === CashMovementType.PAYMENT) issued += m.amount;
+    else if (m.type === CashMovementType.WITHDRAWAL) issued -= m.amount;
+  }
+  return Math.round(issued * 100) / 100;
+}
+
 export async function findOpenRegister(
   db: Db,
   tenantId: string,
@@ -90,6 +106,52 @@ export async function findAnyOpenRegisterOnBranch(
       branch: { select: { id: true, name: true, code: true } },
       counter: { select: { id: true, name: true, code: true } },
     },
+  });
+}
+
+/**
+ * The cashier's own open wallet (cash shift). Wallets belong to the cashier, never to a counter;
+ * one is opened with a zero float when the cashier has none.
+ */
+export async function ensureCashierWallet(
+  db: Db,
+  tenantId: string,
+  branchId: string,
+  cashierId: string,
+  counterId?: string | null,
+) {
+  const existing = await db.cashRegister.findFirst({
+    where: { tenantId, branchId, cashierId, status: CashRegisterStatus.OPEN },
+    orderBy: { openingTime: 'desc' },
+  });
+  if (existing) return existing;
+
+  let validCounterId: string | null = null;
+  if (counterId) {
+    const counter = await db.posCounter.findFirst({
+      where: { id: counterId, tenantId, branchId, isActive: true },
+      select: { id: true },
+    });
+    validCounterId = counter?.id ?? null;
+  }
+
+  return db.cashRegister.create({
+    data: {
+      tenantId,
+      branchId,
+      cashierId,
+      counterId: validCounterId,
+      openingCash: 0,
+      status: CashRegisterStatus.OPEN,
+      notes: 'Cashier wallet (auto-opened)',
+    },
+  });
+}
+
+async function findOwnOpenWallet(db: Db, tenantId: string, branchId: string, cashierId: string) {
+  return db.cashRegister.findFirst({
+    where: { tenantId, branchId, cashierId, status: CashRegisterStatus.OPEN },
+    orderBy: { openingTime: 'desc' },
   });
 }
 
@@ -145,11 +207,7 @@ export async function recordSaleCashMovement(
   const netCash = netCashFromSalePayments(payments, changeDue);
   if (netCash <= 0) return;
 
-  let register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
-  if (!register || register.status !== CashRegisterStatus.OPEN) {
-    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId, counterId);
-  }
-  if (!register || register.status !== CashRegisterStatus.OPEN) return;
+  const register = await ensureCashierWallet(prisma, tenantId, branchId, cashierId, counterId);
 
   await recordCashMovement(prisma, {
     tenantId,
@@ -173,11 +231,7 @@ export async function recordRefundCashMovement(
 ) {
   if (amount <= 0) return;
 
-  let register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
-  if (!register || register.status !== CashRegisterStatus.OPEN) {
-    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId);
-  }
-  if (!register || register.status !== CashRegisterStatus.OPEN) return;
+  const register = await ensureCashierWallet(prisma, tenantId, branchId, cashierId);
 
   await recordCashMovement(prisma, {
     tenantId,
@@ -190,28 +244,20 @@ export async function recordRefundCashMovement(
   });
 }
 
-/**
- * Resolve open drawer for cashier — own shift first, else shared terminal float (PIN switch).
- */
+/** The cashier's own open wallet only — cash never moves out of another cashier's wallet. */
 async function resolveOpenDrawerForCashier(
   db: Db,
   tenantId: string,
   branchId: string,
   cashierId: string,
 ) {
-  let register = await findOpenRegister(db, tenantId, branchId, cashierId);
-  if (!register || register.status !== CashRegisterStatus.OPEN) {
-    register = await findAnyOpenRegisterOnBranch(db, tenantId, branchId);
-  }
-  if (!register || register.status !== CashRegisterStatus.OPEN) return null;
-  return register;
+  return findOwnOpenWallet(db, tenantId, branchId, cashierId);
 }
 
 /**
  * When a cashier pays a supplier in cash from POS / counter,
- * deduct the amount from their open cash drawer (shift).
- * Falls back to shared branch float when PIN-switching cashiers.
- * No-ops if no open register (e.g. office AP payment).
+ * deduct the amount from their own open cashier wallet.
+ * No-ops if no open wallet (e.g. office AP payment).
  */
 export async function recordSupplierCashOutflow(
   db: Db,
@@ -247,8 +293,8 @@ export async function recordSupplierCashOutflow(
 
 /**
  * When a cashier records a cash shop expense from POS / counter,
- * deduct from the open drawer (own or shared float).
- * No-ops if no open register (office expense without shift).
+ * deduct from the cashier's own open wallet.
+ * No-ops if no open wallet (office expense without shift).
  */
 export async function recordExpenseCashOutflow(
   db: Db,

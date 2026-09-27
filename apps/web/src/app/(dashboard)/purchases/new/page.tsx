@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Banknote, CalendarDays, FileText, Package, PackageCheck, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw, BarChart3 } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarDays, FileText, Package, PackageCheck, Plus, Save, Search, ScanLine, Scale, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,11 @@ import { cn } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { PoProductSalesModal } from "@/components/purchases/po-product-sales-modal";
+import { PoStockBalanceModal, type PoStockBalanceTarget } from "@/components/purchases/po-stock-balance-modal";
+import { PoAddProductModal } from "@/components/purchases/po-add-product-modal";
+import { SupplierSearchSelect } from "@/components/purchases/supplier-search-select";
+import type { CreatedProduct } from "@/components/products/add-product-form";
+import { useShopProfile, isGroceryShop } from "@/lib/use-shop-profile";
 import {
   FORM_PAGE, FORM_CARD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
   FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_STATUS_BADGE,
@@ -199,6 +204,9 @@ export default function CreatePOPage() {
   const { user } = useAuthStore();
   const activeBranchName = useBranchStore((s) => s.activeBranchName);
   const adminBypass = bypassesWorkflowApproval(user?.role);
+  const canBalanceStock = isGroceryShop(useShopProfile());
+  const [stockBalanceTarget, setStockBalanceTarget] = useState<PoStockBalanceTarget | null>(null);
+  const [addProductOpen, setAddProductOpen] = useState(false);
 
   const [suppliers,    setSuppliers]    = useState<Supplier[]>([]);
   const [allVariants,  setAllVariants]  = useState<VariantOpt[]>([]);
@@ -240,7 +248,7 @@ export default function CreatePOPage() {
   const itemsSectionRef = useRef<HTMLDivElement>(null);
   const qtyInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const costInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-  const supplierSelectRef = useRef<HTMLSelectElement>(null);
+  const supplierSelectRef = useRef<HTMLInputElement>(null);
   const supplierDetailReqRef = useRef(0);
 
   const catalogReqRef = useRef(0);
@@ -249,6 +257,25 @@ export default function CreatePOPage() {
     window.setTimeout(() => {
       itemsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 80);
+  }, []);
+
+  const openStockBalance = useCallback((item: LineItem, v?: VariantOpt) => {
+    if (!item.variantId) return;
+    setStockBalanceTarget({
+      variantId: item.variantId,
+      productName: item.productName,
+      variantName: item.variantName,
+      barcode: item.barcode || v?.barcode || null,
+      systemStock: Number(v?.stock ?? 0),
+    });
+  }, []);
+
+  const applyBalancedStock = useCallback((variantId: string, newQty: number) => {
+    setAllVariants((prev) => prev.map((v) => {
+      if (v.variantId !== variantId) return v;
+      const reserved = Number(v.reservedStock ?? 0);
+      return { ...v, stock: newQty, currentStock: newQty, availableStock: Math.max(0, newQty - reserved), status: null };
+    }));
   }, []);
 
   const loadSupplierCatalog = useCallback(async (
@@ -378,7 +405,7 @@ export default function CreatePOPage() {
   }, [mapSupplierDetail]);
 
   useEffect(() => {
-    api.get<{ data: Supplier[] }>("/suppliers?limit=200").then((r) =>
+    api.get<{ data: Supplier[] }>("/suppliers?limit=2000").then((r) =>
       setSuppliers(parseApiList<Supplier>(r.data))
     ).catch(() => {});
   }, []);
@@ -770,6 +797,19 @@ export default function CreatePOPage() {
     window.setTimeout(() => qtyInputRefs.current[newIdx]?.focus(), 40);
   };
 
+  const handleProductCreated = async (product: CreatedProduct) => {
+    if (!supplierId) return;
+    const { rows } = await loadSupplierCatalog(supplierId);
+    const variantIds = new Set((product.variants ?? []).map((v) => v.id));
+    const newRows = rows.filter((r) => variantIds.has(r.variantId));
+    if (newRows.length === 0) {
+      toast.info("Product saved — it will appear in the PO once it is active");
+      return;
+    }
+    newRows.forEach((r) => addVariantToItems(r));
+    toast.success(`Added ${newRows.length} line${newRows.length > 1 ? "s" : ""} to this PO`);
+  };
+
   const setAllLinesIncluded = (includeInPo: boolean) => {
     setItems((p) => p.map((it) => ({ ...it, includeInPo })));
   };
@@ -1074,17 +1114,12 @@ export default function CreatePOPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                   <label className={FORM_LABEL}>Supplier *</label>
-                  <select
+                  <SupplierSearchSelect
                     ref={supplierSelectRef}
+                    suppliers={suppliers}
                     value={supplierId}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className={PO_FIELD}
-                  >
-                    <option value="">Choose a supplier…</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                    onChange={(id) => handleSupplierChange(id)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className={FORM_LABEL}>Supplier Next Come Date</label>
@@ -1231,6 +1266,15 @@ export default function CreatePOPage() {
                   <ScanLine className="h-4 w-4" />
                   Scan Barcode
                 </Button>
+                <Button
+                  type="button"
+                  disabled={!supplierId || loadingProducts || saving}
+                  onClick={() => setAddProductOpen(true)}
+                  className={cn("h-12 shrink-0 gap-2", FORM_ORANGE_BTN)}
+                >
+                  <Plus className="h-4 w-4" />
+                  New Product
+                </Button>
               </div>
               {supplierId && (
                 <p className={FORM_HINT}>
@@ -1349,8 +1393,19 @@ export default function CreatePOPage() {
                                 {item.barcode || v?.barcode || "—"}
                                 {item.variantName && item.variantName !== "Default" ? ` · ${item.variantName}` : ""}
                               </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Stock {stock ?? "—"}
+                              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                                {canBalanceStock ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); openStockBalance(item, v); }}
+                                    className={cn("inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 font-semibold", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
+                                    title="Balance stock"
+                                  >
+                                    <Scale className="h-3 w-3" /> Stock {stock ?? "—"}
+                                  </button>
+                                ) : (
+                                  <span>Stock {stock ?? "—"}</span>
+                                )}
                                 {item.size ? ` · ${item.size}` : ""}
                                 {item.color ? ` · ${item.color}` : ""}
                               </p>
@@ -1670,13 +1725,26 @@ export default function CreatePOPage() {
                           <td className="px-3 py-3 font-mono text-xs text-muted-foreground">
                             {item.barcode || v?.barcode || "—"}
                           </td>
-                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{stock ?? "—"}</td>
+                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground" onClick={(e) => { if (canBalanceStock) e.stopPropagation(); }}>
+                            {canBalanceStock && item.variantId ? (
+                              <button
+                                type="button"
+                                onClick={() => openStockBalance(item, v)}
+                                className={cn("inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 tabular-nums", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
+                                title="Balance stock (physical count)"
+                              >
+                                <Scale className="h-3 w-3" />
+                                {stock ?? "—"}
+                              </button>
+                            ) : (
+                              stock ?? "—"
+                            )}
+                          </td>
                           <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end">
                               <input
                                 ref={(el) => { qtyInputRefs.current[idx] = el; }}
                                 type="number"
-                                min={1}
                                 min={0}
                                 value={item.orderedQty}
                                 onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
@@ -2104,6 +2172,20 @@ export default function CreatePOPage() {
         open={salesModalOpen}
         onClose={() => setSalesModalOpen(false)}
         orderLineVariantIds={orderLineVariantIds}
+      />
+
+      <PoAddProductModal
+        open={addProductOpen}
+        supplierId={supplierId || undefined}
+        onClose={() => setAddProductOpen(false)}
+        onCreated={(p) => { void handleProductCreated(p); }}
+      />
+
+      <PoStockBalanceModal
+        open={stockBalanceTarget !== null}
+        target={stockBalanceTarget}
+        onClose={() => setStockBalanceTarget(null)}
+        onBalanced={applyBalancedStock}
       />
     </div>
   );

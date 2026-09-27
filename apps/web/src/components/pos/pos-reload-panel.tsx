@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart, ExternalLink, X, RotateCw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { CartItem } from "@/types";
@@ -19,9 +20,38 @@ export type ReloadOperator = {
   name: string;
   digitalCommissionPct: number;
   physicalCommissionPct: number;
+  quickPayUrl?: string | null;
   isActive: boolean;
   denominations: ReloadDenom[];
 };
+
+const DEFAULT_QUICK_PAY_URLS: Record<string, string> = {
+  MOBITEL: "https://quick-pay.mobitel.lk/quick-pay?ref=01M3GXMPH5MGPSKVY33CZTFXNV",
+};
+
+function resolveQuickPayUrl(op: ReloadOperator): string {
+  return op.quickPayUrl?.trim() || DEFAULT_QUICK_PAY_URLS[op.code?.toUpperCase()] || "";
+}
+
+function openQuickPayWindow(url: string): boolean {
+  const w = 480;
+  const h = 820;
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2));
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2));
+  const win = window.open(
+    url,
+    "hexa-quick-pay",
+    `popup=yes,width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+  );
+  if (!win) return false;
+  try {
+    win.opener = null;
+    win.focus();
+  } catch {
+    /* cross-origin — ignore */
+  }
+  return true;
+}
 
 type FocusZone = "provider" | "mode" | "phone" | "amount" | "cards" | "submit";
 
@@ -85,6 +115,7 @@ function chipStyle(opts: {
 export function PosReloadPanel({
   onBack,
   onAddToCart,
+  onQuickSale,
   taxRate = 0,
   asModal = false,
   initialPhone = "",
@@ -94,6 +125,8 @@ export function PosReloadPanel({
 }: {
   onBack: () => void;
   onAddToCart: (item: CartItem) => void;
+  /** Quick Pay "Paid" — record reload as its own completed sale. Resolves true on success. */
+  onQuickSale?: (item: CartItem) => Promise<boolean>;
   taxRate?: number;
   asModal?: boolean;
   initialPhone?: string;
@@ -207,6 +240,36 @@ export function PosReloadPanel({
     return () => clearTimeout(t);
   }, [loading]);
 
+  const buildDigitalItem = React.useCallback((): CartItem | null => {
+    if (!operator || !(face > 0)) return null;
+    const msisdn = digitsOnly(phone);
+    if (msisdn.length > 0 && msisdn.length < 9) {
+      toast.error("Phone number looks incomplete — clear it or enter a full number");
+      setFocusZone("phone");
+      return null;
+    }
+    const calc = commissionFor(operator, "DIGITAL", face);
+    return {
+      variantId: `custom-reload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      productName: msisdn ? `Reload · ${operator.name} · ${msisdn}` : `Reload · ${operator.name}`,
+      variantName: "",
+      sku: "RELOAD",
+      unitPrice: face,
+      mrp: face,
+      quantity: 1,
+      discountAmount: 0,
+      discountType: "fixed",
+      taxRate,
+      stock: 999999,
+      isCustom: true,
+      costPrice: calc.cost,
+      reloadType: "DIGITAL",
+      reloadOperatorId: operator.id,
+      ...(msisdn ? { reloadMsisdn: msisdn } : {}),
+      reloadFaceValue: face,
+    };
+  }, [operator, face, phone, taxRate]);
+
   const submit = React.useCallback(() => {
     if (!operator) {
       toast.error("Select a provider first");
@@ -218,34 +281,9 @@ export function PosReloadPanel({
     }
     const calc = commissionFor(operator, mode, face);
     if (mode === "DIGITAL") {
-      const msisdn = digitsOnly(phone);
-      if (msisdn.length > 0 && msisdn.length < 9) {
-        toast.error("Phone number looks incomplete — clear it or enter a full number");
-        setFocusZone("phone");
-        return;
-      }
-      const id = `custom-reload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      onAddToCart({
-        variantId: id,
-        productName: msisdn
-          ? `Reload · ${operator.name} · ${msisdn}`
-          : `Reload · ${operator.name}`,
-        variantName: "",
-        sku: "RELOAD",
-        unitPrice: face,
-        mrp: face,
-        quantity: 1,
-        discountAmount: 0,
-        discountType: "fixed",
-        taxRate,
-        stock: 999999,
-        isCustom: true,
-        costPrice: calc.cost,
-        reloadType: "DIGITAL",
-        reloadOperatorId: operator.id,
-        ...(msisdn ? { reloadMsisdn: msisdn } : {}),
-        reloadFaceValue: face,
-      });
+      const item = buildDigitalItem();
+      if (!item) return;
+      onAddToCart(item);
       toast.success(`Reload added · ${operator.name} · LKR ${formatMoney(face)}`);
       setPhone("");
       setAmount("");
@@ -284,7 +322,52 @@ export function PosReloadPanel({
     });
     toast.success(`Recharge card added · ${operator.name} · LKR ${formatMoney(denom.faceValue)}`);
     onBack();
-  }, [operator, face, mode, phone, denoms, denominationId, taxRate, onAddToCart, onBack, setPhone]);
+  }, [operator, face, mode, denoms, denominationId, taxRate, onAddToCart, onBack, setPhone, buildDigitalItem]);
+
+  const quickPayUrl = mode === "DIGITAL" && operator ? resolveQuickPayUrl(operator) : "";
+  const [quickPayOpen, setQuickPayOpen] = React.useState(false);
+  const [iframeKey, setIframeKey] = React.useState(0);
+
+  const openQuickPay = React.useCallback(() => {
+    if (!operator || !quickPayUrl) return;
+    if (!(face > 0)) {
+      toast.error("Enter reload amount");
+      setFocusZone("amount");
+      return;
+    }
+    const msisdn = digitsOnly(phone);
+    if (msisdn.length > 0 && msisdn.length < 9) {
+      toast.error("Phone number looks incomplete — clear it or enter a full number");
+      setFocusZone("phone");
+      return;
+    }
+    setIframeKey((k) => k + 1);
+    setQuickPayOpen(true);
+  }, [operator, quickPayUrl, face, phone]);
+
+  const [quickSaleBusy, setQuickSaleBusy] = React.useState(false);
+
+  const confirmQuickPay = React.useCallback(async () => {
+    if (quickSaleBusy) return;
+    if (!onQuickSale) {
+      setQuickPayOpen(false);
+      submit();
+      return;
+    }
+    const item = buildDigitalItem();
+    if (!item) return;
+    setQuickSaleBusy(true);
+    try {
+      const ok = await onQuickSale(item);
+      if (ok) {
+        setQuickPayOpen(false);
+        setPhone("");
+        setAmount("");
+      }
+    } finally {
+      setQuickSaleBusy(false);
+    }
+  }, [quickSaleBusy, onQuickSale, submit, buildDigitalItem, setPhone]);
 
   const moveZone = React.useCallback((delta: number) => {
     const idx = zones.indexOf(focusZone);
@@ -619,6 +702,21 @@ export function PosReloadPanel({
         className="shrink-0 px-5 pb-5 pt-2 space-y-2"
         style={{ borderTop: "1px solid var(--pos-border)", background: "var(--pos-panel)" }}
       >
+        {quickPayUrl && operator && (
+          <button
+            type="button"
+            onClick={openQuickPay}
+            disabled={!(face > 0)}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-all hover:opacity-90"
+            style={{ background: "#16a34a", color: "#ffffff", boxShadow: "0 8px 20px rgba(22,163,74,0.25)" }}
+          >
+            <ExternalLink className="h-4 w-4" />
+            Pay with {operator.name} Quick Pay
+            {face > 0 && (
+              <span className="opacity-90 font-mono tabular-nums">· LKR {formatMoney(face)}</span>
+            )}
+          </button>
+        )}
         <button
           ref={submitRef}
           type="button"
@@ -643,6 +741,89 @@ export function PosReloadPanel({
           ← → move · ↑ ↓ sections · Enter add
         </p>
       </div>
+
+      {quickPayOpen && operator && quickPayUrl && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3"
+          style={{ background: "rgba(0,0,0,0.75)" }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Escape") setQuickPayOpen(false);
+          }}
+        >
+          <div
+            className="flex w-full max-w-[520px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            style={{ height: "min(92vh, 860px)" }}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">{operator.name} Quick Pay</p>
+                <p className="truncate text-[11px] text-slate-500">
+                  LKR {formatMoney(face)}{phone ? ` · ${phone}` : ""} — complete payment below
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  title="Reload page"
+                  onClick={() => setIframeKey((k) => k + 1)}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Open in new window"
+                  onClick={() => {
+                    if (!openQuickPayWindow(quickPayUrl)) {
+                      toast.error("Popup blocked — allow popups for this site");
+                    }
+                  }}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Close"
+                  onClick={() => setQuickPayOpen(false)}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <iframe
+              key={iframeKey}
+              src={quickPayUrl}
+              title={`${operator.name} Quick Pay`}
+              allow="payment; clipboard-write"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="min-h-0 w-full flex-1 border-0 bg-white"
+            />
+            <div className="flex shrink-0 gap-2 border-t bg-slate-50 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setQuickPayOpen(false)}
+                className="h-11 flex-1 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmQuickPay()}
+                disabled={quickSaleBusy}
+                className="flex h-11 flex-[2] items-center justify-center gap-2 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
+                style={{ background: "#16a34a" }}
+              >
+                {quickSaleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {onQuickSale ? "Paid — Complete sale" : "Paid — Add to bill"} · LKR {formatMoney(face)}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

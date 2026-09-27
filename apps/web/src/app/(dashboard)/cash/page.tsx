@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Banknote, PlayCircle, StopCircle, History, AlertTriangle,
   RefreshCw, Loader2, CheckCircle2, ArrowDownCircle, ArrowUpCircle,
-  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye, Monitor,
+  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye, Monitor, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
@@ -27,6 +27,7 @@ import { DenominationInput, denominationTotal } from "@/components/cash/denomina
 import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-movement-ledger";
 import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
 import { PosCountersPanel } from "@/components/cash/pos-counters-panel";
+import { CashierWalletsPanel } from "@/components/cash/cashier-wallets-panel";
 import { useAuthStore } from "@/stores/auth-store";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
@@ -35,6 +36,7 @@ import { parseApiList } from "@/lib/parse-api-list";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "wallets", label: "Cashier Wallets", icon: Wallet },
   { id: "open", label: "Cash Open", icon: PlayCircle },
   { id: "close", label: "Cash Close", icon: StopCircle },
   { id: "movements", label: "Cash In / Out", icon: ArrowUpCircle },
@@ -278,10 +280,6 @@ export default function CashManagementPage() {
   }, [shiftOpen, isViewingToday, loadActive, loadToday]);
 
   const handleOpenShift = async () => {
-    if (!counterId) {
-      toast.error("Select a cashier counter");
-      return;
-    }
     const amount = parseFloat(openingCash);
     if (!Number.isFinite(amount) || amount < 0) {
       toast.error("Enter a valid opening amount");
@@ -289,8 +287,8 @@ export default function CashManagementPage() {
     }
     setOpening(true);
     try {
-      writePosCounterId(counterId);
-      await api.post("/cash/open", { openingCash: amount, counterId, notes: openingNotes || undefined });
+      if (counterId) writePosCounterId(counterId);
+      await api.post("/cash/open", { openingCash: amount, counterId: counterId || undefined, notes: openingNotes || undefined });
       toast.success("Shift started");
       setOpeningCash("");
       setOpeningNotes("");
@@ -873,7 +871,7 @@ export default function CashManagementPage() {
                       variant="success"
                       size="lg"
                       onClick={() => void handleOpenShift()}
-                      disabled={opening || !counterId}
+                      disabled={opening}
                       className="w-full h-11 rounded-xl gap-2"
                     >
                       {opening ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
@@ -883,6 +881,10 @@ export default function CashManagementPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="wallets" className="m-0 mt-0">
+            <CashierWalletsPanel />
           </TabsContent>
 
           {/* Counters */}

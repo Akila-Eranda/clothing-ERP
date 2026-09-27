@@ -23,6 +23,7 @@ type ReloadOperator = {
   name: string;
   digitalCommissionPct: number;
   physicalCommissionPct: number;
+  quickPayUrl?: string | null;
   isActive: boolean;
   denominations: ReloadDenom[];
 };
@@ -98,6 +99,7 @@ export function ReloadSettingsTab() {
         name: patch.name ?? op.name,
         digitalCommissionPct: patch.digitalCommissionPct ?? op.digitalCommissionPct,
         physicalCommissionPct: patch.physicalCommissionPct ?? op.physicalCommissionPct,
+        quickPayUrl: (patch.quickPayUrl ?? op.quickPayUrl ?? "").trim(),
         isActive: patch.isActive ?? op.isActive,
       });
       setOperators((list) => list.map((o) => (o.id === op.id ? { ...o, ...r.data, denominations: o.denominations } : o)));
@@ -248,6 +250,24 @@ export function ReloadSettingsTab() {
                     }
                   />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Quick Pay link (optional)</Label>
+                <Input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://quick-pay.mobitel.lk/quick-pay?ref=..."
+                  value={op.quickPayUrl ?? ""}
+                  onChange={(e) =>
+                    setOperators((list) =>
+                      list.map((o) => (o.id === op.id ? { ...o, quickPayUrl: e.target.value } : o)),
+                    )
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  POS digital reload opens this page in a popup; after paying, the cashier adds it to the bill.
+                  {op.code === "MOBITEL" ? " Leave empty to use the default Mobitel Quick Pay link." : ""}
+                </p>
               </div>
               <p className="text-xs text-muted-foreground">
                 Card stock:{" "}

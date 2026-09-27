@@ -18,11 +18,13 @@ import { readPosCounterId, writePosCounterId, clearPosCounterId } from "@/lib/po
 interface PosShiftGateProps {
   onShiftReady: () => void;
   onClose?: () => void;
+  /** PIN-unlocked cashier; falls back to the logged-in user. */
+  cashierName?: string | null;
 }
 
 type CounterRow = { id: string; name: string; code: string; sortOrder?: number };
 
-export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
+export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNameProp }: PosShiftGateProps) {
   const { user } = useAuthStore();
   const { branches, ready: branchReady } = useBranchContext();
   const { activeBranchId, activeBranchName, setBranch } = useBranchStore();
@@ -65,12 +67,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
       if (selected) writePosCounterId(selected);
       else clearPosCounterId();
 
-      if (!selected) return;
-
       const [activeRes, suggestRes] = await Promise.all([
-        api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(
-          `/cash/active?counterId=${encodeURIComponent(selected)}`,
-        ),
+        api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>("/cash/active"),
         api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
       ]);
       if (suggestRes.data?.suggestedOpening != null) {
@@ -78,10 +76,6 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
       }
       if (activeRes.data?.status === "OPEN") {
-        if (activeRes.data.counterId) {
-          writePosCounterId(activeRes.data.counterId);
-          setCounterId(activeRes.data.counterId);
-        }
         setExistingOpen(true);
         return;
       }
@@ -104,33 +98,6 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     void loadForBranch(activeBranchId);
   }, [branchReady, activeBranchId, loadForBranch]);
 
-  const checkCounterActive = React.useCallback(async (next: string) => {
-    if (!next) {
-      setExistingOpen(false);
-      return;
-    }
-    try {
-      const activeRes = await api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(
-        `/cash/active?counterId=${encodeURIComponent(next)}`,
-      );
-      if (activeRes.data?.status === "OPEN") {
-        if (activeRes.data.counterId) writePosCounterId(activeRes.data.counterId);
-        setExistingOpen(true);
-        return;
-      }
-      setExistingOpen(false);
-      if (activeRes.data?.status === "PENDING_APPROVAL") {
-        setPendingApproval(true);
-        setPendingRegisterId(activeRes.data.id ?? null);
-      } else {
-        setPendingApproval(false);
-        setPendingRegisterId(null);
-      }
-    } catch {
-      setExistingOpen(false);
-    }
-  }, []);
-
   const handleBranchChange = (branchId: string) => {
     const b = branches.find((x) => x.id === branchId);
     if (!b || b.id === activeBranchId) return;
@@ -145,26 +112,16 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     setCounterId(next);
     if (next) writePosCounterId(next);
     else clearPosCounterId();
-    setExistingOpen(false);
-    void checkCounterActive(next);
   };
 
   const handleContinueExisting = () => {
-    if (!counterId) {
-      toast.error("Select a cashier counter");
-      return;
-    }
-    writePosCounterId(counterId);
+    if (counterId) writePosCounterId(counterId);
     onShiftReady();
   };
 
   const handleStart = async () => {
     if (!activeBranchId) {
       toast.error("Select a branch");
-      return;
-    }
-    if (!counterId) {
-      toast.error("Select a cashier counter");
       return;
     }
     if (existingOpen) {
@@ -178,8 +135,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     }
     setSubmitting(true);
     try {
-      writePosCounterId(counterId);
-      await api.post("/cash/open", { openingCash: amount, counterId });
+      if (counterId) writePosCounterId(counterId);
+      await api.post("/cash/open", { openingCash: amount, counterId: counterId || undefined });
       toast.success("Shift started");
       onShiftReady();
     } catch (e: unknown) {
@@ -208,7 +165,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     }
   };
 
-  const cashierName = user?.name ?? "Cashier";
+  const cashierName = cashierNameProp || user?.name || "Cashier";
   const today = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "2-digit", year: "numeric" });
   const FLOAT_PRESETS = [5000, 10000, 15000, 20000];
   const selectedCounter = counters.find((c) => c.id === counterId);
@@ -283,10 +240,10 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
             </div>
             <div>
               <h2 className="text-white font-bold text-lg">
-                {existingOpen ? "Continue cash shift" : "Start cash shift"}
+                {existingOpen ? "Continue cash wallet" : "Start cash wallet"}
               </h2>
               <p className="text-xs" style={{ color: "var(--pos-muted)" }}>
-                Select branch & counter before sales
+                Cash you collect goes to your own wallet
               </p>
             </div>
           </div>
@@ -338,7 +295,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
 
           <div className="space-y-2">
             <Label className="text-white/70 flex items-center gap-1.5">
-              <Monitor className="h-3.5 w-3.5" /> Cashier counter
+              <Monitor className="h-3.5 w-3.5" /> Counter <span className="font-normal text-white/40">(optional)</span>
             </Label>
             <select
               value={counterId}
@@ -352,7 +309,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                   ? "Select branch first…"
                   : counters.length === 0
                     ? "No counters for this branch"
-                    : "Select counter…"}
+                    : "No counter"}
               </option>
               {counters.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -378,8 +335,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
               className="rounded-xl px-3 py-2.5 text-xs space-y-1"
               style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)" }}
             >
-              <p className="font-semibold text-emerald-300">Open shift found on this counter</p>
-              <p style={{ color: "var(--pos-muted)" }}>Continue to sell on the selected branch & counter.</p>
+              <p className="font-semibold text-emerald-300">Your cash wallet is open</p>
+              <p style={{ color: "var(--pos-muted)" }}>Continue selling — cash stays in your wallet until an admin clears it at day end.</p>
             </div>
           ) : (
             <>
@@ -439,13 +396,13 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
 
           <Button
             onClick={() => void handleStart()}
-            disabled={submitting || !activeBranchId || !counterId}
+            disabled={submitting || !activeBranchId}
             data-pos-accent=""
             className="pos-cta w-full h-11 gap-2 font-bold"
             style={{ background: "var(--pos-success-grad)", color: "#ffffff" }}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-            {existingOpen ? "Continue Shift" : "Start Shift"}
+            {existingOpen ? "Continue" : "Start"}
           </Button>
         </div>
       </motion.div>

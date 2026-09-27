@@ -30,7 +30,7 @@ import { assertCreditAvailable } from '@/modules/customers/customer-credit.helpe
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { nanoid } from 'nanoid';
-import { recordSaleCashMovement, findOpenRegister, findAnyOpenRegisterOnBranch, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
+import { recordSaleCashMovement, findOpenRegister, ensureCashierWallet, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
 import {
   assertValidPosPin,
@@ -91,6 +91,8 @@ export class UpdateReloadOperatorDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) digitalCommissionPct?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) physicalCommissionPct?: number;
+  /** Empty string clears the link. */
+  @ApiPropertyOptional() @IsOptional() @IsString() quickPayUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
 }
@@ -174,17 +176,7 @@ export class PosService {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
 
-    let openRegister = counterId
-      ? await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId, counterId)
-      : await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
-    if ((!openRegister || openRegister.status !== CashRegisterStatus.OPEN) && !counterId) {
-      openRegister = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId);
-    }
-    if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
-      throw new BadRequestException(
-        'Open your cash shift before selling (POS → select counter & opening cash)',
-      );
-    }
+    await ensureCashierWallet(this.prisma, tenantId, branchId, cashierId, counterId);
 
     // Invoice number allocated inside the sale transaction (engine) or just before (legacy)
     let invoiceNumber: string | null = null;
@@ -836,9 +828,6 @@ export class PosService {
     if (opts?.cashierId && !opts?.scopeAll) {
       const open = await findOpenRegister(this.prisma, tenantId, branchId, opts.cashierId);
       if (open && dayjs(open.openingTime).isSame(targetDate, 'day')) return open;
-      // PIN switch: use shared terminal float opened by another cashier
-      const shared = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId);
-      if (shared && dayjs(shared.openingTime).isSame(targetDate, 'day')) return shared;
       return this.prisma.cashRegister.findFirst({
         where: {
           tenantId,
@@ -2278,9 +2267,28 @@ export class PosService {
   async updateReloadOperator(tenantId: string, id: string, dto: UpdateReloadOperatorDto) {
     const op = await this.prisma.reloadOperator.findFirst({ where: { id, tenantId } });
     if (!op) throw new NotFoundException('Provider not found');
+    let quickPayUrl: string | null | undefined;
+    if (dto.quickPayUrl !== undefined) {
+      const raw = dto.quickPayUrl.trim();
+      if (!raw) {
+        quickPayUrl = null;
+      } else {
+        let parsed: URL;
+        try {
+          parsed = new URL(raw);
+        } catch {
+          throw new BadRequestException('Quick Pay link must be a valid URL');
+        }
+        if (parsed.protocol !== 'https:') {
+          throw new BadRequestException('Quick Pay link must start with https://');
+        }
+        quickPayUrl = parsed.toString();
+      }
+    }
     return this.prisma.reloadOperator.update({
       where: { id },
       data: {
+        ...(quickPayUrl !== undefined ? { quickPayUrl } : {}),
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.digitalCommissionPct !== undefined ? { digitalCommissionPct: dto.digitalCommissionPct } : {}),
         ...(dto.physicalCommissionPct !== undefined ? { physicalCommissionPct: dto.physicalCommissionPct } : {}),
@@ -2517,7 +2525,7 @@ export class PosService {
     return { ok: true, hasPin: false };
   }
 
-  async unlockWithPosPin(tenantId: string, branchId: string, pin: string, counterId?: string | null) {
+  async unlockWithPosPin(tenantId: string, branchId: string, pin: string, _counterId?: string | null) {
     assertValidPosPin(pin);
     const candidates = await this.prisma.user.findMany({
       where: {
@@ -2551,17 +2559,7 @@ export class PosService {
 
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const ownRegister = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, matched.id);
-    const ownMatchesCounter =
-      !counterId || !ownRegister?.counterId || ownRegister.counterId === counterId;
-    const sharedRegister =
-      ownRegister?.status === CashRegisterStatus.OPEN && ownMatchesCounter
-        ? ownRegister
-        : await findAnyOpenRegisterOnBranch(
-            this.prisma,
-            tenantId,
-            resolvedBranchId,
-            counterId || undefined,
-          );
+    const sharedRegister = ownRegister?.status === CashRegisterStatus.OPEN ? ownRegister : null;
 
     const unlockToken = signPosUnlockToken(tenantId, matched.id);
     const name = `${matched.firstName} ${matched.lastName}`.trim();

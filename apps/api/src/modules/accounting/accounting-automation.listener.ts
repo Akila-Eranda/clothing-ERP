@@ -136,6 +136,18 @@ export class AccountingAutomationListener {
     }
   }
 
+  @OnEvent('cash.wallet.cleared', { async: true })
+  async onCashierWalletCleared(payload: { registerId: string; tenantId: string; clearedById?: string }) {
+    if (!payload?.registerId || !payload?.tenantId) return;
+    try {
+      await this.outbox.enqueue(payload.tenantId, 'CASH_WALLET_CLEAR', payload.registerId, {
+        userId: payload.clearedById,
+      });
+    } catch (err) {
+      this.logger.error(`Wallet clear GL enqueue failed ${payload.registerId}: ${(err as Error).message}`);
+    }
+  }
+
   @OnEvent('accounting.repair.delivered', { async: true })
   async onRepairDelivered(payload: { jobCardId: string; tenantId: string; userId?: string }) {
     if (!payload?.jobCardId || !payload?.tenantId) return;

@@ -1,7 +1,14 @@
 /** Idempotent GL posting for commerce events (sales, GRN, AR/AP, expenses, returns, repairs). */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentMethod, RoleType, SupplierInvoiceStatus } from '@prisma/client';
+import {
+  CashMovementType,
+  CashRegisterStatus,
+  PaymentMethod,
+  RoleType,
+  SupplierInvoiceStatus,
+} from '@prisma/client';
+import { computeExpectedCashFromMovements, walletFloatIssued } from '@/shared/cash-register.helper';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JournalEntriesService } from './journal-entries.service';
 import { AccountingBootstrapService } from './accounting-bootstrap.service';
@@ -20,6 +27,7 @@ type GlLine = { accountId: string; side: GlSide; amount: number; description?: s
 
 export type ResolvedAccounts = {
   cash: string;
+  cashierWallet: string;
   petty: string;
   bank: string;
   card: string;
@@ -120,6 +128,7 @@ export class AccountingPostingService {
 
     return {
       cash,
+      cashierWallet: mapOr('CASHIER_WALLET') ?? cash,
       petty: mapOr('PETTY_CASH') ?? cash,
       bank: bank!,
       card: card!,
@@ -248,6 +257,40 @@ export class AccountingPostingService {
     }
   }
 
+  /**
+   * Whether the cash of a document sits in a cashier wallet on the wallet ledger. Resolved from the
+   * wallet movement carrying the document id; sales may post before that movement is written, so
+   * they fall back to the cashier's wallet that was open when the sale happened.
+   */
+  private async cashInCashierWallet(
+    tenantId: string,
+    reference: string,
+    fallback?: { branchId: string; cashierId?: string | null; at: Date },
+  ): Promise<boolean> {
+    const movement = await this.prisma.cashMovement.findFirst({
+      where: { tenantId, reference },
+      select: { register: { select: { walletGl: true } } },
+    });
+    if (movement) return movement.register.walletGl;
+    if (!fallback?.cashierId) return false;
+    const wallet = await this.prisma.cashRegister.findFirst({
+      where: {
+        tenantId,
+        branchId: fallback.branchId,
+        cashierId: fallback.cashierId,
+        status: CashRegisterStatus.OPEN,
+        openingTime: { lte: fallback.at },
+      },
+      orderBy: { openingTime: 'desc' },
+      select: { walletGl: true },
+    });
+    return wallet?.walletGl ?? false;
+  }
+
+  private withCashAccount(accounts: ResolvedAccounts, inWallet: boolean): ResolvedAccounts {
+    return inWallet ? { ...accounts, cash: accounts.cashierWallet } : accounts;
+  }
+
   private tenderAccount(accounts: ResolvedAccounts, method: PaymentMethod | string): string {
     switch (String(method).toUpperCase()) {
       case 'CASH':
@@ -310,8 +353,18 @@ export class AccountingPostingService {
     });
     if (!sale) return null;
 
-    const accounts = await this.resolveAccounts(tenantId);
-    if (!accounts) return null;
+    const baseAccounts = await this.resolveAccounts(tenantId);
+    if (!baseAccounts) return null;
+    const paidCash = sale.payments.some((p) => String(p.method).toUpperCase() === 'CASH');
+    const accounts = this.withCashAccount(
+      baseAccounts,
+      paidCash &&
+        (await this.cashInCashierWallet(tenantId, sale.id, {
+          branchId: sale.branchId,
+          cashierId: sale.cashierId,
+          at: sale.createdAt,
+        })),
+    );
 
     const bankIds = [
       ...new Set(
@@ -486,8 +539,9 @@ export class AccountingPostingService {
     });
     if (!ret) return null;
 
-    const accounts = await this.resolveAccounts(tenantId);
-    if (!accounts) return null;
+    const baseAccounts = await this.resolveAccounts(tenantId);
+    if (!baseAccounts) return null;
+    const accounts = this.withCashAccount(baseAccounts, await this.cashInCashierWallet(tenantId, ret.id));
 
     const total = round2(ret.refundAmount > 0 ? ret.refundAmount : ret.totalAmount);
     if (total <= 0.009) return null;
@@ -840,8 +894,9 @@ export class AccountingPostingService {
     });
     if (!payment) return null;
 
-    const accounts = await this.resolveAccounts(tenantId);
-    if (!accounts) return null;
+    const baseAccounts = await this.resolveAccounts(tenantId);
+    if (!baseAccounts) return null;
+    const accounts = this.withCashAccount(baseAccounts, await this.cashInCashierWallet(tenantId, payment.id));
 
     const amount = round2(payment.amount);
     if (amount <= 0.009) return null;
@@ -919,8 +974,9 @@ export class AccountingPostingService {
     const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, tenantId } });
     if (!expense) return null;
 
-    const accounts = await this.resolveAccounts(tenantId);
-    if (!accounts) return null;
+    const baseAccounts = await this.resolveAccounts(tenantId);
+    if (!baseAccounts) return null;
+    const accounts = this.withCashAccount(baseAccounts, await this.cashInCashierWallet(tenantId, expense.id));
 
     const amount = round2(expense.amount);
     if (amount <= 0.009) return null;
@@ -945,6 +1001,88 @@ export class AccountingPostingService {
         { accountId: expenseAcct, side: 'DEBIT', amount, description: expense.description },
         { accountId: creditAcct, side: 'CREDIT', amount, description: 'Paid' },
       ],
+    });
+  }
+
+  // ── Cashier wallet cleared to main cash (day end) ────────────────────
+
+  async postCashierWalletClear(registerId: string, tenantId: string, userId = 'system') {
+    const register = await this.prisma.cashRegister.findFirst({
+      where: { id: registerId, tenantId },
+      include: {
+        movements: true,
+        cashier: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!register?.clearedAt) return null;
+
+    const accounts = await this.resolveAccounts(tenantId);
+    if (!accounts) return null;
+
+    let mainCashAcct = accounts.cash;
+    if (register.clearedToAccountId) {
+      const main = await this.prisma.bankAccount.findFirst({
+        where: { id: register.clearedToAccountId, tenantId },
+        select: { glAccountId: true },
+      });
+      if (main?.glAccountId) mainCashAcct = main.glAccountId;
+    }
+
+    const counted = round2(register.clearedAmount ?? 0);
+    const expected = computeExpectedCashFromMovements(register.openingCash, register.movements);
+    const variance = round2(counted - expected);
+    const floatIssued = walletFloatIssued(register.openingCash, register.movements);
+
+    const lines: GlLine[] = [];
+    const push = (accountId: string, amount: number, description: string, debitWhenPositive: boolean) => {
+      const amt = round2(amount);
+      if (Math.abs(amt) <= 0.009) return;
+      const side: GlSide = (amt > 0) === debitWhenPositive ? 'DEBIT' : 'CREDIT';
+      lines.push({ accountId, side, amount: Math.abs(amt), description });
+    };
+
+    if (register.walletGl) {
+      const outRefs = register.movements
+        .filter((m) => m.type === CashMovementType.EXPENSE && m.reference)
+        .map((m) => m.reference as string);
+      const [expenses, payments] = outRefs.length
+        ? await Promise.all([
+            this.prisma.expense.findMany({ where: { tenantId, id: { in: outRefs } }, select: { id: true } }),
+            this.prisma.supplierPayment.findMany({ where: { tenantId, id: { in: outRefs } }, select: { id: true } }),
+          ])
+        : [[], []];
+      const postedOut = new Set([...expenses, ...payments].map((r) => r.id));
+
+      let walletLedger = 0;
+      let untrackedExpense = 0;
+      for (const m of register.movements) {
+        if (m.type === CashMovementType.SALE) walletLedger += m.amount;
+        else if (m.type === CashMovementType.REFUND) walletLedger -= m.amount;
+        else if (m.type === CashMovementType.EXPENSE) {
+          if (m.reference && postedOut.has(m.reference)) walletLedger -= m.amount;
+          else untrackedExpense += m.amount;
+        }
+      }
+
+      push(mainCashAcct, counted - floatIssued, 'Wallet cash to main cash', true);
+      push(accounts.cashierWallet, walletLedger, 'Clear cashier wallet', false);
+      push(accounts.expense, untrackedExpense, 'Wallet cash expenses', true);
+    } else {
+      // Wallet opened before the wallet ledger: its cash was already booked to main cash.
+      push(mainCashAcct, variance, 'Wallet count difference', true);
+    }
+    push(accounts.cashOverShort, variance, variance < 0 ? 'Cash short' : 'Cash over', false);
+
+    const cashierName = register.cashier
+      ? `${register.cashier.firstName} ${register.cashier.lastName}`.trim()
+      : 'cashier';
+
+    return this.post(tenantId, register.branchId, userId, {
+      description: `Cashier wallet cleared · ${cashierName}`,
+      date: register.clearedAt,
+      referenceType: 'CASH_WALLET_CLEAR',
+      referenceId: register.id,
+      lines,
     });
   }
 

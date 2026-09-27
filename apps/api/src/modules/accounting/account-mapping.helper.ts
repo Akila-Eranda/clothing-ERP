@@ -2,6 +2,7 @@
 
 export const ACCOUNT_MAPPING_KEYS = [
   'CASH',
+  'CASHIER_WALLET',
   'PETTY_CASH',
   'BANK',
   'CARD_CLEARING',
@@ -34,6 +35,7 @@ export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
 export const ACCOUNT_MAPPING_LABELS: Record<AccountMappingKey, string> = {
   CASH: 'Cash on Hand',
+  CASHIER_WALLET: 'Cash in Cashier Wallets',
   PETTY_CASH: 'Petty Cash',
   BANK: 'Bank — Main',
   CARD_CLEARING: 'Card Clearing',
@@ -65,6 +67,7 @@ export const ACCOUNT_MAPPING_LABELS: Record<AccountMappingKey, string> = {
 /** Preferred codes first (report-style + legacy compatibility). */
 export const ACCOUNT_MAPPING_CODE_FALLBACKS: Record<AccountMappingKey, string[]> = {
   CASH: ['1100', '1000'],
+  CASHIER_WALLET: ['1105'],
   PETTY_CASH: ['1110', '1010'],
   BANK: ['1200', '1100'],
   CARD_CLEARING: ['1210', '1110', '1200'],

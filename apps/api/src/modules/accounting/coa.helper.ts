@@ -198,6 +198,7 @@ export function defaultCoaSeed(): {
   return [
     { code: '1000', name: 'Current Assets', type: AccountType.ASSET, description: 'Cash and short-term assets' },
     { code: '1100', name: 'Cash on Hand', type: AccountType.ASSET, parentCode: '1000' },
+    { code: '1105', name: 'Cash in Cashier Wallets', type: AccountType.ASSET, parentCode: '1000', description: 'POS cash held by cashiers until day-end clear to main cash' },
     { code: '1110', name: 'Petty Cash', type: AccountType.ASSET, parentCode: '1000' },
     { code: '1200', name: 'Bank — Main', type: AccountType.ASSET, parentCode: '1000' },
     { code: '1210', name: 'Card Clearing', type: AccountType.ASSET, parentCode: '1000', description: 'Card settlement clearing' },

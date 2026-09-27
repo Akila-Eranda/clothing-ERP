@@ -32,6 +32,8 @@ import { formatNumber } from "@/lib/utils";
 import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { parseApiList } from "@/lib/parse-api-list";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 
 type Tab = "accounts" | "cash" | "bank" | "recon";
 
@@ -70,6 +72,25 @@ type BankBookEntry = {
 };
 
 type GlAccount = { id: string; code: string; name: string; type: string };
+
+type CashierWallet = {
+  id: string;
+  status: "OPEN" | "CLOSED" | "PENDING_APPROVAL";
+  cashierName: string;
+  counterName?: string | null;
+  openingTime: string;
+  openingCash: number;
+  expectedCash: number;
+  amountToClear: number;
+};
+
+type WalletsResponse = {
+  mainCash: { id: string; name: string; code: string; balance: number };
+  wallets: CashierWallet[];
+  totalToClear: number;
+};
+
+const WALLET_MANAGER_ROLES = ["BRANCH_MANAGER", "ACCOUNTANT", "INVENTORY_MANAGER"];
 
 type Recon = {
   id: string;
@@ -193,6 +214,14 @@ function AccountsOverviewPanel({
   const [glAccounts, setGlAccounts] = useState<GlAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { user } = useAuthStore();
+  const canClearWallets =
+    bypassesWorkflowApproval(user?.role) || WALLET_MANAGER_ROLES.includes(String(user?.role ?? ""));
+  const [walletData, setWalletData] = useState<WalletsResponse | null>(null);
+  const [clearTarget, setClearTarget] = useState<CashierWallet | null>(null);
+  const [clearCounted, setClearCounted] = useState("");
+  const [clearBusy, setClearBusy] = useState<string | null>(null);
+
   // quick transaction dialog
   const [txnAccount, setTxnAccount] = useState<BankAccount | null>(null);
   const [txnType, setTxnType] = useState<"DEPOSIT" | "WITHDRAWAL">("DEPOSIT");
@@ -221,12 +250,14 @@ function AccountsOverviewPanel({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [b, a] = await Promise.all([
+      const [b, a, w] = await Promise.all([
         api.get<BankAccount[]>("/accounting/bank-accounts"),
         api.get<{ data: GlAccount[] }>("/accounting/accounts?flat=true"),
+        api.get<WalletsResponse>("/cash/wallets").catch(() => null),
       ]);
       setBanks(Array.isArray(b.data) ? b.data : []);
       setGlAccounts(parseApiList(a.data));
+      setWalletData(w?.data ?? null);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to load accounts");
     } finally {
@@ -235,6 +266,51 @@ function AccountsOverviewPanel({
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const wallets = walletData?.wallets ?? [];
+  const walletTotal = walletData?.totalToClear ?? 0;
+  const mainCashName = walletData?.mainCash.name ?? "Main Cash";
+
+  const openClear = (w: CashierWallet) => {
+    setClearTarget(w);
+    setClearCounted(String(w.amountToClear));
+  };
+
+  const clearWallet = async () => {
+    if (!clearTarget) return;
+    const counted = parseFloat(clearCounted);
+    if (!Number.isFinite(counted) || counted < 0) {
+      toast.error("Enter the counted cash");
+      return;
+    }
+    setClearBusy(clearTarget.id);
+    try {
+      await api.post(`/cash/wallets/${clearTarget.id}/clear`, { countedCash: counted });
+      toast.success(`${clearTarget.cashierName}'s wallet cleared to ${mainCashName}`);
+      setClearTarget(null);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to clear wallet");
+    } finally {
+      setClearBusy(null);
+    }
+  };
+
+  const clearAllWallets = async () => {
+    if (wallets.length === 0) return;
+    if (!window.confirm(`Day end: clear all ${wallets.length} cashier wallets (LKR ${formatNumber(walletTotal)}) into ${mainCashName}?`)) return;
+    setClearBusy("ALL");
+    try {
+      const r = await api.post<{ cleared: number; total: number }>("/cash/wallets/clear-all", {});
+      toast.success(`${r.data.cleared} wallet(s) cleared · LKR ${formatNumber(r.data.total)} counted into ${mainCashName}`);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to clear wallets");
+      await load();
+    } finally {
+      setClearBusy(null);
+    }
+  };
 
   const cashAccounts  = useMemo(() => banks.filter((b) => CASH_TYPES.includes(b.type)), [banks]);
   const bankAccounts  = useMemo(() => banks.filter((b) => BANK_TYPES.includes(b.type)), [banks]);
@@ -246,7 +322,7 @@ function AccountsOverviewPanel({
   const cashTotal  = cashAccounts.reduce((s, b) => s + b.currentBalance, 0);
   const bankTotal  = bankAccounts.reduce((s, b) => s + b.currentBalance, 0);
   const otherTotal = otherAccounts.reduce((s, b) => s + b.currentBalance, 0);
-  const totalLiquidity = cashTotal + bankTotal + otherTotal;
+  const totalLiquidity = cashTotal + walletTotal + bankTotal + otherTotal;
 
   const openTxn = (b: BankAccount, type: "DEPOSIT" | "WITHDRAWAL") => {
     setTxnAccount(b);
@@ -354,6 +430,15 @@ function AccountsOverviewPanel({
       tint: "bg-card border-border",
     },
     {
+      label: "Cashier Wallets",
+      value: `LKR ${formatNumber(walletTotal)}`,
+      sub: wallets.length ? `${wallets.length} to clear at day end` : "All cleared",
+      icon: Wallet,
+      color: "text-amber-600",
+      bg: "bg-amber-500/10",
+      tint: "bg-card border-border",
+    },
+    {
       label: "Bank Balances",
       value: `LKR ${formatNumber(bankTotal)}`,
       sub: `${bankAccounts.length} accounts`,
@@ -372,16 +457,81 @@ function AccountsOverviewPanel({
           bg: "bg-teal-500/15",
           tint: "bg-card border-border",
         }]
-      : [{
-          label: "Quick Actions",
-          value: "Ready",
-          sub: "In · Out · Transfer",
-          icon: ArrowLeftRight,
-          color: "text-amber-600",
-          bg: "bg-amber-500/10",
-          tint: "bg-card border-border",
-        }]),
+      : []),
   ];
+
+  const walletSection = walletData && (
+    <div id="cashier-wallets" className="rounded-xl border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b bg-muted/30">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="h-8 w-8 rounded-[10px] flex items-center justify-center bg-amber-500/10 text-amber-600">
+            <Wallet className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">Cashier wallets</h3>
+            <p className="text-[11px] text-muted-foreground truncate">
+              POS cash held by cashiers · cleared into {mainCashName} at day end
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">{wallets.length}</Badge>
+          {canClearWallets && wallets.length > 0 && (
+            <Button size="sm" onClick={() => void clearAllWallets()} disabled={clearBusy !== null} className="h-8 gap-1.5 text-xs">
+              {clearBusy === "ALL" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowDownCircle className="h-3.5 w-3.5" />}
+              Day End · Clear All
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="p-4">
+        {wallets.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">All cashier wallets are cleared into {mainCashName}</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {wallets.map((w) => (
+              <Card key={w.id} className="rounded-xl shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <CardContent className="p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{w.cashierName}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                        Opened {new Date(w.openingTime).toLocaleString("en-LK", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        {w.counterName ? ` · ${w.counterName}` : ""}
+                      </p>
+                    </div>
+                    <TableStatusBadge
+                      status={w.status}
+                      label={w.status === "OPEN" ? "Open" : w.status === "CLOSED" ? "Closed" : "Pending"}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">In wallet</p>
+                    <p className="text-xl font-bold tabular-nums leading-tight">LKR {formatNumber(w.amountToClear)}</p>
+                    {w.openingCash > 0 && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Includes float LKR {formatNumber(w.openingCash)}</p>
+                    )}
+                  </div>
+                  {canClearWallets && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openClear(w)}
+                      disabled={clearBusy !== null}
+                      className="h-9 w-full text-xs gap-1.5"
+                    >
+                      <Landmark className="h-3.5 w-3.5" /> Clear to {mainCashName}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const accountCard = (b: BankAccount) => {
     const negative = b.currentBalance < 0;
@@ -495,10 +645,64 @@ function AccountsOverviewPanel({
 
       <div className="space-y-4">
         {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/10 text-emerald-600", cashAccounts)}
+        {walletSection}
         {section("bank-accounts", "Bank accounts", <Landmark className="h-4 w-4" />, "bg-indigo-500/15 text-indigo-600", bankAccounts)}
         {otherAccounts.length > 0 &&
           section("other-accounts", "Other accounts", <Wallet className="h-4 w-4" />, "bg-teal-500/15 text-teal-600", otherAccounts)}
       </div>
+
+      {/* ── Clear cashier wallet dialog ── */}
+      <Dialog open={!!clearTarget} onOpenChange={(o) => { if (!o && !clearBusy) setClearTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clear wallet — {clearTarget?.cashierName}</DialogTitle>
+            <DialogDescription>
+              Count the cash handed over. It moves into {mainCashName}; any difference is posted to Cash Over / Short.
+            </DialogDescription>
+          </DialogHeader>
+          {clearTarget && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Expected</p>
+                  <p className="font-bold tabular-nums">LKR {formatNumber(clearTarget.amountToClear)}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Difference</p>
+                  {(() => {
+                    const diff = (parseFloat(clearCounted) || 0) - clearTarget.amountToClear;
+                    return (
+                      <p className={`font-bold tabular-nums ${Math.abs(diff) < 0.01 ? "" : diff < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {diff > 0 ? "+" : ""}{formatNumber(diff)}
+                      </p>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Counted cash</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="h-10 tabular-nums"
+                  value={clearCounted}
+                  onChange={(e) => setClearCounted(e.target.value)}
+                  disabled={clearBusy !== null}
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={clearBusy !== null} onClick={() => setClearTarget(null)}>Cancel</Button>
+            <Button onClick={() => void clearWallet()} disabled={clearBusy !== null} className="gap-1.5">
+              {clearBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Landmark className="h-3.5 w-3.5" />}
+              Clear to {mainCashName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Money in / out dialog ── */}
       <Dialog open={!!txnAccount} onOpenChange={(o) => { if (!o) setTxnAccount(null); }}>

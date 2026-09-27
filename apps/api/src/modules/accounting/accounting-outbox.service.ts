@@ -14,7 +14,8 @@ export type OutboxSourceType =
   | 'SUPPLIER_RETURN'
   | 'CUSTOMER_CREDIT_PAYMENT'
   | 'EXPENSE'
-  | 'REPAIR';
+  | 'REPAIR'
+  | 'CASH_WALLET_CLEAR';
 
 @Injectable()
 export class AccountingOutboxService {
@@ -217,6 +218,8 @@ export class AccountingOutboxService {
         return this.posting.postExpense(sourceId, tenantId, String(p.userId ?? 'system'));
       case 'REPAIR':
         return this.posting.postRepair(sourceId, tenantId, String(p.userId ?? 'system'));
+      case 'CASH_WALLET_CLEAR':
+        return this.posting.postCashierWalletClear(sourceId, tenantId, String(p.userId ?? 'system'));
       case 'CUSTOMER_CREDIT_PAYMENT':
         return this.posting.postCustomerCreditPayment({
           tenantId,
