@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart, ExternalLink, X, RotateCw, CheckCircle2 } from "lucide-react";
+import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart, ExternalLink, X, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { CartItem } from "@/types";
@@ -34,7 +34,11 @@ function resolveQuickPayUrl(op: ReloadOperator): string {
   return op.quickPayUrl?.trim() || DEFAULT_QUICK_PAY_URLS[op.code?.toUpperCase()] || "";
 }
 
-function openQuickPayWindow(url: string): boolean {
+/**
+ * Operator sites keep their session in cookies, which browsers block inside a
+ * cross-site iframe — so Quick Pay must run in a real (first-party) popup window.
+ */
+function openQuickPayWindow(url: string): Window | null {
   const w = 480;
   const h = 820;
   const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2));
@@ -44,14 +48,14 @@ function openQuickPayWindow(url: string): boolean {
     "hexa-quick-pay",
     `popup=yes,width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`,
   );
-  if (!win) return false;
+  if (!win) return null;
   try {
     win.opener = null;
     win.focus();
   } catch {
     /* cross-origin — ignore */
   }
-  return true;
+  return win;
 }
 
 type FocusZone = "provider" | "mode" | "phone" | "amount" | "cards" | "submit";
@@ -327,7 +331,50 @@ export function PosReloadPanel({
 
   const quickPayUrl = mode === "DIGITAL" && operator ? resolveQuickPayUrl(operator) : "";
   const [quickPayOpen, setQuickPayOpen] = React.useState(false);
-  const [iframeKey, setIframeKey] = React.useState(0);
+  const quickPayWinRef = React.useRef<Window | null>(null);
+  const [quickPayWinClosed, setQuickPayWinClosed] = React.useState(false);
+
+  const launchQuickPayWindow = React.useCallback(() => {
+    if (!quickPayUrl) return;
+    const existing = quickPayWinRef.current;
+    if (existing && !existing.closed) {
+      try {
+        existing.focus();
+        return;
+      } catch {
+        /* fall through and reopen */
+      }
+    }
+    const win = openQuickPayWindow(quickPayUrl);
+    quickPayWinRef.current = win;
+    setQuickPayWinClosed(!win);
+    if (!win) toast.error("Popup blocked — allow popups for this site, then tap Open again");
+  }, [quickPayUrl]);
+
+  const closeQuickPayWindow = React.useCallback(() => {
+    try {
+      quickPayWinRef.current?.close();
+    } catch {
+      /* ignore */
+    }
+    quickPayWinRef.current = null;
+  }, []);
+
+  React.useEffect(() => {
+    if (!quickPayOpen) return;
+    const t = window.setInterval(() => {
+      const w = quickPayWinRef.current;
+      setQuickPayWinClosed(!w || w.closed);
+    }, 800);
+    return () => window.clearInterval(t);
+  }, [quickPayOpen]);
+
+  React.useEffect(() => () => closeQuickPayWindow(), [closeQuickPayWindow]);
+
+  const cancelQuickPay = React.useCallback(() => {
+    closeQuickPayWindow();
+    setQuickPayOpen(false);
+  }, [closeQuickPayWindow]);
 
   const openQuickPay = React.useCallback(() => {
     if (!operator || !quickPayUrl) return;
@@ -342,15 +389,16 @@ export function PosReloadPanel({
       setFocusZone("phone");
       return;
     }
-    setIframeKey((k) => k + 1);
+    launchQuickPayWindow();
     setQuickPayOpen(true);
-  }, [operator, quickPayUrl, face, phone]);
+  }, [operator, quickPayUrl, face, phone, launchQuickPayWindow]);
 
   const [quickSaleBusy, setQuickSaleBusy] = React.useState(false);
 
   const confirmQuickPay = React.useCallback(async () => {
     if (quickSaleBusy) return;
     if (!onQuickSale) {
+      closeQuickPayWindow();
       setQuickPayOpen(false);
       submit();
       return;
@@ -361,6 +409,7 @@ export function PosReloadPanel({
     try {
       const ok = await onQuickSale(item);
       if (ok) {
+        closeQuickPayWindow();
         setQuickPayOpen(false);
         setPhone("");
         setAmount("");
@@ -368,7 +417,7 @@ export function PosReloadPanel({
     } finally {
       setQuickSaleBusy(false);
     }
-  }, [quickSaleBusy, onQuickSale, submit, buildDigitalItem, setPhone]);
+  }, [quickSaleBusy, onQuickSale, submit, buildDigitalItem, setPhone, closeQuickPayWindow]);
 
   const moveZone = React.useCallback((delta: number) => {
     const idx = zones.indexOf(focusZone);
@@ -749,63 +798,62 @@ export function PosReloadPanel({
           style={{ background: "rgba(0,0,0,0.75)" }}
           onKeyDown={(e) => {
             e.stopPropagation();
-            if (e.key === "Escape") setQuickPayOpen(false);
+            if (e.key === "Escape") cancelQuickPay();
           }}
         >
-          <div
-            className="flex w-full max-w-[520px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-            style={{ height: "min(92vh, 860px)" }}
-          >
+          <div className="flex w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-slate-900">{operator.name} Quick Pay</p>
                 <p className="truncate text-[11px] text-slate-500">
-                  LKR {formatMoney(face)}{phone ? ` · ${phone}` : ""} — complete payment below
+                  Complete the payment in the {operator.name} window
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                title="Cancel"
+                onClick={cancelQuickPay}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 px-5 py-5">
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reload amount</p>
+                <p className="text-3xl font-extrabold text-slate-900">LKR {formatMoney(face)}</p>
+                {phone ? <p className="mt-0.5 text-sm font-semibold text-slate-600">{phone}</p> : null}
+              </div>
+              <ol className="list-decimal space-y-1 pl-5 text-[13px] text-slate-600">
+                <li>In the {operator.name} window, tap <b>Prepaid Reload</b>.</li>
+                <li>Enter the number and amount above, then pay.</li>
+                <li>When payment succeeds, tap <b>Paid — Complete sale</b> here.</li>
+              </ol>
+              <div
+                className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[12px]"
+                style={{
+                  borderColor: quickPayWinClosed ? "#fca5a5" : "#bbf7d0",
+                  background: quickPayWinClosed ? "#fef2f2" : "#f0fdf4",
+                  color: quickPayWinClosed ? "#b91c1c" : "#15803d",
+                }}
+              >
+                <span className="font-semibold">
+                  {quickPayWinClosed ? "Payment window is closed" : "Payment window is open"}
+                </span>
                 <button
                   type="button"
-                  title="Reload page"
-                  onClick={() => setIframeKey((k) => k + 1)}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                  onClick={launchQuickPayWindow}
+                  className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 font-semibold text-slate-700 shadow-sm hover:bg-slate-100"
                 >
-                  <RotateCw className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  title="Open in new window"
-                  onClick={() => {
-                    if (!openQuickPayWindow(quickPayUrl)) {
-                      toast.error("Popup blocked — allow popups for this site");
-                    }
-                  }}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  title="Close"
-                  onClick={() => setQuickPayOpen(false)}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                >
-                  <X className="h-4 w-4" />
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {quickPayWinClosed ? "Open again" : "Show window"}
                 </button>
               </div>
             </div>
-            <iframe
-              key={iframeKey}
-              src={quickPayUrl}
-              title={`${operator.name} Quick Pay`}
-              allow="payment; clipboard-write"
-              referrerPolicy="no-referrer-when-downgrade"
-              className="min-h-0 w-full flex-1 border-0 bg-white"
-            />
             <div className="flex shrink-0 gap-2 border-t bg-slate-50 px-4 py-3">
               <button
                 type="button"
-                onClick={() => setQuickPayOpen(false)}
+                onClick={cancelQuickPay}
                 className="h-11 flex-1 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100"
               >
                 Cancel
