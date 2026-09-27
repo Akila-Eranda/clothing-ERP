@@ -256,7 +256,7 @@ export function ReloadSettingsTab() {
                 <Input
                   type="url"
                   inputMode="url"
-                  placeholder="https://quick-pay.mobitel.lk/quick-pay/prepaid-reload"
+                  placeholder="https://quick-pay.mobitel.lk/quick-pay?ref=..."
                   value={op.quickPayUrl ?? ""}
                   onChange={(e) =>
                     setOperators((list) =>
