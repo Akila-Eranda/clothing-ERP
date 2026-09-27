@@ -86,6 +86,99 @@ function loadAppOrSetup() {
   mainWindow?.loadURL(url)
 }
 
+/** Operator top-up sites the POS may open in-app so the reload form can be auto-filled. */
+const QUICK_PAY_HOSTS = new Set(['quick-pay.mobitel.lk'])
+
+function isQuickPayUrl(raw) {
+  try {
+    return QUICK_PAY_HOSTS.has(new URL(raw).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** POS appends `#hexa-reload=<msisdn>:<amount>` to the Quick Pay link. */
+function parseQuickPayHint(raw) {
+  try {
+    const m = /hexa-reload=(\d{0,15}):(\d+(?:\.\d+)?)/.exec(new URL(raw).hash)
+    if (!m) return null
+    return { msisdn: m[1] || '', amount: m[2] || '' }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Runs inside the Mobitel page: Prepaid Reload → number → arrow → OTHER → amount.
+ * Stops before PROCEED so the cashier confirms the payment.
+ */
+function quickPayAutofillScript(hint) {
+  return `(() => {
+  if (window.__hexaQuickPay) return;
+  window.__hexaQuickPay = true;
+  const d = ${JSON.stringify(hint)};
+  const setVal = (el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(el, v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  let stage = 0;
+  const started = Date.now();
+  const timer = setInterval(() => {
+    if (Date.now() - started > 45000) return clearInterval(timer);
+    const onReload = /prepaid-reload/.test(location.pathname);
+    if (stage === 0) {
+      if (onReload) { stage = 1; return; }
+      const link = document.querySelector('a[href*="prepaid-reload"]');
+      if (link) { link.click(); stage = 1; }
+      return;
+    }
+    if (stage === 1) {
+      const input = document.querySelector('input[name="mobileNumber"]');
+      if (!input) return;
+      if (!d.msisdn) return clearInterval(timer);
+      setVal(input, d.msisdn);
+      stage = 2;
+      setTimeout(() => {
+        const btn = input.closest('form') && input.closest('form').querySelector('button');
+        if (btn) btn.click();
+      }, 350);
+      return;
+    }
+    if (stage === 2) {
+      if (!d.amount) return clearInterval(timer);
+      const other = document.querySelector('button[role="radio"][value="OTHER"]');
+      if (!other) return;
+      other.click();
+      stage = 3;
+      return;
+    }
+    if (stage === 3) {
+      const amt = document.querySelector('input[name="amount"]');
+      if (!amt) return;
+      setVal(amt, String(d.amount));
+      amt.focus();
+      clearInterval(timer);
+    }
+  }, 400);
+})();`
+}
+
+function wireQuickPayWindow(child, openedUrl) {
+  const hint = parseQuickPayHint(openedUrl)
+  child.setTitle('Mobitel Quick Pay')
+  if (!hint) return
+  let injected = false
+  child.webContents.on('did-finish-load', () => {
+    if (injected) return
+    const current = child.webContents.getURL()
+    if (!isQuickPayUrl(current)) return
+    injected = true
+    child.webContents.executeJavaScript(quickPayAutofillScript(hint)).catch(() => {})
+  })
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -126,6 +219,25 @@ function createMainWindow() {
       const currentRaw = mainWindow?.webContents.getURL() || getAppUrl()
       const currentOrigin = new URL(currentRaw).origin
       const next = new URL(target, currentRaw)
+      if (isQuickPayUrl(next.toString())) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 480,
+            height: 820,
+            minWidth: 380,
+            minHeight: 600,
+            title: 'Mobitel Quick Pay',
+            icon: APP_ICON,
+            autoHideMenuBar: true,
+            webPreferences: {
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true,
+            },
+          },
+        }
+      }
       // Keep same-origin popups (Customer Display, etc.) inside Electron so
       // BroadcastChannel / localStorage stay connected to the POS window.
       if (next.origin === currentOrigin) {
@@ -159,9 +271,10 @@ function createMainWindow() {
     return { action: 'deny' }
   })
 
-  mainWindow.webContents.on('did-create-window', (child) => {
+  mainWindow.webContents.on('did-create-window', (child, details) => {
     child.setMenuBarVisibility(false)
     child.setAutoHideMenuBar(true)
+    if (details && isQuickPayUrl(details.url)) wireQuickPayWindow(child, details.url)
     child.webContents.setWindowOpenHandler(({ url: target }) => {
       shell.openExternal(target)
       return { action: 'deny' }

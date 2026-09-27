@@ -335,6 +335,9 @@ export function PosReloadPanel({
   const [quickPayWinClosed, setQuickPayWinClosed] = React.useState(false);
 
   const [numberCopied, setNumberCopied] = React.useState(false);
+  const desktopAutofill =
+    typeof window !== "undefined" &&
+    !!(window as unknown as { hexaDesktop?: { quickPayAutofill?: boolean } }).hexaDesktop?.quickPayAutofill;
 
   /** Operator page can't be pre-filled (cross-origin, no URL param) — clipboard lets the cashier paste. */
   const copyReloadNumber = React.useCallback(async (silent = false) => {
@@ -364,11 +367,13 @@ export function PosReloadPanel({
         /* fall through and reopen */
       }
     }
-    const win = openQuickPayWindow(quickPayUrl);
+    const target = new URL(quickPayUrl);
+    target.hash = `hexa-reload=${digitsOnly(phone)}:${face > 0 ? face : ""}`;
+    const win = openQuickPayWindow(target.toString());
     quickPayWinRef.current = win;
     setQuickPayWinClosed(!win);
     if (!win) toast.error("Popup blocked — allow popups for this site, then tap Open again");
-  }, [quickPayUrl, copyReloadNumber]);
+  }, [quickPayUrl, copyReloadNumber, phone, face]);
 
   const closeQuickPayWindow = React.useCallback(() => {
     try {
@@ -856,12 +861,20 @@ export function PosReloadPanel({
                 ) : null}
               </div>
               <ol className="list-decimal space-y-1 pl-5 text-[13px] text-slate-600">
-                <li>In the {operator.name} window, tap <b>Prepaid Reload</b>.</li>
-                <li>
-                  {phone
-                    ? <>Click the mobile number box and press <b>Ctrl+V</b> (number is already copied), choose LKR {formatMoney(face)}, then pay.</>
-                    : <>Enter the number and choose LKR {formatMoney(face)}, then pay.</>}
-                </li>
+                {desktopAutofill && phone ? (
+                  <li>
+                    The {operator.name} window fills the number and LKR {formatMoney(face)} automatically — check them and tap <b>PROCEED</b> to pay.
+                  </li>
+                ) : (
+                  <>
+                    <li>In the {operator.name} window, tap <b>Prepaid Reload</b>.</li>
+                    <li>
+                      {phone
+                        ? <>Click the mobile number box and press <b>Ctrl+V</b> (number is already copied), choose LKR {formatMoney(face)}, then pay.</>
+                        : <>Enter the number and choose LKR {formatMoney(face)}, then pay.</>}
+                    </li>
+                  </>
+                )}
                 <li>When payment succeeds, tap <b>Paid — Complete sale</b> here.</li>
               </ol>
               <div

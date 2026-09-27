@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('hexaDesktop', {
+  /** Operator Quick Pay windows get the reload number + amount filled in. */
+  quickPayAutofill: true,
   getConfig: () => ipcRenderer.invoke('desktop:get-config'),
   setAppUrl: (appUrl) => ipcRenderer.invoke('desktop:set-app-url', appUrl),
   checkForUpdates: () => ipcRenderer.invoke('desktop:check-updates'),
