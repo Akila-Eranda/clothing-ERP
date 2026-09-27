@@ -26,7 +26,7 @@ export type ReloadOperator = {
 };
 
 const DEFAULT_QUICK_PAY_URLS: Record<string, string> = {
-  MOBITEL: "https://quick-pay.mobitel.lk/quick-pay?ref=01M3GXMPH5MGPSKVY33CZTFXNV",
+  MOBITEL: "https://quick-pay.mobitel.lk/quick-pay/prepaid-reload",
 };
 
 function resolveQuickPayUrl(op: ReloadOperator): string {
