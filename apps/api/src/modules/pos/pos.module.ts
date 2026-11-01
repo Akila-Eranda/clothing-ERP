@@ -3,8 +3,8 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString } from 'class-validator';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -28,6 +28,13 @@ import {
   findPosPriceViolation,
   PosCatalogPriceContext,
 } from '@/modules/pricing/pos-price-guard.helper';
+import {
+  CLIENT_REQUEST_ID_PATTERN,
+  decideSaleReplay,
+  isClientRequestIdConflict,
+  normalizeClientRequestId,
+  saleRequestFingerprint,
+} from './pos-idempotency.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
@@ -131,6 +138,10 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPartialPayment?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() applyTierDiscount?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() helperEmployeeId?: string;
+  /** Idempotency key — one per checkout attempt, re-sent unchanged on retry. */
+  @ApiPropertyOptional({ description: 'Idempotency key (8–64 chars A-Z a-z 0-9 _ -), reused on retry' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class IssueGiftVoucherDto {
@@ -172,6 +183,27 @@ export class PosService {
     return branch.id;
   }
 
+  /**
+   * Existing sale for an idempotency key, in the same shape createSale returns.
+   * Null when the key is unused; ConflictException when it belongs to another cart / cashier / branch.
+   */
+  private async findSaleReplay(
+    tenantId: string,
+    branchId: string,
+    cashierId: string,
+    clientRequestId: string,
+    fingerprint: string,
+  ) {
+    const existing = await this.prisma.sale.findFirst({
+      where: { tenantId, clientRequestId },
+      include: { items: true, payments: true, customer: true },
+    });
+    if (!existing) return null;
+    const decision = decideSaleReplay(existing, { branchId, cashierId, fingerprint });
+    if (decision.kind === 'CONFLICT') throw new ConflictException(decision.reason);
+    return Object.assign(existing, { idempotentReplay: true as const });
+  }
+
   async createSale(
     tenantId: string,
     branchId: string,
@@ -181,6 +213,14 @@ export class PosService {
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
+
+    // Idempotency: a retry with the same key returns the original sale with no new side effects.
+    const clientRequestId = normalizeClientRequestId(dto.clientRequestId);
+    const requestFingerprint = clientRequestId ? saleRequestFingerprint(dto) : null;
+    if (clientRequestId) {
+      const replay = await this.findSaleReplay(tenantId, branchId, cashierId, clientRequestId, requestFingerprint!);
+      if (replay) return replay;
+    }
 
     await ensureCashierWallet(this.prisma, tenantId, branchId, cashierId, counterId);
 
@@ -464,7 +504,7 @@ export class PosService {
       throw new BadRequestException('One or more bank accounts are invalid or inactive');
     }
 
-    const sale = await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       await this.inventoryService.assertSaleStockAvailable(
         tenantId,
         branchId,
@@ -489,6 +529,7 @@ export class PosService {
           helperName,
           helperCommission,
           invoiceNumber: resolvedInvoice,
+          clientRequestId,
           status: SaleStatus.COMPLETED,
           subtotal,
           discountAmount: totalDiscount,
@@ -510,6 +551,7 @@ export class PosService {
             partialBalance: isPartial ? amountDue - totalPaid : 0,
             helperCommission,
             ...(priceOverrides.length ? { priceOverrides } : {}),
+            ...(requestFingerprint ? { requestFingerprint } : {}),
           },
           items: {
             create: dto.items.map((item) => {
@@ -711,7 +753,19 @@ export class PosService {
       }
 
       return created;
-    });
+    })
+      .then((created) => ({ created, replay: null }))
+      .catch(async (e: unknown) => {
+        // Concurrent retry lost the race on the unique key: the whole transaction rolled back
+        // (no stock / payments written), so return the sale the other request created.
+        if (clientRequestId && isClientRequestIdConflict(e)) {
+          const replay = await this.findSaleReplay(tenantId, branchId, cashierId, clientRequestId, requestFingerprint!);
+          if (replay) return { created: null, replay };
+        }
+        throw e;
+      });
+    if (outcome.replay) return outcome.replay;
+    const sale = outcome.created!;
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
     void recordSaleCashMovement(

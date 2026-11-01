@@ -1,12 +1,15 @@
 /**
- * POS integration: server-side price guard + decimal quantities + FEFO lot deduction.
+ * POS integration: server-side price guard, decimal quantities, FEFO lot deduction and
+ * sale idempotency (clientRequestId).
  * Runs PosService against a real PostgreSQL database (DATABASE_URL), no Redis / Keycloak.
  * Schema must exist: `npx prisma db push --skip-generate` on an empty test database.
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { BadRequestException } from '@nestjs/common';
+import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { PaymentMethod, ProductKind, RoleType, StockMovementType } from '@prisma/client';
 import databaseConfig from '../src/config/database.config';
 import appConfig from '../src/config/app.config';
@@ -322,6 +325,100 @@ describe('POS price guard & decimal quantities (integration)', () => {
         ['SUGAR-A', 0],
         ['SUGAR-B', 4],
       ]);
+    });
+  });
+
+  describe('sale idempotency (clientRequestId)', () => {
+    const key = (label: string) => `it-${run}-${label}`;
+    const withKey = (dto: CreateSaleDto, k: string) => ({ ...dto, clientRequestId: k }) as CreateSaleDto;
+    const completedEvents = () =>
+      emitSpy.mock.calls.filter(([event]) => event === 'pos.sale.completed').length;
+    let emitSpy: jest.SpyInstance;
+
+    beforeAll(() => {
+      emitSpy = jest.spyOn(moduleRef.get(EventEmitter2), 'emit');
+    });
+    afterAll(() => emitSpy.mockRestore());
+
+    it('returns the original sale on retry without charging or deducting stock twice', async () => {
+      const k = key('retry');
+      const [stock, count, events] = [await onHand(milk), await saleCount(), completedEvents()];
+
+      const first = await pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 2, 100)]), k));
+      const second = await pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 2, 100)]), k));
+
+      expect(second.id).toBe(first.id);
+      expect(second.invoiceNumber).toBe(first.invoiceNumber);
+      expect((second as { idempotentReplay?: boolean }).idempotentReplay).toBe(true);
+      expect((first as { idempotentReplay?: boolean }).idempotentReplay).toBeUndefined();
+      expect(second.items).toHaveLength(1);
+      expect(second.payments).toHaveLength(1);
+      expect(await saleCount()).toBe(count + 1);
+      expect(await onHand(milk)).toBe(stock - 2);
+      expect(await prisma.salePayment.count({ where: { saleId: first.id } })).toBe(1);
+      expect(completedEvents()).toBe(events + 1);
+    });
+
+    it('creates exactly one sale when the same request races in parallel', async () => {
+      const k = key('race');
+      // Warm the INVOICE number series: its first-ever creation has its own (pre-existing) race.
+      await pos.createSale(tenantId, branchId, cashierId, saleDto([line(milk, 1, 100)]));
+      const [stock, count] = [await onHand(milk), await saleCount()];
+
+      const results = await Promise.all(
+        [1, 2, 3].map(() =>
+          pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 1, 100)]), k)),
+        ),
+      );
+
+      expect(new Set(results.map((r) => r.id)).size).toBe(1);
+      expect(await saleCount()).toBe(count + 1);
+      expect(await onHand(milk)).toBe(stock - 1);
+      expect(await prisma.sale.count({ where: { tenantId, clientRequestId: k } })).toBe(1);
+    });
+
+    it('rejects reusing a key for a different cart with 409', async () => {
+      const k = key('reuse');
+      await pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 1, 100)]), k));
+      const count = await saleCount();
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 3, 100)]), k)),
+      ).rejects.toThrow(ConflictException);
+      expect(await saleCount()).toBe(count);
+    });
+
+    it('rejects a key already used by another cashier with 409', async () => {
+      const k = key('cashier');
+      await pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 1, 100)]), k));
+      await expect(
+        pos.createSale(tenantId, branchId, managerId, withKey(saleDto([line(milk, 1, 100)]), k)),
+      ).rejects.toThrow(/another cashier/);
+    });
+
+    it('does not burn the key when the first attempt fails validation', async () => {
+      const k = key('fix');
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 1, 10)]), k)),
+      ).rejects.toThrow(/below cost/);
+      const sale = await pos.createSale(tenantId, branchId, cashierId, withKey(saleDto([line(milk, 1, 100)]), k));
+      expect(sale.clientRequestId).toBe(k);
+    });
+
+    it('keeps old behaviour when no key is sent (two identical submits = two sales)', async () => {
+      const count = await saleCount();
+      await pos.createSale(tenantId, branchId, cashierId, saleDto([line(milk, 1, 100)]));
+      await pos.createSale(tenantId, branchId, cashierId, saleDto([line(milk, 1, 100)]));
+      expect(await saleCount()).toBe(count + 2);
+    });
+
+    it('validates the key format at the DTO layer', async () => {
+      const errors = async (clientRequestId: unknown) =>
+        (await validate(plainToInstance(CreateSaleDto, { items: [], payments: [], clientRequestId })))
+          .map((e) => e.property);
+      expect(await errors('3f2b8c1e-9a4d-4c7e-8b1a-2d3e4f5a6b7c')).not.toContain('clientRequestId');
+      expect(await errors(undefined)).not.toContain('clientRequestId');
+      expect(await errors('bad key!')).toContain('clientRequestId');
+      expect(await errors('x'.repeat(65))).toContain('clientRequestId');
     });
   });
 

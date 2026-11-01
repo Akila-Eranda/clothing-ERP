@@ -1767,6 +1767,8 @@ model Sale {
   isReturn          Boolean       @default(false)
   originalSaleId    String?
   terminalId        String?
+  /// POS idempotency key (one per checkout attempt); retries with the same key return the original sale.
+  clientRequestId   String?
   metadata          Json          @default("{}")
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -1781,6 +1783,7 @@ model Sale {
   returns           Return[]
 
   @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId])
   @@index([branchId])
   @@index([customerId])

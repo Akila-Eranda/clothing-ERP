@@ -84,6 +84,7 @@ import {
 } from "@/lib/pos-weight";
 import type { CartItem, Customer } from "@/types";
 import { parseApiList } from "@/lib/parse-api-list";
+import { checkoutRequestKey, checkoutSignature, clearCheckoutRequestKey } from "@/lib/pos-checkout-key";
 
 interface POSOverlayProps {
   /** Cashier mode â€” no ERP shell; exit returns to POS landing only. */
@@ -2100,7 +2101,10 @@ ${receiptSoftwareCreditHtml()}
         ...(helperEmployeeId ? { helperEmployeeId } : {}),
         ...(activeHeldBillId?{heldBillId:activeHeldBillId}:{}),
       };
-      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;amountPaid?:number;paymentStatus?:string}>("/pos/sale",payload);
+      // Same cart retried (double click / timeout / reload) re-sends the same key → API returns the original sale.
+      const clientRequestId = checkoutRequestKey(checkoutSignature(payload));
+      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;amountPaid?:number;paymentStatus?:string;idempotentReplay?:boolean}>("/pos/sale",{...payload, clientRequestId});
+      clearCheckoutRequestKey();
       const s=res.data;
       const saleTotal = Number(s.total) || totalAmt;
       const cashTendered =
@@ -2222,7 +2226,8 @@ ${receiptSoftwareCreditHtml()}
       void refreshPrinterStatus();
       const partialNote = s.paymentStatus === "PENDING" ? " (partial â€” balance on account)" : "";
       const changeNote = resolvedChangeDue > 0.009 ? ` Â· Change LKR ${formatNumber(resolvedChangeDue)}` : "";
-      toast.success(`Sale complete Â· ${s.invoiceNumber} â€” ${payState.currency} ${saleTotal.toLocaleString()}${partialNote}${changeNote}`,{duration:3500});
+      const replayNote = s.idempotentReplay ? " (already recorded — not charged twice)" : "";
+      toast.success(`Sale complete Â· ${s.invoiceNumber} â€” ${payState.currency} ${saleTotal.toLocaleString()}${partialNote}${changeNote}${replayNote}`,{duration:3500});
     } catch(e:unknown){
       const msg=(e as Error).message??"Checkout failed";
       toast.error(msg);
@@ -2238,7 +2243,7 @@ ${receiptSoftwareCreditHtml()}
     const amount = Math.round(item.unitPrice * item.quantity * 100) / 100;
     if (!(amount > 0)) { toast.error("Reload amount must be greater than 0"); return false; }
     try {
-      const res = await api.post<{ invoiceNumber: string; total: number; changeDue: number }>("/pos/sale", {
+      const reloadPayload = {
         customerId: customer?.id,
         items: [{
           isCustom: true,
@@ -2261,7 +2266,17 @@ ${receiptSoftwareCreditHtml()}
         discountAmount: 0,
         applyTierDiscount: false,
         notes: "Quick Pay reload",
+      };
+      // Double tap on the same top-up re-sends the same key; the mobile number keeps different top-ups apart.
+      const clientRequestId = checkoutRequestKey(
+        `${checkoutSignature(reloadPayload)}|${item.reloadMsisdn ?? ""}`,
+        "reload",
+      );
+      const res = await api.post<{ invoiceNumber: string; total: number; changeDue: number }>("/pos/sale", {
+        ...reloadPayload,
+        clientRequestId,
       });
+      clearCheckoutRequestKey("reload");
       const s = res.data;
       const saleTotal = Number(s.total) || amount;
       setThankYouSale({
