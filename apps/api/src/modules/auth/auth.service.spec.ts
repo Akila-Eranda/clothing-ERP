@@ -28,6 +28,13 @@ const mockPrisma = {
   session: { create: jest.fn(), deleteMany: jest.fn(), updateMany: jest.fn() },
   passwordReset: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
   activityLog: { create: jest.fn() },
+  // login() syncs system role permission packs via ensureSystemRoles()
+  permission: { findMany: jest.fn().mockResolvedValue([]) },
+  role: { upsert: jest.fn().mockResolvedValue({ id: 'role-1' }) },
+  rolePermission: {
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
+  },
 };
 
 const mockJwtService = {
