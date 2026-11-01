@@ -145,8 +145,8 @@ function FashionPulseStrip() {
                 .catch(() => ({ data: [] }))
             : Promise.resolve({ data: [] as { status?: string }[] }),
         ]);
-        const reorder = parseApiList(reorderRes.data);
-        const fittings = parseApiList(fittingRes.data);
+        const reorder = parseApiList<{ demandLevel?: string }>(reorderRes.data);
+        const fittings = parseApiList<{ status?: string }>(fittingRes.data);
         if (cancelled) return;
         setMetrics({
           reorderHigh: reorder.filter((r) => (r.demandLevel || "").toUpperCase() === "HIGH").length,
