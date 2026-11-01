@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -31,7 +31,7 @@ export class UpdateWarehouseDto {
 
 export class WarehouseTransferItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) requestedQty: number;
+  @ApiProperty() @IsNumber() @Min(0.001) requestedQty: number;
 }
 
 export class CreateWarehouseTransferDto {

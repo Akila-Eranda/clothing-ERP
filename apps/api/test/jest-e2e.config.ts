@@ -8,6 +8,9 @@ const config: Config = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/../src/$1',
+    '^nanoid$': '<rootDir>/shims/nanoid.ts',
+    '^@prisma/client$': '<rootDir>/../node_modules/.prisma/client',
+    '^@prisma/client/(.*)$': '<rootDir>/../node_modules/.prisma/client/$1',
   },
 };
 

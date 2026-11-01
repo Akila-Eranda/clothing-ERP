@@ -102,6 +102,12 @@ function calculateEAN13CheckDigit(code: string): number {
   return (10 - (sum % 10)) % 10;
 }
 
+/** Parse a stock quantity input — decimals allowed for kg / L goods, rounded to 3 dp. */
+export function parseQty(value: string, fallback = 0): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : fallback;
+}
+
 export function calculateTax(amount: number, taxRate: number): number {
   return Math.round((amount * taxRate) / 100 * 100) / 100;
 }

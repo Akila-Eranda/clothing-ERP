@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsInt, Min, IsArray, ValidateNested,
+  IsString, IsOptional, IsNumber, IsEnum, Min, IsArray, ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -22,13 +22,13 @@ export class AdjustStockDto {
 
 export class TransferItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) requestedQty: number;
+  @ApiProperty() @IsNumber() @Min(0.001) requestedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsString() lotId?: string;
 }
 
 export class LotAdjustDto {
   @ApiProperty() @IsString() lotId: string;
-  @ApiProperty() @IsInt() quantity: number;
+  @ApiProperty() @IsNumber() quantity: number;
   @ApiProperty({ enum: StockMovementType }) @IsEnum(StockMovementType) movementType: StockMovementType;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }

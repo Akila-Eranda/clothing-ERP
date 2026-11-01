@@ -10,7 +10,7 @@ import { modalFooterButtonClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, parseQty } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
@@ -541,11 +541,11 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <input
-                              type="number"
-                              min={1}
+                              type="number" step="any"
+                              min={0}
                               value={item.quantity}
                               onChange={(e) =>
-                                updateLine(idx, "quantity", Math.max(1, parseInt(e.target.value, 10) || 1))
+                                updateLine(idx, "quantity", Math.max(0.001, parseQty(e.target.value, 1)))
                               }
                               className="w-20 text-right text-sm border rounded-lg px-2 py-1.5 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />

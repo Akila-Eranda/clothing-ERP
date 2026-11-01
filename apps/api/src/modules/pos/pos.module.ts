@@ -22,6 +22,12 @@ import {
   breakdownCartLine,
   resolveUnitPrice,
 } from '@/modules/pricing/pricing.helper';
+import {
+  canOverridePosPrice,
+  describePosPriceViolation,
+  findPosPriceViolation,
+  PosCatalogPriceContext,
+} from '@/modules/pricing/pos-price-guard.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
@@ -43,7 +49,7 @@ import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() unitPrice: number;
   @ApiProperty() @IsString() productName: string;
   @ApiProperty() @IsString() variantName: string;
@@ -202,10 +208,26 @@ export class PosService {
           .map((i) => i.variantId!.trim()),
       ),
     ];
+    const priceOverrides: Array<{ variantId: string; unitPrice: number; limit: number; kind: string }> = [];
     if (catalogVariantIds.length > 0) {
       const found = await this.prisma.productVariant.findMany({
         where: { id: { in: catalogVariantIds }, product: { tenantId } },
-        select: { id: true },
+        select: {
+          id: true,
+          sellingPrice: true,
+          costPrice: true,
+          mrp: true,
+          product: {
+            select: {
+              sellingPrice: true,
+              wholesalePrice: true,
+              costPrice: true,
+              mrp: true,
+              productKind: true,
+              unit: true,
+            },
+          },
+        },
       });
       const foundIds = new Set(found.map((v) => v.id));
       const missing = dto.items.filter(
@@ -222,6 +244,51 @@ export class PosService {
         throw new BadRequestException(
           `Cart has products no longer in catalog (${labels}${more}). Clear the cart and re-add items.`,
         );
+      }
+
+      // Server is the price authority: cost comes from the catalog, and cashier-entered prices
+      // must stay between cost and the highest known price (MRP / selling / PO) unless a
+      // manager or admin is the acting cashier.
+      const purchasePrices = await this.attachPurchasePriceOptions(tenantId, catalogVariantIds);
+      const priceCtx = new Map<string, PosCatalogPriceContext>();
+      for (const v of found) {
+        const po = purchasePrices.get(v.id) ?? [];
+        const unit = (v.product.unit ?? '').trim().toLowerCase();
+        priceCtx.set(v.id, {
+          knownPrices: [
+            v.sellingPrice,
+            v.product.sellingPrice,
+            v.product.wholesalePrice,
+            ...po.map((p) => p.sellingPrice),
+          ],
+          mrp: Math.max(v.mrp ?? 0, v.product.mrp ?? 0, ...po.map((p) => p.mrp ?? 0)),
+          costPrice: v.costPrice > 0 ? v.costPrice : v.product.costPrice,
+          isWeighted:
+            v.product.productKind === 'WEIGHTED' ||
+            ['kg', 'g', 'gram', 'grams', 'kilogram', 'kilograms'].includes(unit),
+        });
+      }
+
+      const cashierRoles = await this.prisma.userRole.findMany({
+        where: { userId: cashierId, user: { tenantId } },
+        select: { role: { select: { type: true } } },
+      });
+      const canOverride = canOverridePosPrice(cashierRoles.map((r) => r.role.type));
+
+      for (const item of dto.items) {
+        if (item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-')) continue;
+        const ctx = priceCtx.get(item.variantId.trim());
+        if (!ctx) continue;
+        item.costPrice = ctx.costPrice;
+        if (item.reloadType) continue;
+        const violation = findPosPriceViolation(item, ctx);
+        if (!violation) continue;
+        if (!canOverride) {
+          throw new BadRequestException(
+            describePosPriceViolation(item.productName?.trim() || item.sku, violation),
+          );
+        }
+        priceOverrides.push({ variantId: item.variantId.trim(), ...violation });
       }
     }
 
@@ -442,6 +509,7 @@ export class PosService {
             paymentSummary: buildPaymentsSummary(paymentMethods),
             partialBalance: isPartial ? amountDue - totalPaid : 0,
             helperCommission,
+            ...(priceOverrides.length ? { priceOverrides } : {}),
           },
           items: {
             create: dto.items.map((item) => {

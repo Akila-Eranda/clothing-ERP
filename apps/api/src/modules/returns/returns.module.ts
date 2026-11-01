@@ -4,7 +4,7 @@ import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsEnum, IsArray, IsBoolean, IsOptional, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
+import { IsString, IsEnum, IsArray, IsBoolean, IsOptional, IsNumber, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReturnReason, ReturnStatus, StockMovementType, Prisma } from '@prisma/client';
@@ -24,13 +24,13 @@ import { DocumentNumberingService } from '@/modules/document-numbering/document-
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
 }
 
 export class ExchangeItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
   @ApiPropertyOptional() @IsOptional() @IsString() productName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() variantName?: string;
