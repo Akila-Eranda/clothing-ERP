@@ -2,9 +2,14 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min, IsInt, IsBoolean } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CustomerTier, Gender, NotificationChannel, CreditReminderStatus } from '@prisma/client';
+import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min, IsInt, IsBoolean, Max, MaxLength, IsIn, NotEquals } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { CustomerTier, Gender, NotificationChannel, CreditReminderStatus, PaymentMethod } from '@prisma/client';
+import {
+  assertFinancialAuthority,
+  MAX_MANUAL_LOYALTY_ADJUST,
+  MAX_MANUAL_WALLET_TOPUP,
+} from '@/shared/security/financial-authority';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -26,9 +31,62 @@ export class CreateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() tags?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) creditLimit?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) creditDays?: number;
+}
+
+/** Profile edits only. Balances (wallet, loyalty, credit, totals), tier and tenant are never writable here. */
+export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {}
+
+/** Plain profile columns copied as-is on update (dates and credit limit are handled separately). */
+const CUSTOMER_PROFILE_FIELDS = [
+  'firstName', 'lastName', 'phone', 'email', 'gender', 'address', 'city', 'notes', 'tags', 'creditDays',
+] as const;
+
+export class CustomerCreditNoteDto {
+  @ApiProperty() @IsNumber() @Min(0.01) @Max(MAX_MANUAL_WALLET_TOPUP) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) referenceId?: string;
+}
+
+export class WalletTopUpDto {
+  @ApiProperty() @IsNumber() @Min(0.01) @Max(MAX_MANUAL_WALLET_TOPUP) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+}
+
+export class LoyaltyAdjustDto {
+  /** Positive to add, negative to deduct. */
+  @ApiProperty() @IsInt() @Min(-MAX_MANUAL_LOYALTY_ADJUST) @Max(MAX_MANUAL_LOYALTY_ADJUST) @NotEquals(0) points: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+}
+
+export const CREDIT_PAYMENT_METHODS = [
+  PaymentMethod.CASH,
+  PaymentMethod.CARD,
+  PaymentMethod.UPI,
+  PaymentMethod.QR,
+  PaymentMethod.BANK_TRANSFER,
+  PaymentMethod.CHEQUE,
+] as const;
+
+export class CreditPaymentDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @ApiPropertyOptional({ enum: CREDIT_PAYMENT_METHODS })
+  @IsOptional() @IsIn(CREDIT_PAYMENT_METHODS) paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() applyFromWallet?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) chequeBankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+}
+
+export class CreditLimitDto {
+  @ApiProperty() @IsNumber() @Min(0) @Max(1_000_000_000) creditLimit: number;
+}
+
+export class CreditDaysDto {
+  @ApiProperty() @IsInt() @Min(0) @Max(3650) creditDays: number;
 }
 
 export class CreateCreditScheduleDto {
@@ -180,13 +238,22 @@ export class CustomersService {
     return this.prisma.customer.findFirst({ where: { phone, tenantId } });
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateCustomerDto>) {
-    await this.findOne(id, tenantId);
-    const data: Record<string, unknown> = { ...dto };
-    if (dto.creditLimit !== undefined && dto.creditLimit < 0) {
-      throw new BadRequestException('Credit limit cannot be negative');
+  async update(id: string, tenantId: string, dto: UpdateCustomerDto, actorRoles: string[] = []) {
+    const customer = await this.findOne(id, tenantId);
+    const data: Record<string, unknown> = {};
+    for (const key of CUSTOMER_PROFILE_FIELDS) {
+      if (dto[key] !== undefined) data[key] = dto[key];
     }
-    return this.prisma.customer.update({ where: { id }, data: data as object });
+    if (dto.dateOfBirth !== undefined) data.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
+    if (dto.anniversary !== undefined) data.anniversary = dto.anniversary ? new Date(dto.anniversary) : null;
+    if (dto.creditLimit !== undefined && Math.abs(dto.creditLimit - customer.creditLimit) > 0.001) {
+      assertFinancialAuthority(actorRoles, 'Changing a credit limit');
+      if (dto.creditLimit < customer.creditBalance) {
+        throw new BadRequestException('Credit limit cannot be less than outstanding balance');
+      }
+      data.creditLimit = dto.creditLimit;
+    }
+    return this.prisma.customer.update({ where: { id: customer.id }, data });
   }
 
   async receiveCreditPayment(
@@ -238,8 +305,12 @@ export class CustomersService {
 
   async addLoyaltyPoints(id: string, tenantId: string, points: number, description: string) {
     await assertShopModule(this.prisma, tenantId, 'loyalty');
+    const customer = await this.findOne(id, tenantId);
+    if (customer.loyaltyPoints + points < 0) {
+      throw new BadRequestException(`Customer has only ${customer.loyaltyPoints} points`);
+    }
     return this.prisma.$transaction([
-      this.prisma.customer.update({ where: { id }, data: { loyaltyPoints: { increment: points } } }),
+      this.prisma.customer.update({ where: { id: customer.id }, data: { loyaltyPoints: { increment: points } } }),
       this.prisma.loyaltyTransaction.create({
         data: { customerId: id, tenantId, points, type: 'MANUAL', description },
       }),
@@ -481,8 +552,9 @@ export class CustomersController {
   createCreditNote(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body() body: { amount: number; description?: string; referenceId?: string },
+    @Body() body: CustomerCreditNoteDto,
   ) {
+    assertFinancialAuthority(user.roles, 'Issuing a credit note');
     return this.creditService.createCreditNote(id, user.tenantId, body);
   }
 
@@ -494,20 +566,32 @@ export class CustomersController {
 
   @Put(':id')
   @RequirePermissions('customers:update')
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateCustomerDto>) {
-    return this.customersService.update(id, user.tenantId, dto);
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateCustomerDto) {
+    return this.customersService.update(id, user.tenantId, dto, user.roles);
   }
 
   @Post(':id/wallet/topup')
   @RequirePermissions('customers:update')
-  topUpWallet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { amount: number; description?: string }) {
-    return this.customersService.topUpWallet(id, user.tenantId, body.amount, body.description ?? 'Manual top-up');
+  topUpWallet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: WalletTopUpDto) {
+    assertFinancialAuthority(user.roles, 'Manual wallet top-up');
+    return this.customersService.topUpWallet(
+      id,
+      user.tenantId,
+      body.amount,
+      `${body.description ?? 'Manual top-up'} (by ${user.email})`,
+    );
   }
 
   @Post(':id/loyalty/add')
   @RequirePermissions('customers:update')
-  addLoyaltyPoints(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { points: number; description?: string }) {
-    return this.customersService.addLoyaltyPoints(id, user.tenantId, body.points, body.description ?? 'Manual adjustment');
+  addLoyaltyPoints(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: LoyaltyAdjustDto) {
+    assertFinancialAuthority(user.roles, 'Manual loyalty adjustment');
+    return this.customersService.addLoyaltyPoints(
+      id,
+      user.tenantId,
+      body.points,
+      `${body.description ?? 'Manual adjustment'} (by ${user.email})`,
+    );
   }
 
   @Post(':id/credit/payment')
@@ -516,15 +600,7 @@ export class CustomersController {
   receiveCreditPayment(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body() body: {
-      amount: number;
-      description?: string;
-      paymentMethod?: string;
-      applyFromWallet?: boolean;
-      chequeNumber?: string;
-      chequeBankName?: string;
-      chequeDueDate?: string;
-    },
+    @Body() body: CreditPaymentDto,
   ) {
     return this.customersService.receiveCreditPayment(
       id,
@@ -546,14 +622,15 @@ export class CustomersController {
   @Put(':id/credit/limit')
   @RequirePermissions('customers:update')
   @ApiOperation({ summary: 'Set customer credit limit' })
-  setCreditLimit(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { creditLimit: number }) {
+  setCreditLimit(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: CreditLimitDto) {
+    assertFinancialAuthority(user.roles, 'Changing a credit limit');
     return this.customersService.setCreditLimit(id, user.tenantId, body.creditLimit);
   }
 
   @Put(':id/credit/days')
   @RequirePermissions('customers:update')
   @ApiOperation({ summary: 'Set customer credit payment terms (days)' })
-  setCreditDays(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { creditDays: number }) {
+  setCreditDays(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: CreditDaysDto) {
     return this.customersService.setCreditDays(id, user.tenantId, body.creditDays);
   }
 

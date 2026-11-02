@@ -11,7 +11,9 @@ import {
   AdjustStockDto,
   CreateTransferDto,
   LotAdjustDto,
+  TransferStatusDto,
 } from './inventory.dto';
+import { OptionalNotesDto } from '@/common/dto/notes.dto';
 
 @ApiTags('Inventory')
 @ApiBearerAuth('access-token')
@@ -106,8 +108,8 @@ export class InventoryController {
   @Post('cycle-count')
   @RequirePermissions('inventory:create')
   @ApiOperation({ summary: 'Start cycle count session' })
-  startCycleCount(@CurrentUser() user: IAuthUser, @Body('notes') notes?: string) {
-    return this.inventoryService.createStockCountSession(user.tenantId, user.branchId ?? '', user.id, notes);
+  startCycleCount(@CurrentUser() user: IAuthUser, @Body() body: OptionalNotesDto) {
+    return this.inventoryService.createStockCountSession(user.tenantId, user.branchId ?? '', user.id, body.notes);
   }
 
   @Get('cycle-count')
@@ -200,8 +202,8 @@ export class InventoryController {
   updateTransferStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('status') status: TransferStatus,
+    @Body() body: TransferStatusDto,
   ) {
-    return this.inventoryService.updateTransferStatus(id, user.tenantId, status, user.id, user.roles);
+    return this.inventoryService.updateTransferStatus(id, user.tenantId, body.status, user.id, user.roles);
   }
 }

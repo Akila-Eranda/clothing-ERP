@@ -3,7 +3,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpS
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { IsString, IsOptional, IsBoolean } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -21,6 +21,10 @@ export class CreateBranchDto {
   @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
 }
+
+export class UpdateBranchDto extends PartialType(CreateBranchDto) {}
+
+const BRANCH_UPDATABLE_FIELDS = ['name', 'code', 'address', 'city', 'state', 'phone', 'email', 'isDefault'] as const;
 
 @Injectable()
 export class BranchesService {
@@ -66,9 +70,13 @@ export class BranchesService {
     return branch;
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateBranchDto>) {
+  async update(id: string, tenantId: string, dto: UpdateBranchDto) {
     await this.findOne(id, tenantId);
-    return this.prisma.branch.update({ where: { id }, data: dto as object });
+    const data: Record<string, unknown> = {};
+    for (const key of BRANCH_UPDATABLE_FIELDS) {
+      if (dto[key] !== undefined) data[key] = dto[key];
+    }
+    return this.prisma.branch.update({ where: { id }, data });
   }
 
   async remove(id: string, tenantId: string) {
@@ -101,7 +109,7 @@ export class BranchesController {
 
   @Put(':id')
   @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateBranchDto>) {
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateBranchDto) {
     return this.branchesService.update(id, user.tenantId, dto);
   }
 

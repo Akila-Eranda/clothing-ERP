@@ -3,7 +3,7 @@ import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength, MaxLength, IsEnum, IsNumber, IsArray, IsBoolean } from 'class-validator';
 import {
   DEFAULT_SUBSCRIPTION_PLANS,
   PLATFORM_CONFIG_SUBDOMAIN,
@@ -197,6 +197,15 @@ export class RegisterTenantDto {
   @IsOptional()
   @IsEnum(ShopType)
   shopType?: ShopType;
+}
+
+/** Shop owner's own profile (PUT /tenants/me). Plan, limits, status and subdomain are platform-only. */
+export class UpdateTenantProfileDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) companyName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) country?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) currency?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) timezone?: string;
 }
 
 export class UpdateTenantAdminDto {
@@ -970,7 +979,7 @@ export class TenantsService {
     return { workspaces };
   }
 
-  async update(id: string, dto: Partial<RegisterTenantDto>) {
+  async update(id: string, dto: UpdateTenantProfileDto) {
     return this.prisma.tenant.update({
       where: { id },
       data: {
@@ -1375,7 +1384,7 @@ export class TenantsController {
   @ApiBearerAuth('access-token')
   @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update tenant settings' })
-  update(@CurrentUser() user: IAuthUser, @Body() dto: Partial<RegisterTenantDto>) {
+  update(@CurrentUser() user: IAuthUser, @Body() dto: UpdateTenantProfileDto) {
     return this.tenantsService.update(user.tenantId, dto);
   }
 

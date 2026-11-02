@@ -22,6 +22,10 @@ import { CustomerCreditService } from '@/modules/customers/customer-credit.servi
 import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
 import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
 
+export class ReturnStatusDto {
+  @ApiProperty({ enum: ReturnStatus }) @IsEnum(ReturnStatus) status: ReturnStatus;
+}
+
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiProperty() @IsInt() @Min(1) quantity: number;
@@ -322,8 +326,8 @@ export class ReturnsController {
 
   @Put(':id/status')
   @RequirePermissions('sales:update')
-  updateStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body('status') status: ReturnStatus) {
-    return this.returnsService.updateStatus(id, user.tenantId, status, user.id);
+  updateStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: ReturnStatusDto) {
+    return this.returnsService.updateStatus(id, user.tenantId, body.status, user.id);
   }
 }
 

@@ -4,6 +4,7 @@ import { FeatureSuggestionPriority, RoleType } from '@prisma/client'
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator'
 import { Roles } from '@/common/decorators/roles.decorator'
 import { PlatformOpsService } from './platform-ops.service'
+import { CreateSuggestionDto } from './platform-ops.dto'
 
 /** Tenant-facing feature suggestion submit/list (own tenant only). */
 @ApiTags('Feature Suggestions')
@@ -30,13 +31,7 @@ export class FeatureSuggestionsTenantController {
   @ApiOperation({ summary: 'Submit a feature suggestion' })
   create(
     @CurrentUser() user: IAuthUser,
-    @Body()
-    body: {
-      category: string
-      title: string
-      description: string
-      priority?: FeatureSuggestionPriority
-    },
+    @Body() body: CreateSuggestionDto,
   ) {
     return this.ops.createSuggestion({
       tenantId: user.tenantId,

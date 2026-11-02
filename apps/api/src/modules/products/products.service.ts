@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt, IsIn,
+  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt, IsIn, ArrayMaxSize, ArrayNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
 import { BarcodeMode, ProductKind, ProductStatus, TubeType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { InventoryService } from '@/modules/inventory/inventory.module';
@@ -92,6 +92,33 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Required when branchScope is SINGLE' })
   @IsOptional() @IsString()
   branchId?: string;
+}
+
+/** Variant row in a product edit: existing rows carry their id and can be deactivated. */
+export class UpdateProductVariantDto extends PartialType(CreateVariantDto) {
+  @ApiPropertyOptional() @IsOptional() @IsString() id?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateProductDto extends PartialType(OmitType(CreateProductDto, ['variants'] as const)) {
+  @ApiPropertyOptional({ type: [UpdateProductVariantDto] })
+  @IsOptional() @IsArray() @ArrayMaxSize(500) @ValidateNested({ each: true }) @Type(() => UpdateProductVariantDto)
+  variants?: UpdateProductVariantDto[];
+}
+
+export class BulkProductStatusDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayNotEmpty() @ArrayMaxSize(1000) @IsString({ each: true }) ids: string[];
+  @ApiProperty({ enum: ProductStatus }) @IsEnum(ProductStatus) status: ProductStatus;
+}
+
+export class ProductStatusDto {
+  @ApiProperty({ enum: ProductStatus }) @IsEnum(ProductStatus) status: ProductStatus;
+}
+
+export class AddProductVariantsDto {
+  @ApiProperty({ type: [CreateVariantDto] })
+  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(500) @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
+  variants: CreateVariantDto[];
 }
 
 export class CreateCategoryDto {
@@ -574,7 +601,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
+  async update(id: string, tenantId: string, dto: UpdateProductDto) {
     await this.findOne(id, tenantId);
     const {
       variants,

@@ -23,6 +23,10 @@ import { NotificationsService, NotificationsModule } from '@/modules/notificatio
 
 // ── DTOs ─────────────────────────────────────────────────────
 
+export class FleetFlagDto {
+  @ApiProperty() @IsBoolean() isFleet: boolean;
+}
+
 export class CreateServiceCatalogDto {
   @ApiProperty() @IsString() code: string;
   @ApiProperty() @IsString() name: string;
@@ -601,7 +605,7 @@ export class WorkshopController {
 
   @Put('fleet-customers/:id')
   @RequirePermissions('customers:update')
-  setFleet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { isFleet: boolean }) {
+  setFleet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: FleetFlagDto) {
     return this.service.setFleetFlag(user.tenantId, id, body.isFleet);
   }
 }

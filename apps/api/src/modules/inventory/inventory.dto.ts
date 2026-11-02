@@ -3,7 +3,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StockMovementType } from '@prisma/client';
+import { StockMovementType, TransferStatus } from '@prisma/client';
 
 export class AdjustStockDto {
   @ApiProperty() @IsString() variantId: string;
@@ -18,6 +18,10 @@ export class AdjustStockDto {
   @ApiPropertyOptional() @IsOptional() @IsString() lotId?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() unitCost?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() warehouseId?: string;
+}
+
+export class TransferStatusDto {
+  @ApiProperty({ enum: TransferStatus }) @IsEnum(TransferStatus) status: TransferStatus;
 }
 
 export class TransferItemDto {

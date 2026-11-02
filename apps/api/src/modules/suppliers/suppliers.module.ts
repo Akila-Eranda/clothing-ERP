@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, Max, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus, PurchaseRequestStatus, SupplierLedgerEntryType } from '@prisma/client';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -41,6 +41,19 @@ export class CreateSupplierDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() creditDays?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() creditLimit?: number;
+}
+
+export class UpdateSupplierDto extends PartialType(CreateSupplierDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class SupplierDebitNoteDto {
+  @ApiProperty() @IsNumber() @Min(0.01) @Max(1_000_000_000) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() invoiceId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() noteDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) referenceId?: string;
 }
 
 export class PurchaseItemDto {
@@ -258,7 +271,7 @@ export class SuppliersService {
     };
   }
 
-  async updateSupplier(id: string, tenantId: string, dto: Partial<CreateSupplierDto>) {
+  async updateSupplier(id: string, tenantId: string, dto: UpdateSupplierDto) {
     await this.findOneSupplier(id, tenantId);
     return this.prisma.supplier.update({ where: { id }, data: dto as object });
   }
@@ -1071,15 +1084,7 @@ export class SuppliersController {
   apDebitNote(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      amount: number;
-      reason?: string;
-      invoiceId?: string;
-      purchaseId?: string;
-      noteDate?: string;
-      referenceId?: string;
-    },
+    @Body() body: SupplierDebitNoteDto,
   ) {
     return this.apService.createDebitNote(id, user.tenantId, user.id, body);
   }
@@ -1092,7 +1097,7 @@ export class SuppliersController {
 
   @Put(':id')
   @RequirePermissions('suppliers:update')
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateSupplierDto>) {
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateSupplierDto) {
     return this.suppliersService.updateSupplier(id, user.tenantId, dto);
   }
 
@@ -1243,20 +1248,51 @@ export class PurchasesController {
 
 // ── Phase 3 Procurement DTOs ──────────────────────────────────────────
 
+export class PrItemDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsString() @MaxLength(200) productName: string;
+  @ApiProperty() @IsString() @MaxLength(200) variantName: string;
+  @ApiProperty() @IsString() @MaxLength(100) sku: string;
+  @ApiProperty() @IsNumber() @Min(0.001) requestedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) unitCostHint?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) notes?: string;
+}
+
 export class CreatePurchaseRequestDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiProperty({ type: 'array' }) @IsArray() items: PrItemInput[];
+  @ApiProperty({ type: [PrItemDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => PrItemDto)
+  items: PrItemDto[];
 }
 
 export class ConvertPrDto {
   @ApiProperty() @IsString() supplierId: string;
 }
 
+export class DirectGrnLineDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsString() @MaxLength(200) productName: string;
+  @ApiProperty() @IsString() @MaxLength(200) variantName: string;
+  @ApiProperty() @IsString() @MaxLength(100) sku: string;
+  @ApiProperty() @IsNumber() @Min(0) receivedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) rejectedQty?: number;
+  @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) sellingPrice?: number | null;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) mrp?: number | null;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) orderedQty?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseItemId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) batchNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() expiryDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() manufactureDate?: string;
+}
+
 export class DirectGrnDto {
   @ApiProperty() @IsString() supplierId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() supplierInvoiceRef?: string;
-  @ApiProperty({ type: 'array' }) @IsArray() lines: GrnLineInput[];
+  @ApiProperty({ type: [DirectGrnLineDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => DirectGrnLineDto)
+  lines: DirectGrnLineDto[];
 }
 
 export class QuickGrnLineDto {

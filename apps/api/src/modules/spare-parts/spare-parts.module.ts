@@ -23,6 +23,10 @@ import { nanoid } from 'nanoid';
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
 
+export class QuotationStatusDto {
+  @ApiProperty({ enum: QuotationStatus }) @IsEnum(QuotationStatus) status: QuotationStatus;
+}
+
 export class CreateVehicleBrandDto {
   @ApiProperty() @IsString() name: string;
 }
@@ -642,9 +646,9 @@ export class SparePartsController {
   updateQuotationStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('status') status: QuotationStatus,
+    @Body() body: QuotationStatusDto,
   ) {
-    return this.service.updateQuotationStatus(user.tenantId, id, status);
+    return this.service.updateQuotationStatus(user.tenantId, id, body.status);
   }
 }
 

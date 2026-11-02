@@ -12,6 +12,7 @@ import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegist
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { OptionalNotesDto } from '@/common/dto/notes.dto';
 import { InventoryService } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
@@ -2734,9 +2735,10 @@ export class PosController {
   @ApiOperation({ summary: 'Close day session and get end-of-day summary' })
   closeDaySession(
     @CurrentUser() user: IAuthUser,
-    @Body('notes') notes?: string,
+    @Body() body: OptionalNotesDto,
     @Headers('x-pos-cashier-token') unlockToken?: string,
   ) {
+    const notes = body.notes;
     return this.posService.closeDaySession(
       user.tenantId,
       user.branchId ?? '',

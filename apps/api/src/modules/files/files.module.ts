@@ -4,7 +4,15 @@ import {
   UploadedFile, UseInterceptors, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, Matches } from 'class-validator';
+
+/** Multipart text fields of POST /files/upload (the file itself is handled by multer). */
+export class UploadFileDto {
+  @ApiPropertyOptional({ example: 'products' })
+  @IsOptional() @Matches(/^[A-Za-z0-9_-]{1,40}$/, { message: 'folder may only contain letters, digits, _ and -' })
+  folder?: string;
+}
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -133,9 +141,9 @@ export class FilesController {
   upload(
     @CurrentUser() user: IAuthUser,
     @UploadedFile() file: Express.Multer.File,
-    @Body('folder') folder?: string,
+    @Body() body: UploadFileDto,
   ) {
-    return this.filesService.uploadFile(user.tenantId, user.id, file, folder);
+    return this.filesService.uploadFile(user.tenantId, user.id, file, body.folder);
   }
 
   @Get()

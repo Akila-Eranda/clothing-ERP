@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsInt, Min } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsInt, Min, Max, IsBoolean, IsIn, IsObject, IsArray, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Gender, AttendanceStatus, PaymentMethod, EmploymentType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { createLinkedExpense } from '@/shared/expense.helper';
@@ -31,8 +32,39 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() nicNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() epfNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() etfNumber?: string;
-  @ApiPropertyOptional() @IsOptional() bankDetails?: Record<string, string>;
+  @ApiPropertyOptional() @IsOptional() @IsObject() bankDetails?: Record<string, string>;
   @ApiPropertyOptional({ enum: EmploymentType }) @IsOptional() @IsEnum(EmploymentType) employmentType?: EmploymentType;
+}
+
+export class UpdateEmployeeDto extends PartialType(CreateEmployeeDto) {}
+
+export class PayrollBulkDto {
+  @ApiProperty() @IsInt() @Min(1) @Max(12) month: number;
+  @ApiProperty() @IsInt() @Min(2000) @Max(2100) year: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) allowances?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) bonus?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() deductAbsent?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) absentDeduction?: number;
+}
+
+export const LEAVE_DECISION_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const;
+
+export class LeaveStatusDto {
+  @ApiProperty({ enum: LEAVE_DECISION_STATUSES }) @IsIn(LEAVE_DECISION_STATUSES) status: (typeof LEAVE_DECISION_STATUSES)[number];
+}
+
+export class AttendanceBulkRowDto {
+  @ApiProperty() @IsString() employeeId: string;
+  @ApiProperty({ enum: AttendanceStatus }) @IsEnum(AttendanceStatus) status: AttendanceStatus;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() checkIn?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() checkOut?: string;
+}
+
+export class AttendanceBulkDto {
+  @ApiProperty() @IsDateString() date: string;
+  @ApiProperty({ type: [AttendanceBulkRowDto] })
+  @IsArray() @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => AttendanceBulkRowDto)
+  rows: AttendanceBulkRowDto[];
 }
 
 export class MarkAttendanceDto {
@@ -158,8 +190,12 @@ export class HrService {
     });
   }
 
-  async updateEmployee(id: string, tenantId: string, dto: Partial<CreateEmployeeDto>) {
+  async updateEmployee(id: string, tenantId: string, dto: UpdateEmployeeDto) {
     await this.findOne(id, tenantId);
+    if (dto.branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: dto.branchId, tenantId }, select: { id: true } });
+      if (!branch) throw new NotFoundException('Branch not found');
+    }
     return this.prisma.employee.update({
       where: { id },
       data: {
@@ -191,6 +227,9 @@ export class HrService {
   }
 
   async markAttendanceBulk(tenantId: string, date: string, rows: { employeeId: string; status: AttendanceStatus; checkIn?: string; checkOut?: string }[]) {
+    const ids = [...new Set(rows.map((r) => r.employeeId))];
+    const owned = await this.prisma.employee.count({ where: { id: { in: ids }, tenantId } });
+    if (owned !== ids.length) throw new NotFoundException('One or more employees not found');
     return this.prisma.$transaction(
       rows.map((r) =>
         this.prisma.attendance.upsert({
@@ -392,7 +431,7 @@ export class HrController {
   @Post('payroll/bulk')
   @RequirePermissions('hr:create')
   @ApiOperation({ summary: 'Generate payroll for all active employees' })
-  generatePayrollBulk(@CurrentUser() user: IAuthUser, @Body() body: { month: number; year: number; allowances?: number; bonus?: number; deductAbsent?: boolean; absentDeduction?: number }) {
+  generatePayrollBulk(@CurrentUser() user: IAuthUser, @Body() body: PayrollBulkDto) {
     return this.hrService.generatePayrollBulk(user.tenantId, body.month, body.year, body);
   }
 
@@ -413,14 +452,14 @@ export class HrController {
   @Put('leaves/:id/status')
   @RequirePermissions('hr:update')
   @ApiOperation({ summary: 'Approve or reject a leave request' })
-  updateLeaveStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body('status') status: string) {
-    return this.hrService.updateLeaveStatus(id, user.tenantId, status, user.id);
+  updateLeaveStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: LeaveStatusDto) {
+    return this.hrService.updateLeaveStatus(id, user.tenantId, body.status, user.id);
   }
 
   @Post('attendance/bulk')
   @RequirePermissions('hr:update')
   @ApiOperation({ summary: 'Bulk mark attendance for a date' })
-  markAttendanceBulk(@CurrentUser() user: IAuthUser, @Body() body: { date: string; rows: { employeeId: string; status: AttendanceStatus }[] }) {
+  markAttendanceBulk(@CurrentUser() user: IAuthUser, @Body() body: AttendanceBulkDto) {
     return this.hrService.markAttendanceBulk(user.tenantId, body.date, body.rows);
   }
 
@@ -461,7 +500,7 @@ export class HrController {
 
   @Put(':id')
   @RequirePermissions('hr:update')
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateEmployeeDto>) {
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
     return this.hrService.updateEmployee(id, user.tenantId, dto);
   }
 

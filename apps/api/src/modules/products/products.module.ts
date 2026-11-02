@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductStatus } from '@prisma/client';
-import { ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto, CreateVariantDto } from './products.service';
+import {
+  ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto,
+  UpdateProductDto, BulkProductStatusDto, ProductStatusDto, AddProductVariantsDto,
+} from './products.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -34,7 +37,7 @@ export class ProductsController {
   @Patch('bulk/status')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Bulk update product status' })
-  bulkStatus(@CurrentUser() user: IAuthUser, @Body() body: { ids: string[]; status: ProductStatus }) {
+  bulkStatus(@CurrentUser() user: IAuthUser, @Body() body: BulkProductStatusDto) {
     return this.productsService.bulkUpdateStatus(body.ids, user.tenantId, body.status);
   }
 
@@ -61,21 +64,21 @@ export class ProductsController {
   @Put(':id')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Update product' })
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateProductDto>) {
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.productsService.update(id, user.tenantId, dto);
   }
 
   @Patch(':id/status')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Update product status' })
-  updateStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body('status') status: ProductStatus) {
-    return this.productsService.updateStatus(id, user.tenantId, status);
+  updateStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: ProductStatusDto) {
+    return this.productsService.updateStatus(id, user.tenantId, body.status);
   }
 
   @Post(':id/variants')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Add variants to existing product' })
-  addVariants(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { variants: CreateVariantDto[] }) {
+  addVariants(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: AddProductVariantsDto) {
     return this.productsService.addVariants(id, user.tenantId, body.variants);
   }
 
