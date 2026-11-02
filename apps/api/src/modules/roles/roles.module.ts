@@ -5,7 +5,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
-import { CreateRoleDto } from './roles.service';
+import { RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
+import { CreateRoleDto, UpdateRoleDto } from './roles.service';
 
 @ApiTags('Roles')
 @ApiBearerAuth('access-token')
@@ -33,23 +34,24 @@ export class RolesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get role by ID' })
-  findOne(@Param('id') id: string) {
-    return this.rolesService.findOne(id);
+  @RequireAnyPermissions('roles:read', 'users:read')
+  @ApiOperation({ summary: 'Get role by ID (own tenant only)' })
+  findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.rolesService.findOne(id, user.tenantId);
   }
 
   @Put(':id')
   @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
-  @ApiOperation({ summary: 'Update role' })
-  update(@Param('id') id: string, @Body() dto: Partial<CreateRoleDto>) {
-    return this.rolesService.update(id, dto);
+  @ApiOperation({ summary: 'Update role (own tenant only)' })
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateRoleDto) {
+    return this.rolesService.update(id, user.tenantId, dto);
   }
 
   @Delete(':id')
   @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
-  @ApiOperation({ summary: 'Delete role' })
-  remove(@Param('id') id: string) {
-    return this.rolesService.remove(id);
+  @ApiOperation({ summary: 'Delete role (own tenant only)' })
+  remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.rolesService.remove(id, user.tenantId);
   }
 }
 

@@ -7,6 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Request } from 'express';
+import { stripSensitiveFields } from '@/shared/security/sensitive-fields';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -26,7 +27,9 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>
     const statusCode = context.switchToHttp().getResponse().statusCode;
 
     return next.handle().pipe(
-      map((data) => {
+      map((raw) => {
+        // Never let credential fields (password / 2FA / PIN hashes) leave the API.
+        const data = stripSensitiveFields(raw);
         if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
           return data as ApiResponse<T>;
         }

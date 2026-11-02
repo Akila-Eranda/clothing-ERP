@@ -11,6 +11,7 @@ import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { UserStatus } from '@prisma/client';
+import { isPlatformRoleType } from '@/shared/platform-admin-roles';
 
 @Injectable()
 export class UsersService {
@@ -208,11 +209,17 @@ export class UsersService {
 
   private async assertRolesBelongToTenant(tenantId: string, roleIds: string[]) {
     if (!roleIds.length) return;
-    const count = await this.prisma.role.count({
-      where: { id: { in: roleIds }, tenantId },
+    const unique = [...new Set(roleIds)];
+    const roles = await this.prisma.role.findMany({
+      where: { id: { in: unique }, tenantId },
+      select: { id: true, type: true },
     });
-    if (count !== roleIds.length) {
+    if (roles.length !== unique.length) {
       throw new ForbiddenException('One or more roles do not belong to this tenant');
+    }
+    // Platform roles bypass tenant isolation — only the Platform Admin console may grant them.
+    if (roles.some((r) => isPlatformRoleType(r.type))) {
+      throw new ForbiddenException('Platform roles cannot be assigned from shop user management');
     }
   }
 

@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, UpdateUserDto, UpdateUserStatusDto, AssignUserRolesDto } from './dto/create-user.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -63,12 +63,12 @@ export class UsersController {
   updateStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('status') status: UserStatus,
+    @Body() body: UpdateUserStatusDto,
   ) {
     if (user.roles.includes(RoleType.SUPER_ADMIN) || user.roles.includes(RoleType.PLATFORM_STAFF)) {
-      return this.usersService.updateStatusPlatform(id, status);
+      return this.usersService.updateStatusPlatform(id, body.status);
     }
-    return this.usersService.updateStatus(id, user.tenantId, status);
+    return this.usersService.updateStatus(id, user.tenantId, body.status);
   }
 
   @Patch(':id/roles')
@@ -77,9 +77,9 @@ export class UsersController {
   assignRoles(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('roleIds') roleIds: string[],
+    @Body() body: AssignUserRolesDto,
   ) {
-    return this.usersService.assignRoles(id, user.tenantId, roleIds);
+    return this.usersService.assignRoles(id, user.tenantId, body.roleIds);
   }
 
   @Get(':id/activity')
