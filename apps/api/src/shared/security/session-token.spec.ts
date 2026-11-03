@@ -10,8 +10,7 @@ describe('hashSessionToken', () => {
     expect(hashSessionToken(`${jwt}x`)).not.toBe(h);
   });
 
-  it('matches the SQL used by the 20261103090000_hash_session_tokens migration', () => {
-    // encode(sha256(convert_to('abc','UTF8')),'hex') in PostgreSQL
+  it('is plain SHA-256 hex (same as PostgreSQL encode(sha256(...), \'hex\'))', () => {
     expect(hashSessionToken('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
 });
