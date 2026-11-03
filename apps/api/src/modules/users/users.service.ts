@@ -12,6 +12,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { UserStatus } from '@prisma/client';
 import { isPlatformRoleType } from '@/shared/platform-admin-roles';
+import { SAFE_SESSION_SELECT } from '@/shared/security/session-token';
 
 @Injectable()
 export class UsersService {
@@ -163,7 +164,7 @@ export class UsersService {
       include: {
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
         branch: true,
-        sessions: { where: { isActive: true }, take: 5, orderBy: { createdAt: 'desc' } },
+        sessions: { where: { isActive: true }, take: 5, orderBy: { createdAt: 'desc' }, select: SAFE_SESSION_SELECT },
       },
     });
     if (!user) throw new NotFoundException('User not found');

@@ -27,6 +27,7 @@ import {
 } from './dto/login.dto';
 import { IJwtPayload, IRefreshTokenPayload } from '@/common/interfaces/jwt-payload.interface';
 import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
+import { hashSessionToken } from '@/shared/security/session-token';
 
 const BCRYPT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -219,7 +220,7 @@ export class AuthService {
     await this.prisma.session.create({
       data: {
         userId: user.id,
-        token: tokens.accessToken,
+        token: hashSessionToken(tokens.accessToken),
         ipAddress: ip,
         userAgent,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
@@ -364,7 +365,7 @@ export class AuthService {
   ): Promise<void> {
     await Promise.all([
       this.prisma.session.updateMany({
-        where: { userId, token: accessToken },
+        where: { userId, token: hashSessionToken(accessToken) },
         data: { isActive: false },
       }),
       this.prisma.refreshToken.updateMany({
