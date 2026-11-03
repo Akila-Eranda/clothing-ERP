@@ -2,6 +2,23 @@ import { Prisma, RoleType } from '@prisma/client';
 
 type Db = Prisma.TransactionClient | { permission: Prisma.TransactionClient['permission']; role: Prisma.TransactionClient['role']; rolePermission: Prisma.TransactionClient['rolePermission'] };
 
+/**
+ * Never granted to the default Cashier role: they change prices / cost / MRP (and so defeat the
+ * POS price guard), adjust stock and lots directly, or post journals and bank / cash transfers.
+ */
+export const CASHIER_DENIED_PERMISSIONS: ReadonlySet<string> = new Set([
+  'sales:delete',
+  'customers:delete',
+  'inventory:delete',
+  'products:delete',
+  'cash:delete',
+  'products:update',
+  'inventory:update',
+  'accounting:create',
+  'accounting:update',
+  'accounting:delete',
+]);
+
 /** Ensure standard shop staff roles exist for a tenant (idempotent). */
 export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void> {
   const permissions = await db.permission.findMany();
@@ -38,17 +55,17 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
     .filter(
       (p) =>
         ['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) &&
-        p.action !== 'delete',
+        !CASHIER_DENIED_PERMISSIONS.has(`${p.resource}:${p.action}`),
     )
     .map((p) => p.id);
-  // POS Quick GRN / supplier pay need list + register supplier at the counter
+  // POS Quick GRN / supplier pay need list + register supplier at the counter.
+  // Drawer expenses use cash:create (POST /accounting/expenses accepts it); no accounting:create.
   const cashierExtra = permIds(
     'suppliers:read',
     'suppliers:create',
     'purchases:read',
     'purchases:create',
     'purchases:update',
-    'accounting:create',
     'accounting:read',
   );
   const cashierPermIds = [...new Set([...cashierBase, ...cashierExtra])];

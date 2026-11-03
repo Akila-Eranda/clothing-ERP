@@ -1391,7 +1391,8 @@ export class AccountingController {
   }
 
   @Post('expenses')
-  @RequirePermissions('accounting:create')
+  // cash:create = POS drawer expense by a cashier (cashiers no longer hold accounting:create)
+  @RequireAnyPermissions('accounting:create', 'cash:create')
   @ApiOperation({ summary: 'Record expense' })
   createExpense(
     @CurrentUser() user: IAuthUser,
