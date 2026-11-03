@@ -35,6 +35,15 @@ describe('stripSensitiveFields', () => {
     expect(out.buf).toBe(buf);
   });
 
+  it('strips every occurrence of a shared object, not just the first', () => {
+    const u = { id: 'u', passwordHash: 'h', posPinHash: 'p' };
+    const list = [u];
+    const out = stripSensitiveFields({ createdBy: u, updatedBy: u, a: list, b: list });
+    expect(JSON.stringify(out)).not.toMatch(/passwordHash|posPinHash/);
+    expect(out.updatedBy).toEqual({ id: 'u' });
+    expect(out.b).toEqual([{ id: 'u' }]);
+  });
+
   it('passes primitives through and survives cycles', () => {
     expect(stripSensitiveFields('x')).toBe('x');
     expect(stripSensitiveFields(null)).toBeNull();
@@ -43,5 +52,7 @@ describe('stripSensitiveFields', () => {
     const out = stripSensitiveFields(a) as Record<string, unknown>;
     expect(out.passwordHash).toBeUndefined();
     expect(out.id).toBe(1);
+    // The cycle points at the stripped copy, not back at the original (which still has the hash).
+    expect(out.self).toBe(out);
   });
 });

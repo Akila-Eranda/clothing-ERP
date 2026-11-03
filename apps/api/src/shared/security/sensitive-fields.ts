@@ -20,21 +20,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /**
  * Returns a copy of `value` without sensitive keys. Only plain objects and arrays are walked;
  * Dates, Buffers, streams, Prisma Decimals and class instances are returned untouched.
+ * An object reached twice (shared reference or cycle) maps to the same stripped copy, never
+ * to the original — the original still holds the sensitive keys.
  */
-export function stripSensitiveFields<T>(value: T, seen: WeakSet<object> = new WeakSet()): T {
+export function stripSensitiveFields<T>(value: T, copies: WeakMap<object, unknown> = new WeakMap()): T {
   if (Array.isArray(value)) {
-    if (seen.has(value)) return value;
-    seen.add(value);
-    return value.map((v) => stripSensitiveFields(v, seen)) as unknown as T;
+    if (copies.has(value)) return copies.get(value) as T;
+    const out: unknown[] = [];
+    copies.set(value, out);
+    for (const v of value) out.push(stripSensitiveFields(v, copies));
+    return out as unknown as T;
   }
   if (!isPlainObject(value)) return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
+  if (copies.has(value)) return copies.get(value) as T;
 
   const out: Record<string, unknown> = {};
+  copies.set(value, out);
   for (const [key, v] of Object.entries(value)) {
     if (SENSITIVE_RESPONSE_KEYS.has(key)) continue;
-    out[key] = stripSensitiveFields(v, seen);
+    out[key] = stripSensitiveFields(v, copies);
   }
   return out as T;
 }
