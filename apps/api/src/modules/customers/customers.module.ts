@@ -32,8 +32,8 @@ export class CreateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) creditLimit?: number;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) creditDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) creditLimit?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(3650) creditDays?: number;
 }
 
 /** Profile edits only. Balances (wallet, loyalty, credit, totals), tier and tenant are never writable here. */
@@ -116,7 +116,9 @@ export class CustomersService {
     private readonly credit: CustomerCreditService,
   ) {}
 
-  async create(tenantId: string, dto: CreateCustomerDto) {
+  async create(tenantId: string, dto: CreateCustomerDto, actorRoles: string[] = []) {
+    // Opening a customer with credit is the same decision as raising a limit later.
+    if ((dto.creditLimit ?? 0) > 0) assertFinancialAuthority(actorRoles, 'Setting a credit limit');
     const existing = await this.prisma.customer.findFirst({ where: { tenantId, phone: dto.phone } });
     if (existing) return existing;
 
@@ -390,7 +392,7 @@ export class CustomersController {
   @Post()
   @RequirePermissions('customers:create')
   create(@CurrentUser() user: IAuthUser, @Body() dto: CreateCustomerDto) {
-    return this.customersService.create(user.tenantId, dto);
+    return this.customersService.create(user.tenantId, dto, user.roles);
   }
 
   @Get()
