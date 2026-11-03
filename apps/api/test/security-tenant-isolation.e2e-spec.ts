@@ -345,5 +345,63 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
       const res = await http().get('/api/v1/customers').set(as(A.adminToken)).set('x-tenant-id', B.tenantId);
       expect(res.status).toBe(403);
     });
+
+    it('never returns session tokens from user endpoints', async () => {
+      // Legacy row written before sessions.token was hashed: the raw JWT must still not leave the API.
+      await prisma.session.create({
+        data: { userId: A.adminId, token: `LIVE-ACCESS-JWT-${run}`, expiresAt: new Date(Date.now() + 900_000) },
+      });
+      const res = await http().get(`/api/v1/users/${A.adminId}`).set(as(A.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.data.sessions.length).toBeGreaterThan(0);
+      expect(bodyText(res)).not.toContain(`LIVE-ACCESS-JWT-${run}`);
+      expect(res.body.data.sessions[0]).not.toHaveProperty('token');
+    });
+  });
+
+  // ── The real default Cashier role (ensureSystemRoles), not a hand-picked permission set ──
+
+  describe('default Cashier role', () => {
+    let cashierToken: string;
+
+    beforeAll(async () => {
+      const { ensureSystemRoles } = await import('../src/modules/roles/default-system-roles');
+      await ensureSystemRoles(prisma, A.tenantId);
+      const role = await prisma.role.findFirstOrThrow({ where: { tenantId: A.tenantId, name: 'Cashier' } });
+      const u = await prisma.user.create({
+        data: {
+          tenantId: A.tenantId, branchId: A.branchId, email: `default-cashier-${run}@sec.test`, passwordHash: 'x',
+          firstName: 'Default', lastName: 'Cashier', status: 'ACTIVE', emailVerified: true,
+          roles: { create: { roleId: role.id } },
+        },
+      });
+      cashierToken = jwt.sign({ sub: u.id, email: u.email, tenantId: A.tenantId, roles: [], permissions: [] });
+    });
+
+    it('cannot rewrite variant price / cost / MRP (would defeat the POS price guard)', async () => {
+      const res = await http().put(`/api/v1/products/${A.productId}/variants/${A.variantId}`).set(as(cashierToken))
+        .send({ costPrice: 0, sellingPrice: 1, mrp: 1 });
+      expect(res.status).toBe(403);
+      const v = await prisma.productVariant.findUniqueOrThrow({ where: { id: A.variantId } });
+      expect(v.costPrice).toBeGreaterThan(0);
+    });
+
+    it('cannot open a customer with a credit limit, but can register a cash customer', async () => {
+      const phone = () => `071${Math.floor(1e6 + Math.random() * 8e6)}`;
+      const credit = await http().post('/api/v1/customers').set(as(cashierToken))
+        .send({ firstName: 'Credit', lastName: 'Abuse', phone: phone(), creditLimit: 999_999_999 });
+      expect(credit.status).toBe(403);
+
+      const cash = await http().post('/api/v1/customers').set(as(cashierToken))
+        .send({ firstName: 'Walk', lastName: 'In', phone: phone(), creditLimit: 0 });
+      expect(cash.status).toBe(201);
+    });
+
+    it('lets a shop admin open a customer with credit', async () => {
+      const res = await http().post('/api/v1/customers').set(as(A.adminToken))
+        .send({ firstName: 'Trusted', lastName: 'Buyer', phone: `072${Math.floor(1e6 + Math.random() * 8e6)}`, creditLimit: 50_000 });
+      expect(res.status).toBe(201);
+      expect(res.body.data.creditLimit).toBe(50_000);
+    });
   });
 });
