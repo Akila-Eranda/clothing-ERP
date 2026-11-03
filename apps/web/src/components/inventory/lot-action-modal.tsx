@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseQty } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 
@@ -56,7 +57,7 @@ export function LotActionModal({ open, mode, lot, onClose, onDone }: Props) {
   const submitLabel = mode === "dispose" ? "Dispose" : "Set Quantity";
 
   const submit = async () => {
-    const qty = parseInt(quantity, 10);
+    const qty = parseQty(quantity, NaN);
     if (isNaN(qty) || qty < 0) {
       toast.error("Enter a valid quantity");
       return;
@@ -180,6 +181,7 @@ export function LotActionModal({ open, mode, lot, onClose, onDone }: Props) {
             <Input
               type="number"
               min={0}
+              step="any"
               max={mode === "dispose" ? lot.availableQty : undefined}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}

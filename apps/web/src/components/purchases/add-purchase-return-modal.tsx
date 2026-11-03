@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, parseQty } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
 type Supplier = { id: string; name: string };
@@ -313,11 +313,11 @@ export function AddPurchaseReturnModal({ open, onClose, onSaved }: Props) {
                           </td>
                           <td className="px-3 py-2">
                             <Input
-                              type="number"
-                              min={1}
+                              type="number" step="any"
+                              min={0.001}
                               className="h-8 text-right"
                               value={line.quantity}
-                              onChange={(e) => updateQty(line.variantId, parseInt(e.target.value, 10) || 1)}
+                              onChange={(e) => updateQty(line.variantId, parseQty(e.target.value, 1) || 1)}
                             />
                           </td>
                           <td className="px-3 py-2">

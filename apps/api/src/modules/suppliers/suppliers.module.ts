@@ -61,8 +61,8 @@ export class PurchaseItemDto {
   @ApiProperty() @IsString() productName: string;
   @ApiProperty() @IsString() variantName: string;
   @ApiProperty() @IsString() sku: string;
-  @ApiProperty() @IsInt() @Min(0) orderedQty: number;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) freeQty?: number;
+  @ApiProperty() @IsNumber() @Min(0) orderedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) freeQty?: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) sellingPrice?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) mrp?: number;
@@ -108,8 +108,8 @@ export class UpdatePOStatusDto {
 
 export class ReceiveItemDto {
   @ApiProperty() @IsString() itemId: string;
-  @ApiProperty() @IsInt() @Min(0) receivedQty: number;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
+  @ApiProperty() @IsNumber() @Min(0) receivedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) rejectedQty?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
@@ -322,7 +322,7 @@ export class SuppliersService {
     const itemsData = dto.items.map((item) => {
       const orderedQty = Math.max(0, item.orderedQty ?? 0);
       const freeQty = Math.max(0, item.freeQty ?? 0);
-      if (orderedQty + freeQty < 1) {
+      if (orderedQty + freeQty <= 0) {
         throw new BadRequestException(`Add Order Qty or Free Qty for ${item.productName || item.sku}`);
       }
       const lineTotal = item.unitCost * orderedQty;
@@ -1297,7 +1297,7 @@ export class DirectGrnDto {
 
 export class QuickGrnLineDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;

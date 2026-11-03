@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseQty } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
 interface Supplier { id: string; name: string; contactPerson?: string | null; phone: string; }
@@ -339,8 +340,8 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                           </td>
                           <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">{item.sku}</td>
                           <td className="px-2 py-1.5">
-                            <Input type="number" min={1} value={item.orderedQty} className="h-6 text-xs px-1.5 w-14"
-                              onChange={(e) => updateItem(idx, "orderedQty", parseInt(e.target.value) || 1)} />
+                            <Input type="number" step="any" min={0.001} value={item.orderedQty} className="h-6 text-xs px-1.5 w-14"
+                              onChange={(e) => updateItem(idx, "orderedQty", parseQty(e.target.value, 1) || 1)} />
                           </td>
                           <td className="px-2 py-1.5">
                             <Input type="number" min={0} step={0.01} value={item.unitCost} className="h-6 text-xs px-1.5 w-20"

@@ -7,6 +7,7 @@ import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseQty } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 
 export interface POItem {
@@ -270,20 +271,20 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                       </td>
                       <td className="px-3 py-2.5 w-20">
                         <Input
-                          type="number" min={0} max={Math.max(0, remaining)}
+                          type="number" step="any" min={0} max={Math.max(0, remaining)}
                           value={rows[idx]?.receivedQty ?? 0}
                           disabled={fullyReceived}
                           className="h-7 text-xs px-2 w-20"
-                          onChange={(e) => update(idx, "receivedQty", parseInt(e.target.value) || 0)}
+                          onChange={(e) => update(idx, "receivedQty", parseQty(e.target.value))}
                         />
                       </td>
                       <td className="px-3 py-2.5 w-20">
                         <Input
-                          type="number" min={0}
+                          type="number" step="any" min={0}
                           value={rows[idx]?.rejectedQty ?? 0}
                           disabled={fullyReceived}
                           className="h-7 text-xs px-2 w-20"
-                          onChange={(e) => update(idx, "rejectedQty", parseInt(e.target.value) || 0)}
+                          onChange={(e) => update(idx, "rejectedQty", parseQty(e.target.value))}
                         />
                       </td>
                       {showBatch && (

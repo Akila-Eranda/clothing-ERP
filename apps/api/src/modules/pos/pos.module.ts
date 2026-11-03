@@ -3,8 +3,8 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString } from 'class-validator';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -23,6 +23,19 @@ import {
   breakdownCartLine,
   resolveUnitPrice,
 } from '@/modules/pricing/pricing.helper';
+import {
+  canOverridePosPrice,
+  describePosPriceViolation,
+  findPosPriceViolation,
+  PosCatalogPriceContext,
+} from '@/modules/pricing/pos-price-guard.helper';
+import {
+  CLIENT_REQUEST_ID_PATTERN,
+  decideSaleReplay,
+  isClientRequestIdConflict,
+  normalizeClientRequestId,
+  saleRequestFingerprint,
+} from './pos-idempotency.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
@@ -44,7 +57,7 @@ import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() unitPrice: number;
   @ApiProperty() @IsString() productName: string;
   @ApiProperty() @IsString() variantName: string;
@@ -126,6 +139,10 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPartialPayment?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() applyTierDiscount?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() helperEmployeeId?: string;
+  /** Idempotency key — one per checkout attempt, re-sent unchanged on retry. */
+  @ApiPropertyOptional({ description: 'Idempotency key (8–64 chars A-Z a-z 0-9 _ -), reused on retry' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class IssueGiftVoucherDto {
@@ -167,6 +184,27 @@ export class PosService {
     return branch.id;
   }
 
+  /**
+   * Existing sale for an idempotency key, in the same shape createSale returns.
+   * Null when the key is unused; ConflictException when it belongs to another cart / cashier / branch.
+   */
+  private async findSaleReplay(
+    tenantId: string,
+    branchId: string,
+    cashierId: string,
+    clientRequestId: string,
+    fingerprint: string,
+  ) {
+    const existing = await this.prisma.sale.findFirst({
+      where: { tenantId, clientRequestId },
+      include: { items: true, payments: true, customer: true },
+    });
+    if (!existing) return null;
+    const decision = decideSaleReplay(existing, { branchId, cashierId, fingerprint });
+    if (decision.kind === 'CONFLICT') throw new ConflictException(decision.reason);
+    return Object.assign(existing, { idempotentReplay: true as const });
+  }
+
   async createSale(
     tenantId: string,
     branchId: string,
@@ -176,6 +214,14 @@ export class PosService {
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
+
+    // Idempotency: a retry with the same key returns the original sale with no new side effects.
+    const clientRequestId = normalizeClientRequestId(dto.clientRequestId);
+    const requestFingerprint = clientRequestId ? saleRequestFingerprint(dto) : null;
+    if (clientRequestId) {
+      const replay = await this.findSaleReplay(tenantId, branchId, cashierId, clientRequestId, requestFingerprint!);
+      if (replay) return replay;
+    }
 
     await ensureCashierWallet(this.prisma, tenantId, branchId, cashierId, counterId);
 
@@ -203,10 +249,26 @@ export class PosService {
           .map((i) => i.variantId!.trim()),
       ),
     ];
+    const priceOverrides: Array<{ variantId: string; unitPrice: number; limit: number; kind: string }> = [];
     if (catalogVariantIds.length > 0) {
       const found = await this.prisma.productVariant.findMany({
         where: { id: { in: catalogVariantIds }, product: { tenantId } },
-        select: { id: true },
+        select: {
+          id: true,
+          sellingPrice: true,
+          costPrice: true,
+          mrp: true,
+          product: {
+            select: {
+              sellingPrice: true,
+              wholesalePrice: true,
+              costPrice: true,
+              mrp: true,
+              productKind: true,
+              unit: true,
+            },
+          },
+        },
       });
       const foundIds = new Set(found.map((v) => v.id));
       const missing = dto.items.filter(
@@ -223,6 +285,51 @@ export class PosService {
         throw new BadRequestException(
           `Cart has products no longer in catalog (${labels}${more}). Clear the cart and re-add items.`,
         );
+      }
+
+      // Server is the price authority: cost comes from the catalog, and cashier-entered prices
+      // must stay between cost and the highest known price (MRP / selling / PO) unless a
+      // manager or admin is the acting cashier.
+      const purchasePrices = await this.attachPurchasePriceOptions(tenantId, catalogVariantIds);
+      const priceCtx = new Map<string, PosCatalogPriceContext>();
+      for (const v of found) {
+        const po = purchasePrices.get(v.id) ?? [];
+        const unit = (v.product.unit ?? '').trim().toLowerCase();
+        priceCtx.set(v.id, {
+          knownPrices: [
+            v.sellingPrice,
+            v.product.sellingPrice,
+            v.product.wholesalePrice,
+            ...po.map((p) => p.sellingPrice),
+          ],
+          mrp: Math.max(v.mrp ?? 0, v.product.mrp ?? 0, ...po.map((p) => p.mrp ?? 0)),
+          costPrice: v.costPrice > 0 ? v.costPrice : v.product.costPrice,
+          isWeighted:
+            v.product.productKind === 'WEIGHTED' ||
+            ['kg', 'g', 'gram', 'grams', 'kilogram', 'kilograms'].includes(unit),
+        });
+      }
+
+      const cashierRoles = await this.prisma.userRole.findMany({
+        where: { userId: cashierId, user: { tenantId } },
+        select: { role: { select: { type: true } } },
+      });
+      const canOverride = canOverridePosPrice(cashierRoles.map((r) => r.role.type));
+
+      for (const item of dto.items) {
+        if (item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-')) continue;
+        const ctx = priceCtx.get(item.variantId.trim());
+        if (!ctx) continue;
+        item.costPrice = ctx.costPrice;
+        if (item.reloadType) continue;
+        const violation = findPosPriceViolation(item, ctx);
+        if (!violation) continue;
+        if (!canOverride) {
+          throw new BadRequestException(
+            describePosPriceViolation(item.productName?.trim() || item.sku, violation),
+          );
+        }
+        priceOverrides.push({ variantId: item.variantId.trim(), ...violation });
       }
     }
 
@@ -398,7 +505,7 @@ export class PosService {
       throw new BadRequestException('One or more bank accounts are invalid or inactive');
     }
 
-    const sale = await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       await this.inventoryService.assertSaleStockAvailable(
         tenantId,
         branchId,
@@ -423,6 +530,7 @@ export class PosService {
           helperName,
           helperCommission,
           invoiceNumber: resolvedInvoice,
+          clientRequestId,
           status: SaleStatus.COMPLETED,
           subtotal,
           discountAmount: totalDiscount,
@@ -443,6 +551,8 @@ export class PosService {
             paymentSummary: buildPaymentsSummary(paymentMethods),
             partialBalance: isPartial ? amountDue - totalPaid : 0,
             helperCommission,
+            ...(priceOverrides.length ? { priceOverrides } : {}),
+            ...(requestFingerprint ? { requestFingerprint } : {}),
           },
           items: {
             create: dto.items.map((item) => {
@@ -644,7 +754,19 @@ export class PosService {
       }
 
       return created;
-    });
+    })
+      .then((created) => ({ created, replay: null }))
+      .catch(async (e: unknown) => {
+        // Concurrent retry lost the race on the unique key: the whole transaction rolled back
+        // (no stock / payments written), so return the sale the other request created.
+        if (clientRequestId && isClientRequestIdConflict(e)) {
+          const replay = await this.findSaleReplay(tenantId, branchId, cashierId, clientRequestId, requestFingerprint!);
+          if (replay) return { created: null, replay };
+        }
+        throw e;
+      });
+    if (outcome.replay) return outcome.replay;
+    const sale = outcome.created!;
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
     void recordSaleCashMovement(

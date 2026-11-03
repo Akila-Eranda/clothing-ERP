@@ -17,7 +17,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatNumber, cn } from "@/lib/utils";
+import { formatNumber, cn, parseQty } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
@@ -294,8 +294,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                           <p className="text-[10px] text-muted-foreground font-mono">{item.variantName} · {item.sku}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <Input type="number" min={1} max={item.quantity} value={sel.quantity}
-                            onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, quantity: Math.min(item.quantity, parseInt(e.target.value) || 1) } }))}
+                          <Input type="number" step="any" min={0.001} max={item.quantity} value={sel.quantity}
+                            onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, quantity: Math.min(item.quantity, parseQty(e.target.value, 1) || 1) } }))}
                             className="w-14 h-7 text-xs text-center px-1" disabled={!sel.selected} />
                           <span className="text-[10px] text-muted-foreground">/{item.quantity}</span>
                         </div>
@@ -393,8 +393,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                             <p className="text-xs font-semibold text-violet-800">{item.productName}</p>
                             <p className="text-[10px] text-muted-foreground font-mono">{item.variantName ? `${item.variantName} · ` : ""}{item.sku}</p>
                           </div>
-                          <Input type="number" min={1} value={item.quantity}
-                            onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
+                          <Input type="number" step="any" min={0.001} value={item.quantity}
+                            onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseQty(e.target.value, 1) || 1 } : x))}
                             className="w-14 h-7 text-xs text-center px-1 shrink-0" />
                           <span className="text-xs font-bold text-violet-700 w-20 text-right shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
                           <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500 shrink-0">

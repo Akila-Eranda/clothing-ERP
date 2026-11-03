@@ -981,8 +981,8 @@ model Inventory {
   variantId     String
   quantity      Float    @default(0)
   reservedQty   Float    @default(0)
-  damagedQty    Int      @default(0)
-  returnedQty   Int      @default(0)
+  damagedQty    Float      @default(0)
+  returnedQty   Float      @default(0)
   avgCost       Float    @default(0)
   lastCost      Float    @default(0)
   minStockLevel Int      @default(0)
@@ -1051,8 +1051,8 @@ model InventoryLot {
   batchNumber     String?
   expiryDate      DateTime?
   manufactureDate DateTime?
-  quantity        Int       @default(0)
-  reservedQty     Int       @default(0)
+  quantity        Float       @default(0)
+  reservedQty     Float       @default(0)
   unitCost        Float     @default(0)
   receivedAt      DateTime  @default(now())
   referenceType   String?
@@ -1081,7 +1081,7 @@ model InventoryLotReservation {
   id          String                     @id @default(cuid())
   tenantId    String
   lotId       String
-  quantity    Int
+  quantity    Float
   status      InventoryReservationStatus @default(ACTIVE)
   sourceType  String
   sourceId    String
@@ -1100,7 +1100,7 @@ model InventoryReservation {
   tenantId    String
   branchId    String
   variantId   String
-  quantity    Int
+  quantity    Float
   status      InventoryReservationStatus @default(ACTIVE)
   sourceType  String
   sourceId    String
@@ -1138,8 +1138,8 @@ model StockCountLine {
   id          String            @id @default(cuid())
   sessionId   String
   variantId   String
-  systemQty   Int
-  countedQty  Int
+  systemQty   Float
+  countedQty  Float
   variance    Int
 
   session     StockCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -1180,9 +1180,9 @@ model StockTransferItem {
   id            String        @id @default(cuid())
   transferId    String
   variantId     String
-  requestedQty  Int
-  sentQty       Int           @default(0)
-  receivedQty   Int           @default(0)
+  requestedQty  Float
+  sentQty       Float           @default(0)
+  receivedQty   Float           @default(0)
 
   transfer      StockTransfer    @relation(fields: [transferId], references: [id], onDelete: Cascade)
   variant       ProductVariant   @relation(fields: [variantId], references: [id])
@@ -1199,7 +1199,7 @@ model StockTransferLot {
   toLotId        String?
   batchNumber    String?
   expiryDate     DateTime?
-  quantity       Int
+  quantity       Float
 
   transferItem   StockTransferItem @relation(fields: [transferItemId], references: [id], onDelete: Cascade)
 
@@ -1767,6 +1767,8 @@ model Sale {
   isReturn          Boolean       @default(false)
   originalSaleId    String?
   terminalId        String?
+  /// POS idempotency key (one per checkout attempt); retries with the same key return the original sale.
+  clientRequestId   String?
   metadata          Json          @default("{}")
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -1781,6 +1783,7 @@ model Sale {
   returns           Return[]
 
   @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId])
   @@index([branchId])
   @@index([customerId])
@@ -2026,7 +2029,7 @@ model ReturnItem {
   id          String   @id @default(cuid())
   returnId    String
   variantId   String
-  quantity    Int
+  quantity    Float
   unitPrice   Float
   totalAmount Float
 
@@ -2218,10 +2221,10 @@ model PurchaseOrderItem {
   productName   String
   variantName   String
   sku           String
-  orderedQty    Int
-  freeQty       Int       @default(0)
-  receivedQty   Int       @default(0)
-  rejectedQty   Int       @default(0)
+  orderedQty    Float
+  freeQty       Float       @default(0)
+  receivedQty   Float       @default(0)
+  rejectedQty   Float       @default(0)
   unitCost      Float
   sellingPrice  Float?
   mrp           Float?
@@ -2312,7 +2315,7 @@ model PurchaseRequestItem {
   productName   String
   variantName   String
   sku           String
-  requestedQty  Int
+  requestedQty  Float
   unitCostHint  Float    @default(0)
   notes         String?
 
@@ -2361,9 +2364,9 @@ model GoodsReceiptItem {
   productName     String
   variantName     String
   sku             String
-  orderedQty      Int       @default(0)
-  receivedQty     Int
-  rejectedQty     Int       @default(0)
+  orderedQty      Float       @default(0)
+  receivedQty     Float
+  rejectedQty     Float       @default(0)
   unitCost        Float     @default(0)
   batchNumber     String?
   expiryDate      DateTime?
@@ -2412,7 +2415,7 @@ model SupplierReturnItem {
   variantId   String
   productName String
   sku         String
-  quantity    Int
+  quantity    Float
   unitCost    Float    @default(0)
   lotId       String?
   batchNumber String?

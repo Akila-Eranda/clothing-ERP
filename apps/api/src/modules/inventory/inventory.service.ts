@@ -23,6 +23,7 @@ import {
   reconcileLotTotals,
   releaseLotReservations,
   reserveLots,
+  roundQty,
   startOfLocalDay,
   type LotAllocationStrategy,
 } from './inventory-lots.helper';
@@ -416,8 +417,8 @@ export class InventoryService {
       const onHand = inv?.quantity ?? 0;
       const reserved = inv?.reservedQty ?? 0;
       const heldForBill = heldByVariant.get(item.variantId) ?? 0;
-      const available = onHand - reserved + heldForBill;
-      if (available < item.quantity) {
+      const available = roundQty(onHand - reserved + heldForBill);
+      if (available < roundQty(item.quantity)) {
         const variant = await client.productVariant.findFirst({
           where: { id: item.variantId, product: { tenantId } },
           select: { sku: true, name: true, product: { select: { name: true } } },
@@ -444,10 +445,10 @@ export class InventoryService {
 
       const sellable = filterSellableLots(lots, true);
       const sellableQty = availableQtyOnLots(sellable);
-      const lotQty = lots.reduce((s, l) => s + l.quantity, 0);
-      const unlotted = Math.max(0, onHand - lotQty);
-      const sellableAvailable = sellableQty + unlotted + heldForBill;
-      if (sellableAvailable < item.quantity) {
+      const lotQty = roundQty(lots.reduce((s, l) => s + l.quantity, 0));
+      const unlotted = roundQty(Math.max(0, onHand - lotQty));
+      const sellableAvailable = roundQty(sellableQty + unlotted + heldForBill);
+      if (sellableAvailable < roundQty(item.quantity)) {
         const variant = await client.productVariant.findFirst({
           where: { id: item.variantId, product: { tenantId } },
           select: { sku: true, name: true, product: { select: { name: true } } },
@@ -640,7 +641,7 @@ export class InventoryService {
           branchId: effectiveBranch,
           variantId: dto.variantId,
           movementType: dto.movementType,
-          quantityChange: finalQty - currentQty,
+          quantityChange: roundQty(finalQty - currentQty),
           quantityBefore: currentQty,
           quantityAfter: finalQty,
           reservedBefore: currentReserved,

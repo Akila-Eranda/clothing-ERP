@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { InventoryReservationStatus, Prisma, StockMovementType } from '@prisma/client';
+import { roundQty } from './inventory-engine.helper';
+
+export { roundQty };
 
 export type LotClient = Prisma.TransactionClient;
 
@@ -108,7 +111,7 @@ export function filterSellableLots<T extends { expiryDate: Date | null }>(
 }
 
 export function availableQtyOnLots(lots: LotLike[]): number {
-  return lots.reduce((sum, lot) => sum + Math.max(0, lot.quantity - lot.reservedQty), 0);
+  return roundQty(lots.reduce((sum, lot) => sum + Math.max(0, lot.quantity - lot.reservedQty), 0));
 }
 
 /**
@@ -122,13 +125,13 @@ export function allocateFromLots(
   if (quantity <= 0 || !lots.length) return [];
 
   const allocations: LotAllocation[] = [];
-  let remaining = quantity;
+  let remaining = roundQty(quantity);
 
   for (const lot of lots) {
     if (remaining <= 0) break;
-    const available = Math.max(0, lot.quantity - lot.reservedQty);
+    const available = roundQty(Math.max(0, lot.quantity - lot.reservedQty));
     if (available <= 0) continue;
-    const take = Math.min(available, remaining);
+    const take = roundQty(Math.min(available, remaining));
     allocations.push({
       lotId: lot.id,
       quantity: take,
@@ -136,7 +139,7 @@ export function allocateFromLots(
       expiryDate: lot.expiryDate,
       manufactureDate: lot.manufactureDate ?? null,
     });
-    remaining -= take;
+    remaining = roundQty(remaining - take);
   }
 
   return allocations;
@@ -168,10 +171,12 @@ export function reconcileLotTotals(
         reservedInventory: inv.reservedQty,
         reservedLots: 0,
         delta: inv.quantity,
-        status: inv.quantity === 0 ? 'MATCHED' : 'NO_LOTS',
+        status: roundQty(inv.quantity) === 0 ? 'MATCHED' : 'NO_LOTS',
       };
     }
-    const delta = inv.quantity - lots.qty;
+    lots.qty = roundQty(lots.qty);
+    lots.reserved = roundQty(lots.reserved);
+    const delta = roundQty(inv.quantity - lots.qty);
     let status: ReconcileRow['status'] = 'MATCHED';
     if (delta > 0) status = 'LOT_SHORT';
     else if (delta < 0) status = 'LOT_OVER';
@@ -271,8 +276,8 @@ export async function planLotAllocation(
         `Cannot sell expired lot ${label}: expiry ${lot.expiryDate?.toISOString().slice(0, 10) ?? 'unknown'}`,
       );
     }
-    const available = Math.max(0, lot.quantity - lot.reservedQty);
-    if (available < quantity) {
+    const available = roundQty(Math.max(0, lot.quantity - lot.reservedQty));
+    if (available < roundQty(quantity)) {
       throw new BadRequestException(
         `Insufficient quantity on lot ${lot.batchNumber || lot.id.slice(0, 8)}: ${available} available, ${quantity} requested`,
       );
@@ -311,7 +316,7 @@ export async function planLotAllocation(
   const plan = allocateFromLots(lots, quantity);
   if (
     blockExpired
-    && plan.reduce((s, a) => s + a.quantity, 0) < quantity
+    && roundQty(plan.reduce((s, a) => s + a.quantity, 0)) < roundQty(quantity)
     && availableQtyOnLots(allLots) >= quantity
   ) {
     throw new BadRequestException(
@@ -342,7 +347,7 @@ export async function applyOutboundLots(
   for (const a of allocations) {
     const lot = await client.inventoryLot.findUnique({ where: { id: a.lotId } });
     if (!lot) throw new BadRequestException(`Lot ${a.lotId} not found`);
-    const nextQty = lot.quantity - a.quantity;
+    const nextQty = roundQty(lot.quantity - a.quantity);
     if (nextQty < 0) {
       throw new BadRequestException(`Lot ${lot.batchNumber || lot.id} would go negative`);
     }

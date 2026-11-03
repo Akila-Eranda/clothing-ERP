@@ -28,6 +28,14 @@ export type StockDeltaResult = {
   finalQty: number;
 };
 
+/**
+ * Round a stock quantity to 3 dp (gram precision for kg goods) so float noise such as
+ * 0.3 - 0.1 - 0.2 = -2.8e-17 never looks like a shortfall or a leftover.
+ */
+export function roundQty(n: number): number {
+  return Math.round((n + Number.EPSILON) * 1000) / 1000;
+}
+
 export function isDeductionMovement(type: StockMovementType): boolean {
   return DEDUCTION_TYPES.includes(type);
 }
@@ -67,13 +75,14 @@ export function computeStockDelta(input: StockDeltaInput): StockDeltaResult {
   const allowNegSale =
     !!input.allowNegativeSale && input.movementType === StockMovementType.SALE;
 
+  newQty = roundQty(newQty);
   const finalQty = allowNegSale ? newQty : Math.max(0, newQty);
 
   return {
-    delta,
+    delta: roundQty(delta),
     newQty,
-    newDamaged,
-    newReturned,
+    newDamaged: roundQty(newDamaged),
+    newReturned: roundQty(newReturned),
     isDeduction,
     finalQty,
   };

@@ -1,5 +1,7 @@
 /** Pure procurement cycle helpers — unit-tested without DB. */
 
+import { roundQty } from '@/modules/inventory/inventory-engine.helper';
+
 export type PoReceiveLine = {
   orderedQty: number;
   receivedQty: number;
@@ -15,14 +17,14 @@ export type PoReceiveResult = {
 export function applyPartialReceive(lines: PoReceiveLine[]): PoReceiveResult {
   const nextReceived = lines.map((l) => {
     if (l.thisReceive < 0) throw new Error('Receive qty cannot be negative');
-    const next = l.receivedQty + l.thisReceive;
-    if (next > l.orderedQty) {
+    const next = roundQty(l.receivedQty + l.thisReceive);
+    if (next > roundQty(l.orderedQty)) {
       throw new Error(`Cannot receive beyond ordered qty (${l.orderedQty})`);
     }
     return next;
   });
 
-  const fullyReceived = nextReceived.every((n, i) => n >= lines[i].orderedQty);
+  const fullyReceived = nextReceived.every((n, i) => n >= roundQty(lines[i].orderedQty));
   const anyReceived = nextReceived.some((n, i) => n > lines[i].receivedQty || lines[i].receivedQty > 0);
 
   if (fullyReceived) {

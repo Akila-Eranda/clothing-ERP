@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
-import { cn } from "@/lib/utils";
+import { cn, parseQty } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { PoProductSalesModal } from "@/components/purchases/po-product-sales-modal";
@@ -1486,20 +1486,20 @@ export default function CreatePOPage() {
                           <div className="space-y-1">
                             <label className="text-[10px] font-semibold uppercase text-muted-foreground">Order Qty</label>
                             <input
-                              type="number"
+                              type="number" step="any"
                               min={0}
                               value={item.orderedQty}
-                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseQty(e.target.value)))}
                               className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] font-semibold uppercase text-muted-foreground">Free Qty</label>
                             <input
-                              type="number"
+                              type="number" step="any"
                               min={0}
                               value={item.freeQty}
-                              onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseQty(e.target.value)))}
                               className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
@@ -1744,10 +1744,10 @@ export default function CreatePOPage() {
                             <div className="flex justify-end">
                               <input
                                 ref={(el) => { qtyInputRefs.current[idx] = el; }}
-                                type="number"
+                                type="number" step="any"
                                 min={0}
                                 value={item.orderedQty}
-                                onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseQty(e.target.value)))}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     e.preventDefault();
@@ -1761,10 +1761,10 @@ export default function CreatePOPage() {
                           <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end">
                               <input
-                                type="number"
+                                type="number" step="any"
                                 min={0}
                                 value={item.freeQty}
-                                onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseQty(e.target.value)))}
                                 className={cn(FORM_LINE_INPUT, "w-[4.5rem]")}
                               />
                             </div>
