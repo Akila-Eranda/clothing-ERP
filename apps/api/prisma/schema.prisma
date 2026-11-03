@@ -416,103 +416,103 @@ enum DiscountType {
 // ============================================================
 
 model Tenant {
-  id               String           @id @default(cuid())
-  name             String
-  subdomain        String           @unique
-  logo             String?
-  domain           String?          @unique
-  email            String?
-  phone            String?
-  currency         String           @default("INR")
-  country          String           @default("IN")
-  timezone         String           @default("Asia/Kolkata")
-  plan             SubscriptionPlan @default(STARTER)
-  shopType         ShopType         @default(CLOTHING)
-  status           TenantStatus     @default(TRIAL)
-  trialEndsAt      DateTime?
-  subscriptionId   String?
-  billingEmail     String?
-  maxBranches      Int              @default(1)
-  maxUsers         Int              @default(5)
-  maxProducts      Int              @default(500)
-  settings         Json             @default("{}")
-  metadata         Json             @default("{}")
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  name           String
+  subdomain      String           @unique
+  logo           String?
+  domain         String?          @unique
+  email          String?
+  phone          String?
+  currency       String           @default("INR")
+  country        String           @default("IN")
+  timezone       String           @default("Asia/Kolkata")
+  plan           SubscriptionPlan @default(STARTER)
+  shopType       ShopType         @default(CLOTHING)
+  status         TenantStatus     @default(TRIAL)
+  trialEndsAt    DateTime?
+  subscriptionId String?
+  billingEmail   String?
+  maxBranches    Int              @default(1)
+  maxUsers       Int              @default(5)
+  maxProducts    Int              @default(500)
+  settings       Json             @default("{}")
+  metadata       Json             @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  branches         Branch[]
-  users            User[]
-  products         Product[]
-  categories       Category[]
-  brands           Brand[]
-  customers        Customer[]
-  suppliers        Supplier[]
-  sales            Sale[]
-  purchases        PurchaseOrder[]
-  purchaseRequests PurchaseRequest[]
-  goodsReceipts    GoodsReceipt[]
-  supplierReturns  SupplierReturn[]
-  supplierInvoices SupplierInvoice[]
+  branches                   Branch[]
+  users                      User[]
+  products                   Product[]
+  categories                 Category[]
+  brands                     Brand[]
+  customers                  Customer[]
+  suppliers                  Supplier[]
+  sales                      Sale[]
+  purchases                  PurchaseOrder[]
+  purchaseRequests           PurchaseRequest[]
+  goodsReceipts              GoodsReceipt[]
+  supplierReturns            SupplierReturn[]
+  supplierInvoices           SupplierInvoice[]
   supplierProductAssignments SupplierProductAssignment[]
-  supplierLedgerEntries SupplierLedgerEntry[]
-  supplierDebitNotes SupplierDebitNote[]
-  taxRates           TaxRate[]
-  vatReturns         VatReturn[]
-  pettyCashFunds     PettyCashFund[]
-  expenseClaims      ExpenseClaim[]
-  reimbursements     Reimbursement[]
-  fixedAssetCategories FixedAssetCategory[]
-  fixedAssets        FixedAsset[]
-  payrollSettings    PayrollSetting?
-  payrollComponents  PayrollComponent[]
-  payrollRuns        PayrollRun[]
-  payslips           Payslip[]
-  employees        Employee[]
-  accounts         Account[]
-  fiscalYears      FiscalYear[]
-  accountingPeriods AccountingPeriod[]
-  notifications    Notification[]
-  bankAccounts     BankAccount[]
-  cheques          Cheque[]
-  cashBookEntries  CashBookEntry[]
-  bankReconciliations BankReconciliation[]
-  auditLogs        AuditLog[]
-  promotions       Promotion[]
-  warehouses       Warehouse[]
-  reports          Report[]
-  fileUploads      FileUpload[]
-  vehicleBrands    VehicleBrand[]
-  warrantyClaims   WarrantyClaim[]
-  quotations       Quotation[]
-  jobCards         JobCard[]
-  appointments     Appointment[]
-  workshopServices WorkshopServiceCatalog[]
-  serviceReminders ServiceReminder[]
-  tyreSerials      TyreSerial[]
-  receiptPrintLogs ReceiptPrintLog[]
-  cashRegisters    CashRegister[]
-  posCounters      PosCounter[]
-  cashMovements    CashMovement[]
-  giftVouchers     GiftVoucher[]
-  reloadOperators  ReloadOperator[]
-  reloadDenominations ReloadDenomination[]
-  reloadCardStocks ReloadCardStock[]
-  reloadSales      ReloadSale[]
-  creditSchedules  CustomerCreditSchedule[]
-  creditReminders  CustomerCreditReminder[]
-  calendarNotes    CalendarNote[]
-  calendarTasks    CalendarTask[]
-  calendarMeetings CalendarMeeting[]
-  documentNumberSeries DocumentNumberSeries[]
-  accountingPreference AccountingPreference?
-  accountMappings      AccountMapping[]
-  accountingOutboxEvents AccountingOutboxEvent[]
-  costCenters       CostCenter[]
-  accountingBudgets AccountingBudget[]
-  recurringJournals RecurringJournal[]
-  exchangeRates     ExchangeRate[]
-  featureSuggestions FeatureSuggestion[]
-  releaseReads     TenantReleaseRead[]
+  supplierLedgerEntries      SupplierLedgerEntry[]
+  supplierDebitNotes         SupplierDebitNote[]
+  taxRates                   TaxRate[]
+  vatReturns                 VatReturn[]
+  pettyCashFunds             PettyCashFund[]
+  expenseClaims              ExpenseClaim[]
+  reimbursements             Reimbursement[]
+  fixedAssetCategories       FixedAssetCategory[]
+  fixedAssets                FixedAsset[]
+  payrollSettings            PayrollSetting?
+  payrollComponents          PayrollComponent[]
+  payrollRuns                PayrollRun[]
+  payslips                   Payslip[]
+  employees                  Employee[]
+  accounts                   Account[]
+  fiscalYears                FiscalYear[]
+  accountingPeriods          AccountingPeriod[]
+  notifications              Notification[]
+  bankAccounts               BankAccount[]
+  cheques                    Cheque[]
+  cashBookEntries            CashBookEntry[]
+  bankReconciliations        BankReconciliation[]
+  auditLogs                  AuditLog[]
+  promotions                 Promotion[]
+  warehouses                 Warehouse[]
+  reports                    Report[]
+  fileUploads                FileUpload[]
+  vehicleBrands              VehicleBrand[]
+  warrantyClaims             WarrantyClaim[]
+  quotations                 Quotation[]
+  jobCards                   JobCard[]
+  appointments               Appointment[]
+  workshopServices           WorkshopServiceCatalog[]
+  serviceReminders           ServiceReminder[]
+  tyreSerials                TyreSerial[]
+  receiptPrintLogs           ReceiptPrintLog[]
+  cashRegisters              CashRegister[]
+  posCounters                PosCounter[]
+  cashMovements              CashMovement[]
+  giftVouchers               GiftVoucher[]
+  reloadOperators            ReloadOperator[]
+  reloadDenominations        ReloadDenomination[]
+  reloadCardStocks           ReloadCardStock[]
+  reloadSales                ReloadSale[]
+  creditSchedules            CustomerCreditSchedule[]
+  creditReminders            CustomerCreditReminder[]
+  calendarNotes              CalendarNote[]
+  calendarTasks              CalendarTask[]
+  calendarMeetings           CalendarMeeting[]
+  documentNumberSeries       DocumentNumberSeries[]
+  accountingPreference       AccountingPreference?
+  accountMappings            AccountMapping[]
+  accountingOutboxEvents     AccountingOutboxEvent[]
+  costCenters                CostCenter[]
+  accountingBudgets          AccountingBudget[]
+  recurringJournals          RecurringJournal[]
+  exchangeRates              ExchangeRate[]
+  featureSuggestions         FeatureSuggestion[]
+  releaseReads               TenantReleaseRead[]
 
   @@map("tenants")
 }
@@ -535,22 +535,22 @@ enum ReceiptPrintStatus {
 }
 
 model ReceiptPrintLog {
-  id             String              @id @default(cuid())
+  id             String             @id @default(cuid())
   tenantId       String
   branchId       String?
   userId         String?
   printType      ReceiptPrintType
   invoiceNumber  String?
   status         ReceiptPrintStatus
-  printMode      String              @default("browser")
+  printMode      String             @default("browser")
   printServerUrl String?
   printerName    String?
   errorMessage   String?
-  metadata       Json                @default("{}")
-  createdAt      DateTime            @default(now())
+  metadata       Json               @default("{}")
+  createdAt      DateTime           @default(now())
 
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user           User?               @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
 
   @@index([tenantId, createdAt])
   @@index([invoiceNumber])
@@ -562,33 +562,33 @@ model ReceiptPrintLog {
 // ============================================================
 
 model Branch {
-  id          String   @id @default(cuid())
-  tenantId    String
-  name        String
-  code        String
-  address     String?
-  city        String?
-  state       String?
-  pincode     String?
-  phone       String?
-  email       String?
-  gstNumber   String?
-  isDefault   Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  settings    Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String
+  address   String?
+  city      String?
+  state     String?
+  pincode   String?
+  phone     String?
+  email     String?
+  gstNumber String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users       User[]
-  inventory   Inventory[]
-  lots        InventoryLot[]
-  sales       Sale[]
-  employees   Employee[]
-  transfers   StockTransfer[]
-  warehouses  Warehouse[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users         User[]
+  inventory     Inventory[]
+  lots          InventoryLot[]
+  sales         Sale[]
+  employees     Employee[]
+  transfers     StockTransfer[]
+  warehouses    Warehouse[]
   cashRegisters CashRegister[]
-  posCounters PosCounter[]
+  posCounters   PosCounter[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -600,45 +600,45 @@ model Branch {
 // ============================================================
 
 model User {
-  id                  String     @id @default(cuid())
-  tenantId            String
-  branchId            String?
-  email               String
-  phone               String?
-  passwordHash        String
-  firstName           String
-  lastName            String
-  avatar              String?
-  gender              Gender?
-  status              UserStatus @default(PENDING_VERIFICATION)
-  emailVerified       Boolean    @default(false)
-  phoneVerified       Boolean    @default(false)
-  twoFactorEnabled    Boolean    @default(false)
-  twoFactorSecret     String?
-  lastLoginAt         DateTime?
-  lastLoginIp         String?
-  loginAttempts       Int        @default(0)
-  lockedUntil         DateTime?
-  passwordChangedAt   DateTime?
+  id                String     @id @default(cuid())
+  tenantId          String
+  branchId          String?
+  email             String
+  phone             String?
+  passwordHash      String
+  firstName         String
+  lastName          String
+  avatar            String?
+  gender            Gender?
+  status            UserStatus @default(PENDING_VERIFICATION)
+  emailVerified     Boolean    @default(false)
+  phoneVerified     Boolean    @default(false)
+  twoFactorEnabled  Boolean    @default(false)
+  twoFactorSecret   String?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  loginAttempts     Int        @default(0)
+  lockedUntil       DateTime?
+  passwordChangedAt DateTime?
   // 4-digit POS unlock PIN (bcrypt hash) — switch cashier without re-login
-  posPinHash          String?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  posPinHash        String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch              Branch?       @relation(fields: [branchId], references: [id])
-  roles               UserRole[]
-  sessions            Session[]
-  refreshTokens       RefreshToken[]
-  auditLogs           AuditLog[]
-  sales               Sale[]        @relation("CashierSales")
-  notifications       UserNotification[]
-  activityLogs        ActivityLog[]
-  receiptPrintLogs    ReceiptPrintLog[]
-  cashRegisters       CashRegister[] @relation("CashierRegisters")
-  cashRegistersApproved CashRegister[] @relation("CashRegisterApprover")
-  cashMovements       CashMovement[]
-  featureSuggestions  FeatureSuggestion[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch                 Branch?                 @relation(fields: [branchId], references: [id])
+  roles                  UserRole[]
+  sessions               Session[]
+  refreshTokens          RefreshToken[]
+  auditLogs              AuditLog[]
+  sales                  Sale[]                  @relation("CashierSales")
+  notifications          UserNotification[]
+  activityLogs           ActivityLog[]
+  receiptPrintLogs       ReceiptPrintLog[]
+  cashRegisters          CashRegister[]          @relation("CashierRegisters")
+  cashRegistersApproved  CashRegister[]          @relation("CashRegisterApprover")
+  cashMovements          CashMovement[]
+  featureSuggestions     FeatureSuggestion[]
   announcementDismissals AnnouncementDismissal[]
 
   @@unique([tenantId, email])
@@ -671,7 +671,7 @@ model Permission {
   description String?
   createdAt   DateTime @default(now())
 
-  roles       RolePermission[]
+  roles RolePermission[]
 
   @@unique([resource, action])
   @@map("permissions")
@@ -684,39 +684,39 @@ model UserRole {
   grantedAt DateTime @default(now())
   grantedBy String?
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
   @@map("user_roles")
 }
 
 model RolePermission {
-  id           String     @id @default(cuid())
+  id           String   @id @default(cuid())
   roleId       String
   permissionId String
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime @default(now())
 
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model Session {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  ipAddress   String?
-  userAgent   String?
-  deviceName  String?
-  isActive    Boolean  @default(true)
-  expiresAt   DateTime
-  lastUsedAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  ipAddress  String?
+  userAgent  String?
+  deviceName String?
+  isActive   Boolean  @default(true)
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -724,16 +724,16 @@ model Session {
 }
 
 model RefreshToken {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  family      String
-  isUsed      Boolean  @default(false)
-  isRevoked   Boolean  @default(false)
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  family    String
+  isUsed    Boolean  @default(false)
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -742,12 +742,12 @@ model RefreshToken {
 }
 
 model PasswordReset {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   email     String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([token])
   @@map("password_resets")
@@ -758,22 +758,22 @@ model PasswordReset {
 // ============================================================
 
 model Category {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   tenantId    String
   parentId    String?
   name        String
   slug        String
   description String?
   image       String?
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryHierarchy")
-  products    Product[]
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -791,8 +791,8 @@ model Brand {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products    Product[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -800,55 +800,55 @@ model Brand {
 }
 
 model Product {
-  id              String        @id @default(cuid())
-  tenantId        String
-  categoryId      String?
-  brandId         String?
-  name            String
-  slug            String
-  description     String?
-  shortDesc       String?
-  sku             String
-  barcode         String?
-  hsn             String?
-  taxRate         Float         @default(18)
-  costPrice       Float         @default(0)
-  sellingPrice    Float         @default(0)
-  mrp             Float         @default(0)
-  wholesalePrice  Float         @default(0)
-  unit            String?
-  productKind     ProductKind   @default(STANDARD)
-  barcodeMode     BarcodeMode   @default(UNIQUE)
-  allowNegativeStock Boolean    @default(false)
-  allowDecimalSelling Boolean   @default(false)
-  weightScaleReady Boolean      @default(false)
-  status          ProductStatus @default(DRAFT)
-  images          String[]      @default([])
-  tags            String[]      @default([])
-  attributes      Json          @default("{}")
-  oemNumber       String?
-  modelNumber     String?
-  loadIndex       String?
-  speedRating     String?
-  tubeType        TubeType?
-  pattern         String?
-  warrantyMonths  Int?
-  seoTitle        String?
-  seoDescription  String?
-  aiTags          String[]      @default([])
-  isFeatured      Boolean       @default(false)
-  hasVariants     Boolean       @default(true)
-  trackInventory  Boolean       @default(true)
-  sortOrder       Int           @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  tenantId            String
+  categoryId          String?
+  brandId             String?
+  name                String
+  slug                String
+  description         String?
+  shortDesc           String?
+  sku                 String
+  barcode             String?
+  hsn                 String?
+  taxRate             Float         @default(18)
+  costPrice           Float         @default(0)
+  sellingPrice        Float         @default(0)
+  mrp                 Float         @default(0)
+  wholesalePrice      Float         @default(0)
+  unit                String?
+  productKind         ProductKind   @default(STANDARD)
+  barcodeMode         BarcodeMode   @default(UNIQUE)
+  allowNegativeStock  Boolean       @default(false)
+  allowDecimalSelling Boolean       @default(false)
+  weightScaleReady    Boolean       @default(false)
+  status              ProductStatus @default(DRAFT)
+  images              String[]      @default([])
+  tags                String[]      @default([])
+  attributes          Json          @default("{}")
+  oemNumber           String?
+  modelNumber         String?
+  loadIndex           String?
+  speedRating         String?
+  tubeType            TubeType?
+  pattern             String?
+  warrantyMonths      Int?
+  seoTitle            String?
+  seoDescription      String?
+  aiTags              String[]      @default([])
+  isFeatured          Boolean       @default(false)
+  hasVariants         Boolean       @default(true)
+  trackInventory      Boolean       @default(true)
+  sortOrder           Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
-  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category        Category?      @relation(fields: [categoryId], references: [id])
-  brand           Brand?         @relation(fields: [brandId], references: [id])
-  variants        ProductVariant[]
-  collections     CollectionProduct[]
-  promotions      PromotionProduct[]
+  tenant           Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category         Category?                @relation(fields: [categoryId], references: [id])
+  brand            Brand?                   @relation(fields: [brandId], references: [id])
+  variants         ProductVariant[]
+  collections      CollectionProduct[]
+  promotions       PromotionProduct[]
   bundleComponents ProductBundleComponent[] @relation("BundleProduct")
 
   @@unique([tenantId, sku])
@@ -859,48 +859,48 @@ model Product {
 }
 
 model ProductVariant {
-  id            String        @id @default(cuid())
-  productId     String
-  sku           String
-  barcode       String?
-  name          String
-  size          String?
-  color         String?
-  material      String?
-  style         String?
-  dotCode       String?
-  attributes    Json          @default("{}")
-  costPrice     Float         @default(0)
-  sellingPrice  Float         @default(0)
-  mrp           Float         @default(0)
-  images        String[]      @default([])
-  isActive      Boolean       @default(true)
-  sortOrder     Int           @default(0)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String   @id @default(cuid())
+  productId    String
+  sku          String
+  barcode      String?
+  name         String
+  size         String?
+  color        String?
+  material     String?
+  style        String?
+  dotCode      String?
+  attributes   Json     @default("{}")
+  costPrice    Float    @default(0)
+  sellingPrice Float    @default(0)
+  mrp          Float    @default(0)
+  images       String[] @default([])
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inventory     Inventory[]
-  lots          InventoryLot[]
-  saleItems     SaleItem[]
-  returnItems   ReturnItem[]
-  purchaseItems PurchaseOrderItem[]
+  product              Product                     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory            Inventory[]
+  lots                 InventoryLot[]
+  saleItems            SaleItem[]
+  returnItems          ReturnItem[]
+  purchaseItems        PurchaseOrderItem[]
   purchaseRequestItems PurchaseRequestItem[]
-  goodsReceiptItems GoodsReceiptItem[]
-  supplierReturnItems SupplierReturnItem[]
-  stockMovements InventoryLog[]
-  transferItems  StockTransferItem[]
-  reservations  InventoryReservation[]
-  stockCountLines StockCountLine[]
-  partCompatibilities PartCompatibility[]
-  warrantyClaims WarrantyClaim[]
-  quotationItems QuotationItem[]
-  jobCardLines   JobCardLine[]
-  tyreSerials    TyreSerial[]
-  supplierAssignments SupplierProductAssignment[]
-  shelfLocations    VariantShelfLocation[]
-  bundleAsComponent ProductBundleComponent[] @relation("BundleComponent")
-  fittingItems      FittingSessionItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
+  supplierReturnItems  SupplierReturnItem[]
+  stockMovements       InventoryLog[]
+  transferItems        StockTransferItem[]
+  reservations         InventoryReservation[]
+  stockCountLines      StockCountLine[]
+  partCompatibilities  PartCompatibility[]
+  warrantyClaims       WarrantyClaim[]
+  quotationItems       QuotationItem[]
+  jobCardLines         JobCardLine[]
+  tyreSerials          TyreSerial[]
+  supplierAssignments  SupplierProductAssignment[]
+  shelfLocations       VariantShelfLocation[]
+  bundleAsComponent    ProductBundleComponent[]    @relation("BundleComponent")
+  fittingItems         FittingSessionItem[]
 
   @@unique([productId, sku])
   @@index([productId])
@@ -926,7 +926,7 @@ model Collection {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  products    CollectionProduct[]
+  products CollectionProduct[]
 
   @@index([tenantId])
   @@index([tenantId, isActive])
@@ -938,8 +938,8 @@ model CollectionProduct {
   productId    String
   sortOrder    Int    @default(0)
 
-  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([collectionId, productId])
   @@map("collection_products")
@@ -950,21 +950,21 @@ model CollectionProduct {
 // ============================================================
 
 model Warehouse {
-  id          String   @id @default(cuid())
-  tenantId    String
-  branchId    String
-  name        String
-  code        String
-  address     String?
-  isDefault   Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String
+  branchId  String
+  name      String
+  code      String
+  address   String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch      Branch     @relation(fields: [branchId], references: [id])
-  inventory   Inventory[]
-  lots        InventoryLot[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  inventory     Inventory[]
+  lots          InventoryLot[]
   transfersFrom StockTransfer[] @relation("TransferFromWarehouse")
   transfersTo   StockTransfer[] @relation("TransferToWarehouse")
 
@@ -974,27 +974,33 @@ model Warehouse {
 }
 
 model Inventory {
-  id            String   @id @default(cuid())
-  tenantId      String
-  branchId      String
-  warehouseId   String
-  variantId     String
-  quantity      Float    @default(0)
-  reservedQty   Float    @default(0)
-  damagedQty    Float      @default(0)
-  returnedQty   Float      @default(0)
-  avgCost       Float    @default(0)
-  lastCost      Float    @default(0)
-  minStockLevel Int      @default(0)
-  maxStockLevel Int      @default(0)
-  reorderPoint  Int      @default(5)
-  lastCountedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String @id @default(cuid())
+  tenantId    String
+  branchId    String
+  warehouseId String
+  variantId   String
+  quantity    Float  @default(0)
+  reservedQty Float  @default(0)
+  damagedQty  Float  @default(dbgenerated("'NaN'::double precision")) @map("damagedQtyDec")
 
-  branch        Branch         @relation(fields: [branchId], references: [id])
-  warehouse     Warehouse      @relation(fields: [warehouseId], references: [id])
-  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  damagedQtyLegacy  Int       @default(0) @map("damagedQty")
+  returnedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("returnedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  returnedQtyLegacy Int       @default(0) @map("returnedQty")
+  avgCost           Float     @default(0)
+  lastCost          Float     @default(0)
+  minStockLevel     Int       @default(0)
+  maxStockLevel     Int       @default(0)
+  reorderPoint      Int       @default(5)
+  lastCountedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  branch    Branch         @relation(fields: [branchId], references: [id])
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
 
   @@unique([warehouseId, variantId])
   @@index([tenantId])
@@ -1005,31 +1011,31 @@ model Inventory {
 }
 
 model InventoryLog {
-  id              String             @id @default(cuid())
-  tenantId        String
-  branchId        String
-  variantId       String
-  movementType    StockMovementType
-  quantityChange  Float
-  quantityBefore  Float
-  quantityAfter   Float
-  reservedBefore  Float              @default(0)
-  reservedAfter   Float              @default(0)
-  damagedBefore   Int                @default(0)
-  damagedAfter    Int                @default(0)
-  unitCost        Float?
-  batchNumber     String?
-  expiryDate      DateTime?
-  lotId           String?
-  correlationId   String?
-  referenceId     String?
-  referenceType   String?
-  notes           String?
-  performedBy     String?
-  createdAt       DateTime           @default(now())
+  id             String            @id @default(cuid())
+  tenantId       String
+  branchId       String
+  variantId      String
+  movementType   StockMovementType
+  quantityChange Float
+  quantityBefore Float
+  quantityAfter  Float
+  reservedBefore Float             @default(0)
+  reservedAfter  Float             @default(0)
+  damagedBefore  Int               @default(0)
+  damagedAfter   Int               @default(0)
+  unitCost       Float?
+  batchNumber    String?
+  expiryDate     DateTime?
+  lotId          String?
+  correlationId  String?
+  referenceId    String?
+  referenceType  String?
+  notes          String?
+  performedBy    String?
+  createdAt      DateTime          @default(now())
 
-  variant         ProductVariant     @relation(fields: [variantId], references: [id])
-  lot             InventoryLot?      @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+  lot     InventoryLot?  @relation(fields: [lotId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([branchId])
@@ -1051,22 +1057,28 @@ model InventoryLot {
   batchNumber     String?
   expiryDate      DateTime?
   manufactureDate DateTime?
-  quantity        Float       @default(0)
-  reservedQty     Float       @default(0)
-  unitCost        Float     @default(0)
-  receivedAt      DateTime  @default(now())
-  referenceType   String?
-  referenceId     String?
-  notes           String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  quantity        Float     @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  branch          Branch                   @relation(fields: [branchId], references: [id])
-  warehouse       Warehouse?               @relation(fields: [warehouseId], references: [id])
-  variant         ProductVariant           @relation(fields: [variantId], references: [id])
-  reservations    InventoryLotReservation[]
-  logs            InventoryLog[]
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy    Int      @default(0) @map("quantity")
+  reservedQty       Float    @default(dbgenerated("'NaN'::double precision")) @map("reservedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  reservedQtyLegacy Int      @default(0) @map("reservedQty")
+  unitCost          Float    @default(0)
+  receivedAt        DateTime @default(now())
+  referenceType     String?
+  referenceId       String?
+  notes             String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  branch       Branch                    @relation(fields: [branchId], references: [id])
+  warehouse    Warehouse?                @relation(fields: [warehouseId], references: [id])
+  variant      ProductVariant            @relation(fields: [variantId], references: [id])
+  reservations InventoryLotReservation[]
+  logs         InventoryLog[]
 
   @@index([tenantId, branchId, variantId])
   @@index([tenantId, warehouseId, variantId])
@@ -1078,17 +1090,21 @@ model InventoryLot {
 }
 
 model InventoryLotReservation {
-  id          String                     @id @default(cuid())
-  tenantId    String
-  lotId       String
-  quantity    Float
-  status      InventoryReservationStatus @default(ACTIVE)
-  sourceType  String
-  sourceId    String
-  createdAt   DateTime                   @default(now())
-  releasedAt  DateTime?
+  id       String @id @default(cuid())
+  tenantId String
+  lotId    String
+  quantity Float  @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  lot         InventoryLot               @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy Int                        @default(0) @map("quantity")
+  status         InventoryReservationStatus @default(ACTIVE)
+  sourceType     String
+  sourceId       String
+  createdAt      DateTime                   @default(now())
+  releasedAt     DateTime?
+
+  lot InventoryLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
 
   @@index([lotId, status])
   @@index([tenantId, sourceType, sourceId])
@@ -1096,20 +1112,24 @@ model InventoryLotReservation {
 }
 
 model InventoryReservation {
-  id          String                     @id @default(cuid())
-  tenantId    String
-  branchId    String
-  variantId   String
-  quantity    Float
-  status      InventoryReservationStatus @default(ACTIVE)
-  sourceType  String
-  sourceId    String
-  expiresAt   DateTime?
-  createdBy   String?
-  createdAt   DateTime                   @default(now())
-  releasedAt  DateTime?
+  id        String @id @default(cuid())
+  tenantId  String
+  branchId  String
+  variantId String
+  quantity  Float  @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  variant     ProductVariant             @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy Int                        @default(0) @map("quantity")
+  status         InventoryReservationStatus @default(ACTIVE)
+  sourceType     String
+  sourceId       String
+  expiresAt      DateTime?
+  createdBy      String?
+  createdAt      DateTime                   @default(now())
+  releasedAt     DateTime?
+
+  variant ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([tenantId, branchId, variantId, status])
   @@index([sourceType, sourceId])
@@ -1128,22 +1148,28 @@ model StockCountSession {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  lines       StockCountLine[]
+  lines StockCountLine[]
 
   @@index([tenantId, branchId, status])
   @@map("stock_count_sessions")
 }
 
 model StockCountLine {
-  id          String            @id @default(cuid())
-  sessionId   String
-  variantId   String
-  systemQty   Float
-  countedQty  Float
-  variance    Int
+  id        String @id @default(cuid())
+  sessionId String
+  variantId String
+  systemQty Float  @default(dbgenerated("'NaN'::double precision")) @map("systemQtyDec")
 
-  session     StockCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  variant     ProductVariant    @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  systemQtyLegacy  Int   @default(0) @map("systemQty")
+  countedQty       Float @default(dbgenerated("'NaN'::double precision")) @map("countedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  countedQtyLegacy Int   @default(0) @map("countedQty")
+  variance         Int
+
+  session StockCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  variant ProductVariant    @relation(fields: [variantId], references: [id])
 
   @@index([sessionId])
   @@map("stock_count_lines")
@@ -1165,10 +1191,10 @@ model StockTransfer {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  fromBranch      Branch         @relation(fields: [fromBranchId], references: [id])
-  fromWarehouse   Warehouse?     @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
-  toWarehouse     Warehouse?     @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
-  items           StockTransferItem[]
+  fromBranch    Branch              @relation(fields: [fromBranchId], references: [id])
+  fromWarehouse Warehouse?          @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse?          @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
+  items         StockTransferItem[]
 
   @@index([tenantId])
   @@index([fromWarehouseId])
@@ -1177,15 +1203,23 @@ model StockTransfer {
 }
 
 model StockTransferItem {
-  id            String        @id @default(cuid())
-  transferId    String
-  variantId     String
-  requestedQty  Float
-  sentQty       Float           @default(0)
-  receivedQty   Float           @default(0)
+  id           String @id @default(cuid())
+  transferId   String
+  variantId    String
+  requestedQty Float  @default(dbgenerated("'NaN'::double precision")) @map("requestedQtyDec")
 
-  transfer      StockTransfer    @relation(fields: [transferId], references: [id], onDelete: Cascade)
-  variant       ProductVariant   @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  requestedQtyLegacy Int   @default(0) @map("requestedQty")
+  sentQty            Float @default(dbgenerated("'NaN'::double precision")) @map("sentQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  sentQtyLegacy      Int   @default(0) @map("sentQty")
+  receivedQty        Float @default(dbgenerated("'NaN'::double precision")) @map("receivedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  receivedQtyLegacy  Int   @default(0) @map("receivedQty")
+
+  transfer       StockTransfer      @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  variant        ProductVariant     @relation(fields: [variantId], references: [id])
   lotAllocations StockTransferLot[]
 
   @@index([transferId])
@@ -1199,9 +1233,13 @@ model StockTransferLot {
   toLotId        String?
   batchNumber    String?
   expiryDate     DateTime?
-  quantity       Float
+  quantity       Float     @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  transferItem   StockTransferItem @relation(fields: [transferItemId], references: [id], onDelete: Cascade)
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy Int @default(0) @map("quantity")
+
+  transferItem StockTransferItem @relation(fields: [transferItemId], references: [id], onDelete: Cascade)
 
   @@index([transferItemId])
   @@map("stock_transfer_lots")
@@ -1212,51 +1250,51 @@ model StockTransferLot {
 // ============================================================
 
 model Customer {
-  id              String       @id @default(cuid())
-  tenantId        String
-  code            String?
-  firstName       String
-  lastName        String?
-  email           String?
-  phone           String
-  gender          Gender?
-  dateOfBirth     DateTime?
-  anniversary     DateTime?
-  address         String?
-  city            String?
-  state           String?
-  pincode         String?
-  tier            CustomerTier @default(BRONZE)
-  loyaltyPoints   Int          @default(0)
-  walletBalance   Float        @default(0)
-  creditLimit     Float        @default(0)
-  creditBalance   Float        @default(0)
-  creditDays      Int          @default(30)
-  totalSpent      Float        @default(0)
-  totalOrders     Int          @default(0)
-  isActive        Boolean      @default(true)
-  referralCode    String?      @unique
-  referredBy      String?
-  notes           String?
-  tags            String[]     @default([])
-  isFleet         Boolean      @default(false)
-  metadata        Json         @default("{}")
-  lastPurchaseAt  DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  tenantId       String
+  code           String?
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String
+  gender         Gender?
+  dateOfBirth    DateTime?
+  anniversary    DateTime?
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+  tier           CustomerTier @default(BRONZE)
+  loyaltyPoints  Int          @default(0)
+  walletBalance  Float        @default(0)
+  creditLimit    Float        @default(0)
+  creditBalance  Float        @default(0)
+  creditDays     Int          @default(30)
+  totalSpent     Float        @default(0)
+  totalOrders    Int          @default(0)
+  isActive       Boolean      @default(true)
+  referralCode   String?      @unique
+  referredBy     String?
+  notes          String?
+  tags           String[]     @default([])
+  isFleet        Boolean      @default(false)
+  metadata       Json         @default("{}")
+  lastPurchaseAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sales           Sale[]
-  loyaltyTxns     LoyaltyTransaction[]
-  walletTxns      WalletTransaction[]
-  creditTxns      CustomerCreditTransaction[]
-  creditSchedules CustomerCreditSchedule[]
-  creditReminders CustomerCreditReminder[]
-  vehicles        CustomerVehicle[]
-  warrantyClaims  WarrantyClaim[]
-  quotations      Quotation[]
-  jobCards        JobCard[]
-  appointments    Appointment[]
+  tenant           Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sales            Sale[]
+  loyaltyTxns      LoyaltyTransaction[]
+  walletTxns       WalletTransaction[]
+  creditTxns       CustomerCreditTransaction[]
+  creditSchedules  CustomerCreditSchedule[]
+  creditReminders  CustomerCreditReminder[]
+  vehicles         CustomerVehicle[]
+  warrantyClaims   WarrantyClaim[]
+  quotations       Quotation[]
+  jobCards         JobCard[]
+  appointments     Appointment[]
   serviceReminders ServiceReminder[]
 
   @@unique([tenantId, phone])
@@ -1443,8 +1481,8 @@ model WorkshopServiceCatalog {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lines   JobCardLine[]
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  JobCardLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1452,14 +1490,14 @@ model WorkshopServiceCatalog {
 }
 
 model JobCard {
-  id                String         @id @default(cuid())
+  id                String        @id @default(cuid())
   tenantId          String
   branchId          String?
   customerId        String
   customerVehicleId String?
-  appointmentId     String?        @unique
+  appointmentId     String?       @unique
   jobNumber         String
-  status            JobCardStatus  @default(OPEN)
+  status            JobCardStatus @default(OPEN)
   technicianId      String?
   odometer          Int?
   complaintNotes    String?
@@ -1467,17 +1505,17 @@ model JobCard {
   afterNotes        String?
   technicianNotes   String?
   customerSignature String?
-  subtotal          Float          @default(0)
-  taxAmount         Float          @default(0)
-  discountAmount    Float          @default(0)
-  total             Float          @default(0)
+  subtotal          Float         @default(0)
+  taxAmount         Float         @default(0)
+  discountAmount    Float         @default(0)
+  total             Float         @default(0)
   saleId            String?
   quotationId       String?
   createdBy         String?
   startedAt         DateTime?
   completedAt       DateTime?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer        Customer         @relation(fields: [customerId], references: [id])
@@ -1493,21 +1531,21 @@ model JobCard {
 }
 
 model JobCardLine {
-  id                 String          @id @default(cuid())
-  jobCardId          String
-  lineType           ServiceLineType @default(SERVICE)
-  variantId          String?
-  serviceCatalogId   String?
-  description        String?
-  quantity           Int             @default(1)
-  unitPrice          Float           @default(0)
-  discount           Float           @default(0)
-  taxRate            Float           @default(0)
-  total              Float           @default(0)
+  id               String          @id @default(cuid())
+  jobCardId        String
+  lineType         ServiceLineType @default(SERVICE)
+  variantId        String?
+  serviceCatalogId String?
+  description      String?
+  quantity         Int             @default(1)
+  unitPrice        Float           @default(0)
+  discount         Float           @default(0)
+  taxRate          Float           @default(0)
+  total            Float           @default(0)
 
-  jobCard         JobCard                 @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
-  variant         ProductVariant?         @relation(fields: [variantId], references: [id])
-  serviceCatalog  WorkshopServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
+  jobCard        JobCard                 @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  variant        ProductVariant?         @relation(fields: [variantId], references: [id])
+  serviceCatalog WorkshopServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
 
   @@index([jobCardId])
   @@map("job_card_lines")
@@ -1591,7 +1629,7 @@ model ServiceReminder {
 }
 
 model LoyaltyTransaction {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   customerId  String
   tenantId    String
   points      Int
@@ -1599,9 +1637,9 @@ model LoyaltyTransaction {
   description String?
   referenceId String?
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@map("loyalty_transactions")
@@ -1617,27 +1655,27 @@ model WalletTransaction {
   referenceId String?
   createdAt   DateTime @default(now())
 
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@map("wallet_transactions")
 }
 
 model CustomerCreditTransaction {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   customerId  String
   tenantId    String
   amount      Float
-  paidAmount  Float    @default(0)
+  paidAmount  Float     @default(0)
   type        String
-  status      String   @default("OPEN")
+  status      String    @default("OPEN")
   description String?
   referenceId String?
   dueDate     DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  schedules   CustomerCreditSchedule[]
+  customer  Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  schedules CustomerCreditSchedule[]
 
   @@index([customerId])
   @@index([tenantId])
@@ -1674,10 +1712,10 @@ model CustomerCreditSchedule {
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
-  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  chargeTxn        CustomerCreditTransaction? @relation(fields: [chargeTxnId], references: [id])
-  lines            CustomerCreditScheduleLine[]
+  tenant    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer  Customer                     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  chargeTxn CustomerCreditTransaction?   @relation(fields: [chargeTxnId], references: [id])
+  lines     CustomerCreditScheduleLine[]
 
   @@index([tenantId])
   @@index([customerId])
@@ -1685,17 +1723,17 @@ model CustomerCreditSchedule {
 }
 
 model CustomerCreditScheduleLine {
-  id          String                   @id @default(cuid())
-  scheduleId  String
-  sequence    Int
-  dueDate     DateTime
-  amount      Float
-  paidAmount  Float                    @default(0)
-  status      CreditScheduleLineStatus @default(PENDING)
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
+  id         String                   @id @default(cuid())
+  scheduleId String
+  sequence   Int
+  dueDate    DateTime
+  amount     Float
+  paidAmount Float                    @default(0)
+  status     CreditScheduleLineStatus @default(PENDING)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
 
-  schedule    CustomerCreditSchedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule CustomerCreditSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@index([scheduleId])
   @@index([dueDate])
@@ -1710,22 +1748,22 @@ enum CreditReminderStatus {
 }
 
 model CustomerCreditReminder {
-  id            String               @id @default(cuid())
-  tenantId      String
-  customerId    String
-  chargeTxnId   String?
+  id             String               @id @default(cuid())
+  tenantId       String
+  customerId     String
+  chargeTxnId    String?
   scheduleLineId String?
-  channel       NotificationChannel  @default(IN_APP)
-  status        CreditReminderStatus @default(PENDING)
-  dueDate       DateTime?
-  title         String
-  message       String
-  sentAt        DateTime?
-  createdBy     String?
-  createdAt     DateTime             @default(now())
+  channel        NotificationChannel  @default(IN_APP)
+  status         CreditReminderStatus @default(PENDING)
+  dueDate        DateTime?
+  title          String
+  message        String
+  sentAt         DateTime?
+  createdBy      String?
+  createdAt      DateTime             @default(now())
 
-  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer      Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([customerId])
@@ -1738,49 +1776,49 @@ model CustomerCreditReminder {
 // ============================================================
 
 model Sale {
-  id                String        @id @default(cuid())
-  tenantId          String
-  branchId          String
-  customerId        String?
-  cashierId         String?
-  invoiceNumber     String
-  invoiceDate       DateTime      @default(now())
-  status            SaleStatus    @default(COMPLETED)
-  subtotal          Float
-  discountAmount    Float         @default(0)
-  taxAmount         Float         @default(0)
-  roundOff          Float         @default(0)
-  loyaltyDiscount   Float         @default(0)
-  total             Float
-  amountPaid        Float         @default(0)
-  changeDue         Float         @default(0)
-  paymentMethod     PaymentMethod @default(CASH)
-  paymentStatus     PaymentStatus @default(COMPLETED)
-  notes             String?
-  couponCode        String?
-  couponDiscount    Float         @default(0)
-  pointsRedeemed    Int           @default(0)
-  pointsEarned      Int           @default(0)
-  helperEmployeeId  String?
-  helperName        String?
-  helperCommission  Float         @default(0)
-  isReturn          Boolean       @default(false)
-  originalSaleId    String?
-  terminalId        String?
+  id               String        @id @default(cuid())
+  tenantId         String
+  branchId         String
+  customerId       String?
+  cashierId        String?
+  invoiceNumber    String
+  invoiceDate      DateTime      @default(now())
+  status           SaleStatus    @default(COMPLETED)
+  subtotal         Float
+  discountAmount   Float         @default(0)
+  taxAmount        Float         @default(0)
+  roundOff         Float         @default(0)
+  loyaltyDiscount  Float         @default(0)
+  total            Float
+  amountPaid       Float         @default(0)
+  changeDue        Float         @default(0)
+  paymentMethod    PaymentMethod @default(CASH)
+  paymentStatus    PaymentStatus @default(COMPLETED)
+  notes            String?
+  couponCode       String?
+  couponDiscount   Float         @default(0)
+  pointsRedeemed   Int           @default(0)
+  pointsEarned     Int           @default(0)
+  helperEmployeeId String?
+  helperName       String?
+  helperCommission Float         @default(0)
+  isReturn         Boolean       @default(false)
+  originalSaleId   String?
+  terminalId       String?
   /// POS idempotency key (one per checkout attempt); retries with the same key return the original sale.
-  clientRequestId   String?
-  metadata          Json          @default("{}")
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  clientRequestId  String?
+  metadata         Json          @default("{}")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch            Branch        @relation(fields: [branchId], references: [id])
-  customer          Customer?     @relation(fields: [customerId], references: [id])
-  cashier           User?         @relation("CashierSales", fields: [cashierId], references: [id])
-  helperEmployee    Employee?     @relation("HelperSales", fields: [helperEmployeeId], references: [id])
-  items             SaleItem[]
-  payments          SalePayment[]
-  returns           Return[]
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch         Branch        @relation(fields: [branchId], references: [id])
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  cashier        User?         @relation("CashierSales", fields: [cashierId], references: [id])
+  helperEmployee Employee?     @relation("HelperSales", fields: [helperEmployeeId], references: [id])
+  items          SaleItem[]
+  payments       SalePayment[]
+  returns        Return[]
 
   @@unique([tenantId, invoiceNumber])
   @@unique([tenantId, clientRequestId])
@@ -1793,25 +1831,25 @@ model Sale {
 }
 
 model SaleItem {
-  id            String   @id @default(cuid())
-  saleId        String
+  id           String   @id @default(cuid())
+  saleId       String
   /// Null for POS bill-only / custom lines (not linked to product catalog).
-  variantId     String?
-  productName   String
-  variantName   String
-  sku           String
-  quantity      Float
-  unitPrice     Float
-  costPrice     Float    @default(0)
-  discount      Float    @default(0)
-  discountType  String   @default("FIXED")
-  taxRate       Float    @default(0)
-  taxAmount     Float    @default(0)
-  total         Float
-  createdAt     DateTime @default(now())
+  variantId    String?
+  productName  String
+  variantName  String
+  sku          String
+  quantity     Float
+  unitPrice    Float
+  costPrice    Float    @default(0)
+  discount     Float    @default(0)
+  discountType String   @default("FIXED")
+  taxRate      Float    @default(0)
+  taxAmount    Float    @default(0)
+  total        Float
+  createdAt    DateTime @default(now())
 
-  sale          Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  sale    Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([saleId])
   @@index([variantId])
@@ -1827,23 +1865,23 @@ enum GiftVoucherStatus {
 }
 
 model GiftVoucher {
-  id                String            @id @default(cuid())
-  tenantId          String
-  branchId          String?
-  code              String
-  initialAmount     Float
-  balance           Float
-  status            GiftVoucherStatus @default(ACTIVE)
-  issuedToName      String?
+  id                 String            @id @default(cuid())
+  tenantId           String
+  branchId           String?
+  code               String
+  initialAmount      Float
+  balance            Float
+  status             GiftVoucherStatus @default(ACTIVE)
+  issuedToName       String?
   issuedToCustomerId String?
-  issuedBySaleId    String?
-  expiresAt         DateTime?
-  notes             String?
-  createdBy         String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  issuedBySaleId     String?
+  expiresAt          DateTime?
+  notes              String?
+  createdBy          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1863,23 +1901,23 @@ enum ReloadCardStatus {
 }
 
 model ReloadOperator {
-  id                     String               @id @default(cuid())
-  tenantId               String
-  code                   String
-  name                   String
-  digitalCommissionPct   Float                @default(2)
-  physicalCommissionPct  Float                @default(3)
+  id                    String   @id @default(cuid())
+  tenantId              String
+  code                  String
+  name                  String
+  digitalCommissionPct  Float    @default(2)
+  physicalCommissionPct Float    @default(3)
   /// Operator web top-up page (e.g. Mobitel Quick Pay) opened from POS digital reload.
-  quickPayUrl            String?
-  isActive               Boolean              @default(true)
-  sortOrder              Int                  @default(0)
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  quickPayUrl           String?
+  isActive              Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  denominations          ReloadDenomination[]
-  cardStocks             ReloadCardStock[]
-  sales                  ReloadSale[]
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  denominations ReloadDenomination[]
+  cardStocks    ReloadCardStock[]
+  sales         ReloadSale[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
@@ -1887,18 +1925,18 @@ model ReloadOperator {
 }
 
 model ReloadDenomination {
-  id          String            @id @default(cuid())
-  tenantId    String
-  operatorId  String
-  faceValue   Float
-  isActive    Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id         String   @id @default(cuid())
+  tenantId   String
+  operatorId String
+  faceValue  Float
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  operator    ReloadOperator    @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-  cardStocks  ReloadCardStock[]
-  sales       ReloadSale[]
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator   ReloadOperator    @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  cardStocks ReloadCardStock[]
+  sales      ReloadSale[]
 
   @@unique([operatorId, faceValue])
   @@index([tenantId])
@@ -1907,24 +1945,24 @@ model ReloadDenomination {
 }
 
 model ReloadCardStock {
-  id              String           @id @default(cuid())
-  tenantId        String
-  branchId        String?
-  operatorId      String
-  denominationId  String
-  pinCode         String
-  pinMasked       String
-  purchaseCost    Float?
-  status          ReloadCardStatus @default(AVAILABLE)
-  soldSaleId      String?
-  soldAt          DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  operatorId     String
+  denominationId String
+  pinCode        String
+  pinMasked      String
+  purchaseCost   Float?
+  status         ReloadCardStatus @default(AVAILABLE)
+  soldSaleId     String?
+  soldAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  operator        ReloadOperator   @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-  denomination    ReloadDenomination @relation(fields: [denominationId], references: [id], onDelete: Cascade)
-  sales           ReloadSale[]
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator     ReloadOperator     @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  denomination ReloadDenomination @relation(fields: [denominationId], references: [id], onDelete: Cascade)
+  sales        ReloadSale[]
 
   @@unique([tenantId, pinCode])
   @@index([tenantId, status])
@@ -1933,26 +1971,26 @@ model ReloadCardStock {
 }
 
 model ReloadSale {
-  id                String         @id @default(cuid())
-  tenantId          String
-  branchId          String
-  saleId            String
-  type              ReloadSaleType
-  operatorId        String
-  denominationId    String?
-  cardStockId       String?
-  msisdn            String?
-  faceValue         Float
-  unitPrice         Float
-  costPrice         Float          @default(0)
-  commissionPct     Float          @default(0)
-  commissionEarned  Float          @default(0)
-  createdAt         DateTime       @default(now())
+  id               String         @id @default(cuid())
+  tenantId         String
+  branchId         String
+  saleId           String
+  type             ReloadSaleType
+  operatorId       String
+  denominationId   String?
+  cardStockId      String?
+  msisdn           String?
+  faceValue        Float
+  unitPrice        Float
+  costPrice        Float          @default(0)
+  commissionPct    Float          @default(0)
+  commissionEarned Float          @default(0)
+  createdAt        DateTime       @default(now())
 
-  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  operator          ReloadOperator @relation(fields: [operatorId], references: [id])
-  denomination      ReloadDenomination? @relation(fields: [denominationId], references: [id])
-  cardStock         ReloadCardStock? @relation(fields: [cardStockId], references: [id])
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator     ReloadOperator      @relation(fields: [operatorId], references: [id])
+  denomination ReloadDenomination? @relation(fields: [denominationId], references: [id])
+  cardStock    ReloadCardStock?    @relation(fields: [cardStockId], references: [id])
 
   @@index([tenantId, createdAt])
   @@index([saleId])
@@ -1970,8 +2008,8 @@ model SalePayment {
   status        PaymentStatus @default(COMPLETED)
   processedAt   DateTime      @default(now())
 
-  sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  sale        Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
 
   @@index([saleId])
   @@index([bankAccountId])
@@ -1979,15 +2017,15 @@ model SalePayment {
 }
 
 model HeldBill {
-  id          String   @id @default(cuid())
-  tenantId    String
-  branchId    String
-  cashierId   String?
-  customerId  String?
-  label       String?
-  data        Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  tenantId   String
+  branchId   String
+  cashierId  String?
+  customerId String?
+  label      String?
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([tenantId, branchId])
   @@map("held_bills")
@@ -1998,27 +2036,27 @@ model HeldBill {
 // ============================================================
 
 model Return {
-  id              String       @id @default(cuid())
-  tenantId        String
-  branchId        String
-  originalSaleId  String
-  returnNumber    String
-  reason          ReturnReason
-  status          ReturnStatus @default(INITIATED)
-  returnType      String       @default("RETURN")
-  notes           String?
-  totalAmount     Float
-  refundAmount    Float        @default(0)
-  exchangeAmount  Float        @default(0)
-  exchangeData    Json?
-  restockItems    Boolean      @default(true)
-  processedBy     String?
-  approvedBy      String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  tenantId       String
+  branchId       String
+  originalSaleId String
+  returnNumber   String
+  reason         ReturnReason
+  status         ReturnStatus @default(INITIATED)
+  returnType     String       @default("RETURN")
+  notes          String?
+  totalAmount    Float
+  refundAmount   Float        @default(0)
+  exchangeAmount Float        @default(0)
+  exchangeData   Json?
+  restockItems   Boolean      @default(true)
+  processedBy    String?
+  approvedBy     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  originalSale    Sale         @relation(fields: [originalSaleId], references: [id])
-  items           ReturnItem[]
+  originalSale Sale         @relation(fields: [originalSaleId], references: [id])
+  items        ReturnItem[]
 
   @@unique([tenantId, returnNumber])
   @@index([tenantId])
@@ -2026,15 +2064,19 @@ model Return {
 }
 
 model ReturnItem {
-  id          String   @id @default(cuid())
-  returnId    String
-  variantId   String
-  quantity    Float
-  unitPrice   Float
-  totalAmount Float
+  id        String @id @default(cuid())
+  returnId  String
+  variantId String
+  quantity  Float  @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  return      Return         @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy Int   @default(0) @map("quantity")
+  unitPrice      Float
+  totalAmount    Float
+
+  return  Return         @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([returnId])
   @@map("return_items")
@@ -2045,29 +2087,29 @@ model ReturnItem {
 // ============================================================
 
 model Promotion {
-  id              String       @id @default(cuid())
-  tenantId        String
-  name            String
-  description     String?
-  discountType    DiscountType
-  discountValue   Float
-  minOrderAmount  Float        @default(0)
-  maxDiscount     Float?
-  usageLimit      Int?
-  usageCount      Int          @default(0)
+  id               String       @id @default(cuid())
+  tenantId         String
+  name             String
+  description      String?
+  discountType     DiscountType
+  discountValue    Float
+  minOrderAmount   Float        @default(0)
+  maxDiscount      Float?
+  usageLimit       Int?
+  usageCount       Int          @default(0)
   perCustomerLimit Int?
-  startsAt        DateTime
-  endsAt          DateTime?
-  isActive        Boolean      @default(true)
-  applicableTo    String       @default("ALL")
+  startsAt         DateTime
+  endsAt           DateTime?
+  isActive         Boolean      @default(true)
+  applicableTo     String       @default("ALL")
   /// STANDARD | CLEARANCE | MARKDOWN | FINAL_SALE — Clothing markdown lifecycle
-  campaignKind    String       @default("STANDARD")
-  couponCode      String?      @unique
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  campaignKind     String       @default("STANDARD")
+  couponCode       String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products        PromotionProduct[]
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products PromotionProduct[]
 
   @@index([tenantId])
   @@index([couponCode])
@@ -2079,8 +2121,8 @@ model PromotionProduct {
   promotionId String
   productId   String
 
-  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([promotionId, productId])
   @@map("promotion_products")
@@ -2114,38 +2156,38 @@ model Supplier {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  purchases     PurchaseOrder[]
-  payments      SupplierPayment[]
-  goodsReceipts GoodsReceipt[]
-  returns       SupplierReturn[]
-  invoices      SupplierInvoice[]
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchases          PurchaseOrder[]
+  payments           SupplierPayment[]
+  goodsReceipts      GoodsReceipt[]
+  returns            SupplierReturn[]
+  invoices           SupplierInvoice[]
   productAssignments SupplierProductAssignment[]
-  ledgerEntries SupplierLedgerEntry[]
-  debitNotes    SupplierDebitNote[]
+  ledgerEntries      SupplierLedgerEntry[]
+  debitNotes         SupplierDebitNote[]
 
   @@index([tenantId])
   @@map("suppliers")
 }
 
 model SupplierProductAssignment {
-  id                String   @id @default(cuid())
-  tenantId          String
-  supplierId        String
-  variantId         String
+  id                  String   @id @default(cuid())
+  tenantId            String
+  supplierId          String
+  variantId           String
   supplierProductCode String?
-  leadTimeDays      Int?
-  lastBuyingPrice   Float?
-  minOrderQty       Float?
-  isPreferred       Boolean  @default(false)
-  isActive          Boolean  @default(true)
-  notes             String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  leadTimeDays        Int?
+  lastBuyingPrice     Float?
+  minOrderQty         Float?
+  isPreferred         Boolean  @default(false)
+  isActive            Boolean  @default(true)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier          Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  variant           ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@unique([supplierId, variantId])
   @@index([tenantId, supplierId])
@@ -2166,8 +2208,8 @@ model SupplierLedgerEntry {
   createdBy     String?
   createdAt     DateTime                @default(now())
 
-  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier      Supplier                @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, supplierId, createdAt])
   @@index([referenceType, referenceId])
@@ -2175,38 +2217,38 @@ model SupplierLedgerEntry {
 }
 
 model PurchaseOrder {
-  id              String              @id @default(cuid())
-  tenantId        String
-  branchId        String?
-  supplierId      String
-  poNumber        String
-  status          PurchaseOrderStatus @default(DRAFT)
-  orderDate       DateTime            @default(now())
-  expectedDate    DateTime?
-  paymentDueDate  DateTime?
-  receivedDate    DateTime?
-  subtotal        Float               @default(0)
-  taxAmount       Float               @default(0)
-  discountAmount  Float               @default(0)
-  total           Float               @default(0)
-  paidAmount      Float               @default(0)
-  notes           String?
-  reference       String?
-  paymentTerms    String?  @map("paymentterms")
-  createdBy       String?
-  approvedBy      String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id             String              @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  supplierId     String
+  poNumber       String
+  status         PurchaseOrderStatus @default(DRAFT)
+  orderDate      DateTime            @default(now())
+  expectedDate   DateTime?
+  paymentDueDate DateTime?
+  receivedDate   DateTime?
+  subtotal       Float               @default(0)
+  taxAmount      Float               @default(0)
+  discountAmount Float               @default(0)
+  total          Float               @default(0)
+  paidAmount     Float               @default(0)
+  notes          String?
+  reference      String?
+  paymentTerms   String?             @map("paymentterms")
+  createdBy      String?
+  approvedBy     String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
-  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier        Supplier            @relation(fields: [supplierId], references: [id])
-  items           PurchaseOrderItem[]
-  payments        SupplierPayment[]
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier           Supplier                    @relation(fields: [supplierId], references: [id])
+  items              PurchaseOrderItem[]
+  payments           SupplierPayment[]
   paymentAllocations SupplierPaymentAllocation[]
-  goodsReceipts   GoodsReceipt[]
-  supplierReturns SupplierReturn[]
-  invoices        SupplierInvoice[]
-  purchaseRequest PurchaseRequest?
+  goodsReceipts      GoodsReceipt[]
+  supplierReturns    SupplierReturn[]
+  invoices           SupplierInvoice[]
+  purchaseRequest    PurchaseRequest?
 
   @@unique([tenantId, poNumber])
   @@index([tenantId])
@@ -2215,44 +2257,54 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id            String    @id @default(cuid())
-  purchaseId    String
-  variantId     String
-  productName   String
-  variantName   String
-  sku           String
-  orderedQty    Float
-  freeQty       Float       @default(0)
-  receivedQty   Float       @default(0)
-  rejectedQty   Float       @default(0)
-  unitCost      Float
-  sellingPrice  Float?
-  mrp           Float?
-  expiryDate    DateTime?
-  discount      Float     @default(0)
-  taxRate       Float     @default(0)
-  taxAmount     Float     @default(0)
-  total         Float
+  id          String @id @default(cuid())
+  purchaseId  String
+  variantId   String
+  productName String
+  variantName String
+  sku         String
+  orderedQty  Float  @default(dbgenerated("'NaN'::double precision")) @map("orderedQtyDec")
 
-  purchase      PurchaseOrder  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  orderedQtyLegacy  Int       @default(0) @map("orderedQty")
+  freeQty           Float     @default(dbgenerated("'NaN'::double precision")) @map("freeQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  freeQtyLegacy     Int       @default(0) @map("freeQty")
+  receivedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("receivedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  receivedQtyLegacy Int       @default(0) @map("receivedQty")
+  rejectedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("rejectedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  rejectedQtyLegacy Int       @default(0) @map("rejectedQty")
+  unitCost          Float
+  sellingPrice      Float?
+  mrp               Float?
+  expiryDate        DateTime?
+  discount          Float     @default(0)
+  taxRate           Float     @default(0)
+  taxAmount         Float     @default(0)
+  total             Float
+
+  purchase PurchaseOrder  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([purchaseId])
   @@map("purchase_order_items")
 }
 
 model SupplierPayment {
-  id          String   @id @default(cuid())
-  tenantId    String
-  supplierId  String
-  purchaseId  String?
-  invoiceId   String?
-  amount      Float
-  method      PaymentMethod
-  reference   String?
-  notes       String?
-  paidAt      DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id         String        @id @default(cuid())
+  tenantId   String
+  supplierId String
+  purchaseId String?
+  invoiceId  String?
+  amount     Float
+  method     PaymentMethod
+  reference  String?
+  notes      String?
+  paidAt     DateTime      @default(now())
+  createdAt  DateTime      @default(now())
 
   supplier    Supplier                    @relation(fields: [supplierId], references: [id])
   purchase    PurchaseOrder?              @relation(fields: [purchaseId], references: [id])
@@ -2267,17 +2319,17 @@ model SupplierPayment {
 
 // Per-PO (or invoice) application of a supplier payment — supports multi-PO FIFO.
 model SupplierPaymentAllocation {
-  id          String   @id @default(cuid())
-  tenantId    String
-  paymentId   String
-  purchaseId  String?
-  invoiceId   String?
-  amount      Float
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  tenantId   String
+  paymentId  String
+  purchaseId String?
+  invoiceId  String?
+  amount     Float
+  createdAt  DateTime @default(now())
 
-  payment     SupplierPayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  purchase    PurchaseOrder?   @relation(fields: [purchaseId], references: [id])
-  invoice     SupplierInvoice? @relation(fields: [invoiceId], references: [id])
+  payment  SupplierPayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  purchase PurchaseOrder?   @relation(fields: [purchaseId], references: [id])
+  invoice  SupplierInvoice? @relation(fields: [invoiceId], references: [id])
 
   @@index([paymentId])
   @@index([purchaseId])
@@ -2286,21 +2338,21 @@ model SupplierPaymentAllocation {
 }
 
 model PurchaseRequest {
-  id              String                @id @default(cuid())
-  tenantId        String
-  branchId        String?
-  requestNumber   String
-  status          PurchaseRequestStatus @default(DRAFT)
-  notes           String?
-  createdBy       String?
-  approvedBy      String?
-  convertedPoId   String?               @unique
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id            String                @id @default(cuid())
+  tenantId      String
+  branchId      String?
+  requestNumber String
+  status        PurchaseRequestStatus @default(DRAFT)
+  notes         String?
+  createdBy     String?
+  approvedBy    String?
+  convertedPoId String?               @unique
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  convertedPo     PurchaseOrder?        @relation(fields: [convertedPoId], references: [id])
-  items           PurchaseRequestItem[]
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  convertedPo PurchaseOrder?        @relation(fields: [convertedPoId], references: [id])
+  items       PurchaseRequestItem[]
 
   @@unique([tenantId, requestNumber])
   @@index([tenantId])
@@ -2309,45 +2361,49 @@ model PurchaseRequest {
 }
 
 model PurchaseRequestItem {
-  id            String   @id @default(cuid())
-  requestId     String
-  variantId     String
-  productName   String
-  variantName   String
-  sku           String
-  requestedQty  Float
-  unitCostHint  Float    @default(0)
-  notes         String?
+  id           String @id @default(cuid())
+  requestId    String
+  variantId    String
+  productName  String
+  variantName  String
+  sku          String
+  requestedQty Float  @default(dbgenerated("'NaN'::double precision")) @map("requestedQtyDec")
 
-  request       PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  variant       ProductVariant  @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  requestedQtyLegacy Int     @default(0) @map("requestedQty")
+  unitCostHint       Float   @default(0)
+  notes              String?
+
+  request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  variant ProductVariant  @relation(fields: [variantId], references: [id])
 
   @@index([requestId])
   @@map("purchase_request_items")
 }
 
 model GoodsReceipt {
-  id                  String             @id @default(cuid())
-  tenantId            String
-  branchId            String
-  grnNumber           String
-  source              GoodsReceiptSource @default(FROM_PO)
-  status              GoodsReceiptStatus @default(POSTED)
-  purchaseId          String?
-  supplierId          String
-  receivedAt          DateTime           @default(now())
-  receivedBy          String?
-  notes               String?
-  supplierInvoiceRef  String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  id                 String             @id @default(cuid())
+  tenantId           String
+  branchId           String
+  grnNumber          String
+  source             GoodsReceiptSource @default(FROM_PO)
+  status             GoodsReceiptStatus @default(POSTED)
+  purchaseId         String?
+  supplierId         String
+  receivedAt         DateTime           @default(now())
+  receivedBy         String?
+  notes              String?
+  supplierInvoiceRef String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  purchase            PurchaseOrder?     @relation(fields: [purchaseId], references: [id])
-  supplier            Supplier           @relation(fields: [supplierId], references: [id])
-  items               GoodsReceiptItem[]
-  returns             SupplierReturn[]
-  invoices            SupplierInvoice[]
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase PurchaseOrder?     @relation(fields: [purchaseId], references: [id])
+  supplier Supplier           @relation(fields: [supplierId], references: [id])
+  items    GoodsReceiptItem[]
+  returns  SupplierReturn[]
+  invoices SupplierInvoice[]
 
   @@unique([tenantId, grnNumber])
   @@index([tenantId])
@@ -2357,24 +2413,32 @@ model GoodsReceipt {
 }
 
 model GoodsReceiptItem {
-  id              String    @id @default(cuid())
-  grnId           String
-  purchaseItemId  String?
-  variantId       String
-  productName     String
-  variantName     String
-  sku             String
-  orderedQty      Float       @default(0)
-  receivedQty     Float
-  rejectedQty     Float       @default(0)
-  unitCost        Float     @default(0)
-  batchNumber     String?
-  expiryDate      DateTime?
-  manufactureDate DateTime?
-  lotId           String?
+  id             String  @id @default(cuid())
+  grnId          String
+  purchaseItemId String?
+  variantId      String
+  productName    String
+  variantName    String
+  sku            String
+  orderedQty     Float   @default(dbgenerated("'NaN'::double precision")) @map("orderedQtyDec")
 
-  grn             GoodsReceipt   @relation(fields: [grnId], references: [id], onDelete: Cascade)
-  variant         ProductVariant @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  orderedQtyLegacy  Int       @default(0) @map("orderedQty")
+  receivedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("receivedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  receivedQtyLegacy Int       @default(0) @map("receivedQty")
+  rejectedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("rejectedQtyDec")
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+  rejectedQtyLegacy Int       @default(0) @map("rejectedQty")
+  unitCost          Float     @default(0)
+  batchNumber       String?
+  expiryDate        DateTime?
+  manufactureDate   DateTime?
+  lotId             String?
+
+  grn     GoodsReceipt   @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([grnId])
   @@index([variantId])
@@ -2382,26 +2446,26 @@ model GoodsReceiptItem {
 }
 
 model SupplierReturn {
-  id              String               @id @default(cuid())
-  tenantId        String
-  branchId        String
-  returnNumber    String
-  supplierId      String
-  purchaseId      String?
-  goodsReceiptId  String?
-  status          SupplierReturnStatus @default(DRAFT)
-  reason          String?
-  notes           String?
-  createdBy       String?
-  postedAt        DateTime?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  id             String               @id @default(cuid())
+  tenantId       String
+  branchId       String
+  returnNumber   String
+  supplierId     String
+  purchaseId     String?
+  goodsReceiptId String?
+  status         SupplierReturnStatus @default(DRAFT)
+  reason         String?
+  notes          String?
+  createdBy      String?
+  postedAt       DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier        Supplier             @relation(fields: [supplierId], references: [id])
-  purchase        PurchaseOrder?       @relation(fields: [purchaseId], references: [id])
-  goodsReceipt    GoodsReceipt?        @relation(fields: [goodsReceiptId], references: [id])
-  items           SupplierReturnItem[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier     Supplier             @relation(fields: [supplierId], references: [id])
+  purchase     PurchaseOrder?       @relation(fields: [purchaseId], references: [id])
+  goodsReceipt GoodsReceipt?        @relation(fields: [goodsReceiptId], references: [id])
+  items        SupplierReturnItem[]
 
   @@unique([tenantId, returnNumber])
   @@index([tenantId])
@@ -2410,50 +2474,54 @@ model SupplierReturn {
 }
 
 model SupplierReturnItem {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   returnId    String
   variantId   String
   productName String
   sku         String
-  quantity    Float
-  unitCost    Float    @default(0)
-  lotId       String?
-  batchNumber String?
-  reason      String?
+  quantity    Float  @default(dbgenerated("'NaN'::double precision")) @map("quantityDec")
 
-  returnDoc   SupplierReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
+
+  quantityLegacy Int     @default(0) @map("quantity")
+  unitCost       Float   @default(0)
+  lotId          String?
+  batchNumber    String?
+  reason         String?
+
+  returnDoc SupplierReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([returnId])
   @@map("supplier_return_items")
 }
 
 model SupplierInvoice {
-  id              String                @id @default(cuid())
-  tenantId        String
-  supplierId      String
-  invoiceNumber   String
-  invoiceDate     DateTime              @default(now())
-  dueDate         DateTime?
-  purchaseId      String?
-  goodsReceiptId  String?
-  subtotal        Float                 @default(0)
-  taxAmount       Float                 @default(0)
-  total           Float                 @default(0)
-  paidAmount      Float                 @default(0)
-  status          SupplierInvoiceStatus @default(DRAFT)
-  notes           String?
-  createdBy       String?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id             String                @id @default(cuid())
+  tenantId       String
+  supplierId     String
+  invoiceNumber  String
+  invoiceDate    DateTime              @default(now())
+  dueDate        DateTime?
+  purchaseId     String?
+  goodsReceiptId String?
+  subtotal       Float                 @default(0)
+  taxAmount      Float                 @default(0)
+  total          Float                 @default(0)
+  paidAmount     Float                 @default(0)
+  status         SupplierInvoiceStatus @default(DRAFT)
+  notes          String?
+  createdBy      String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier        Supplier              @relation(fields: [supplierId], references: [id])
-  purchase        PurchaseOrder?        @relation(fields: [purchaseId], references: [id])
-  goodsReceipt    GoodsReceipt?         @relation(fields: [goodsReceiptId], references: [id])
-  payments        SupplierPayment[]
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier           Supplier                    @relation(fields: [supplierId], references: [id])
+  purchase           PurchaseOrder?              @relation(fields: [purchaseId], references: [id])
+  goodsReceipt       GoodsReceipt?               @relation(fields: [goodsReceiptId], references: [id])
+  payments           SupplierPayment[]
   paymentAllocations SupplierPaymentAllocation[]
-  debitNotes      SupplierDebitNote[]
+  debitNotes         SupplierDebitNote[]
 
   @@unique([tenantId, supplierId, invoiceNumber])
   @@index([tenantId])
@@ -2480,9 +2548,9 @@ model SupplierDebitNote {
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
 
-  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier      Supplier                @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  invoice       SupplierInvoice?        @relation(fields: [invoiceId], references: [id])
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  invoice  SupplierInvoice? @relation(fields: [invoiceId], references: [id])
 
   @@unique([tenantId, noteNumber])
   @@index([tenantId, supplierId])
@@ -2525,7 +2593,7 @@ model TaxRate {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2554,7 +2622,7 @@ model VatReturn {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, periodStart, periodEnd])
@@ -2588,24 +2656,24 @@ enum ReimbursementStatus {
 }
 
 model PettyCashFund {
-  id              String   @id @default(cuid())
-  tenantId        String
-  branchId        String?
-  code            String
-  name            String
-  floatAmount     Float    @default(0)
-  currentBalance  Float    @default(0)
-  glAccountId     String?
-  bankAccountId   String?
-  isActive        Boolean  @default(true)
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  code           String
+  name           String
+  floatAmount    Float    @default(0)
+  currentBalance Float    @default(0)
+  glAccountId    String?
+  bankAccountId  String?
+  isActive       Boolean  @default(true)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  transactions    PettyCashTransaction[]
-  claims          ExpenseClaim[]
-  reimbursements  Reimbursement[]
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions   PettyCashTransaction[]
+  claims         ExpenseClaim[]
+  reimbursements Reimbursement[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2631,7 +2699,7 @@ model PettyCashTransaction {
   createdBy          String?
   createdAt          DateTime         @default(now())
 
-  fund               PettyCashFund    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  fund PettyCashFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, fundId])
   @@index([tenantId, txnDate])
@@ -2661,9 +2729,9 @@ model ExpenseClaim {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  fund               PettyCashFund?     @relation(fields: [fundId], references: [id])
-  reimbursement      Reimbursement?
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fund          PettyCashFund? @relation(fields: [fundId], references: [id])
+  reimbursement Reimbursement?
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -2672,24 +2740,24 @@ model ExpenseClaim {
 }
 
 model Reimbursement {
-  id                  String               @id @default(cuid())
-  tenantId            String
-  claimId             String               @unique
-  fundId              String?
-  amount              Float
-  payDate             DateTime             @default(now())
+  id                   String              @id @default(cuid())
+  tenantId             String
+  claimId              String              @unique
+  fundId               String?
+  amount               Float
+  payDate              DateTime            @default(now())
   payFromBankAccountId String?
-  reference           String?
-  notes               String?
-  status              ReimbursementStatus  @default(PAID)
-  journalEntryId      String?
-  createdBy           String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  reference            String?
+  notes                String?
+  status               ReimbursementStatus @default(PAID)
+  journalEntryId       String?
+  createdBy            String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  claim               ExpenseClaim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  fund                PettyCashFund?       @relation(fields: [fundId], references: [id])
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claim  ExpenseClaim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fund   PettyCashFund? @relation(fields: [fundId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, payDate])
@@ -2736,8 +2804,8 @@ model FixedAssetCategory {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assets                FixedAsset[]
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assets FixedAsset[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2774,10 +2842,10 @@ model FixedAsset {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category              FixedAssetCategory? @relation(fields: [categoryId], references: [id])
-  depreciations         FixedAssetDepreciation[]
-  transactions          FixedAssetTransaction[]
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category      FixedAssetCategory?      @relation(fields: [categoryId], references: [id])
+  depreciations FixedAssetDepreciation[]
+  transactions  FixedAssetTransaction[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2787,7 +2855,7 @@ model FixedAsset {
 }
 
 model FixedAssetDepreciation {
-  id             String     @id @default(cuid())
+  id             String   @id @default(cuid())
   tenantId       String
   assetId        String
   periodLabel    String
@@ -2797,10 +2865,10 @@ model FixedAssetDepreciation {
   accumAfter     Float
   bookValueAfter Float
   journalEntryId String?
-  postedAt       DateTime   @default(now())
+  postedAt       DateTime @default(now())
   createdBy      String?
 
-  asset          FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, periodLabel])
   @@index([tenantId, periodStart])
@@ -2824,7 +2892,7 @@ model FixedAssetTransaction {
   createdBy      String?
   createdAt      DateTime          @default(now())
 
-  asset          FixedAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, assetId])
   @@index([tenantId, txnDate])
@@ -2836,27 +2904,27 @@ model FixedAssetTransaction {
 // ============================================================
 
 model Account {
-  id                  String      @id @default(cuid())
-  tenantId            String
-  parentId            String?
-  code                String
-  name                String
-  type                AccountType
-  description         String?
-  isSystem            Boolean     @default(false)
-  isActive            Boolean     @default(true)
-  balance             Float       @default(0)
-  openingBalance      Float       @default(0)
-  openingBalanceDate  DateTime?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  id                 String      @id @default(cuid())
+  tenantId           String
+  parentId           String?
+  code               String
+  name               String
+  type               AccountType
+  description        String?
+  isSystem           Boolean     @default(false)
+  isActive           Boolean     @default(true)
+  balance            Float       @default(0)
+  openingBalance     Float       @default(0)
+  openingBalanceDate DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent      Account?      @relation("AccountHierarchy", fields: [parentId], references: [id])
-  children    Account[]     @relation("AccountHierarchy")
-  debitLines  JournalLine[] @relation("DebitAccount")
-  creditLines JournalLine[] @relation("CreditAccount")
-  budgetLines AccountingBudgetLine[]
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent          Account?               @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children        Account[]              @relation("AccountHierarchy")
+  debitLines      JournalLine[]          @relation("DebitAccount")
+  creditLines     JournalLine[]          @relation("CreditAccount")
+  budgetLines     AccountingBudgetLine[]
   accountMappings AccountMapping[]
 
   @@unique([tenantId, code])
@@ -2867,23 +2935,23 @@ model Account {
 }
 
 model FiscalYear {
-  id              String           @id @default(cuid())
-  tenantId        String
-  name            String
-  startDate       DateTime
-  endDate         DateTime
-  status          FiscalYearStatus @default(OPEN)
-  isCurrent       Boolean          @default(false)
-  closedAt        DateTime?
-  closedBy        String?
-  closingNotes    String?
+  id                        String           @id @default(cuid())
+  tenantId                  String
+  name                      String
+  startDate                 DateTime
+  endDate                   DateTime
+  status                    FiscalYearStatus @default(OPEN)
+  isCurrent                 Boolean          @default(false)
+  closedAt                  DateTime?
+  closedBy                  String?
+  closingNotes              String?
   retainedEarningsAccountId String?
-  createdBy       String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdBy                 String?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  periods         AccountingPeriod[]
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periods AccountingPeriod[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -2892,24 +2960,24 @@ model FiscalYear {
 }
 
 model AccountingPeriod {
-  id            String                  @id @default(cuid())
-  tenantId      String
-  fiscalYearId  String
-  name          String
-  sequence      Int
-  startDate     DateTime
-  endDate       DateTime
-  status        AccountingPeriodStatus  @default(OPEN)
-  closedAt      DateTime?
-  closedBy      String?
-  reopenedAt    DateTime?
-  reopenedBy    String?
-  notes         String?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  id           String                 @id @default(cuid())
+  tenantId     String
+  fiscalYearId String
+  name         String
+  sequence     Int
+  startDate    DateTime
+  endDate      DateTime
+  status       AccountingPeriodStatus @default(OPEN)
+  closedAt     DateTime?
+  closedBy     String?
+  reopenedAt   DateTime?
+  reopenedBy   String?
+  notes        String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
 
-  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  fiscalYear    FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
 
   @@unique([fiscalYearId, sequence])
   @@index([tenantId, status])
@@ -2918,27 +2986,27 @@ model AccountingPeriod {
 }
 
 model JournalEntry {
-  id          String             @id @default(cuid())
-  tenantId    String
-  branchId    String?
-  entryNumber String
-  description String
-  referenceId String?
+  id            String             @id @default(cuid())
+  tenantId      String
+  branchId      String?
+  entryNumber   String
+  description   String
+  referenceId   String?
   referenceType String?
-  date        DateTime           @default(now())
-  status      JournalEntryStatus @default(DRAFT)
-  isPosted    Boolean            @default(false)
-  approvedBy  String?
-  approvedAt  DateTime?
-  postedAt    DateTime?
-  voidedBy    String?
-  voidedAt    DateTime?
-  voidReason  String?
-  createdBy   String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  date          DateTime           @default(now())
+  status        JournalEntryStatus @default(DRAFT)
+  isPosted      Boolean            @default(false)
+  approvedBy    String?
+  approvedAt    DateTime?
+  postedAt      DateTime?
+  voidedBy      String?
+  voidedAt      DateTime?
+  voidReason    String?
+  createdBy     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  lines       JournalLine[]
+  lines JournalLine[]
 
   @@unique([tenantId, entryNumber])
   @@index([tenantId])
@@ -2956,27 +3024,27 @@ model JournalLine {
   amount          Float
   description     String?
 
-  journalEntry    JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  debitAccount    Account?      @relation("DebitAccount", fields: [debitAccountId], references: [id])
-  creditAccount   Account?      @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  journalEntry  JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  debitAccount  Account?     @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount Account?     @relation("CreditAccount", fields: [creditAccountId], references: [id])
 
   @@index([journalEntryId])
   @@map("journal_lines")
 }
 
 model Expense {
-  id          String   @id @default(cuid())
-  tenantId    String
-  branchId    String?
-  categoryId  String?
-  amount      Float
-  description String
-  date        DateTime
-  reference   String?
+  id            String        @id @default(cuid())
+  tenantId      String
+  branchId      String?
+  categoryId    String?
+  amount        Float
+  description   String
+  date          DateTime
+  reference     String?
   paymentMethod PaymentMethod @default(CASH)
-  createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([tenantId])
   @@index([date])
@@ -3049,11 +3117,11 @@ model BankAccount {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  transactions   BankTransaction[]
-  cheques        Cheque[]
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions    BankTransaction[]
+  cheques         Cheque[]
   reconciliations BankReconciliation[]
-  salePayments   SalePayment[]
+  salePayments    SalePayment[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3061,23 +3129,23 @@ model BankAccount {
 }
 
 model BankTransaction {
-  id            String        @id @default(cuid())
-  tenantId      String
-  bankAccountId String
-  type          BankTxnType
-  status        BankTxnStatus @default(CLEARED)
-  amount        Float
-  txnDate       DateTime      @default(now())
-  valueDate     DateTime?
-  reference     String?
-  description   String?
-  expenseId     String?
-  chequeId      String?
+  id               String        @id @default(cuid())
+  tenantId         String
+  bankAccountId    String
+  type             BankTxnType
+  status           BankTxnStatus @default(CLEARED)
+  amount           Float
+  txnDate          DateTime      @default(now())
+  valueDate        DateTime?
+  reference        String?
+  description      String?
+  expenseId        String?
+  chequeId         String?
   reconciliationId String?
-  createdBy     String?
-  createdAt     DateTime      @default(now())
+  createdBy        String?
+  createdAt        DateTime      @default(now())
 
-  bankAccount   BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  bankAccount    BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   reconciliation BankReconciliation? @relation(fields: [reconciliationId], references: [id])
 
   @@index([tenantId, bankAccountId])
@@ -3106,8 +3174,8 @@ model Cheque {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -3116,23 +3184,23 @@ model Cheque {
 }
 
 model BankReconciliation {
-  id                String                    @id @default(cuid())
-  tenantId          String
-  bankAccountId     String
-  statementDate     DateTime
-  statementBalance  Float
-  systemBalance     Float
-  difference        Float                     @default(0)
-  status            BankReconciliationStatus  @default(DRAFT)
-  notes             String?
-  completedAt       DateTime?
-  createdBy         String?
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
+  id               String                   @id @default(cuid())
+  tenantId         String
+  bankAccountId    String
+  statementDate    DateTime
+  statementBalance Float
+  systemBalance    Float
+  difference       Float                    @default(0)
+  status           BankReconciliationStatus @default(DRAFT)
+  notes            String?
+  completedAt      DateTime?
+  createdBy        String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
-  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankAccount       BankAccount               @relation(fields: [bankAccountId], references: [id])
-  matchedTxns       BankTransaction[]
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount       @relation(fields: [bankAccountId], references: [id])
+  matchedTxns BankTransaction[]
 
   @@index([tenantId])
   @@index([bankAccountId])
@@ -3140,22 +3208,22 @@ model BankReconciliation {
 }
 
 model CashBookEntry {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
   tenantId      String
   branchId      String?
-  entryDate     DateTime @default(now())
+  entryDate     DateTime       @default(now())
   type          String
   description   String
-  debit         Float    @default(0)
-  credit        Float    @default(0)
-  balanceAfter  Float    @default(0)
+  debit         Float          @default(0)
+  credit        Float          @default(0)
+  balanceAfter  Float          @default(0)
   referenceType String?
   referenceId   String?
   paymentMethod PaymentMethod?
   createdBy     String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, entryDate])
   @@index([tenantId, branchId])
@@ -3167,58 +3235,58 @@ model CashBookEntry {
 // ============================================================
 
 model Employee {
-  id              String         @id @default(cuid())
-  tenantId        String
-  branchId        String?
-  userId          String?
-  code            String?
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String
-  gender          Gender?
-  dateOfBirth     DateTime?
-  address         String?
-  department      String?
-  designation     String?
-  employmentType  EmploymentType @default(FULL_TIME)
-  joiningDate     DateTime
-  leavingDate     DateTime?
-  basicSalary     Float          @default(0)
-  commissionRate  Float          @default(0)
-  bankDetails     Json           @default("{}")
-  epfNumber       String?
-  etfNumber       String?
-  nicNumber       String?
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  userId         String?
+  code           String?
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String
+  gender         Gender?
+  dateOfBirth    DateTime?
+  address        String?
+  department     String?
+  designation    String?
+  employmentType EmploymentType @default(FULL_TIME)
+  joiningDate    DateTime
+  leavingDate    DateTime?
+  basicSalary    Float          @default(0)
+  commissionRate Float          @default(0)
+  bankDetails    Json           @default("{}")
+  epfNumber      String?
+  etfNumber      String?
+  nicNumber      String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch          Branch?      @relation(fields: [branchId], references: [id])
-  attendances     Attendance[]
-  payrolls        Payroll[]
-  payslips        Payslip[]
-  shifts          EmployeeShift[]
-  leaveRequests   LeaveRequest[]
-  helperSales     Sale[]       @relation("HelperSales")
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch?         @relation(fields: [branchId], references: [id])
+  attendances   Attendance[]
+  payrolls      Payroll[]
+  payslips      Payslip[]
+  shifts        EmployeeShift[]
+  leaveRequests LeaveRequest[]
+  helperSales   Sale[]          @relation("HelperSales")
 
   @@index([tenantId])
   @@map("employees")
 }
 
 model Attendance {
-  id          String           @id @default(cuid())
-  employeeId  String
-  tenantId    String
-  date        DateTime
-  checkIn     DateTime?
-  checkOut    DateTime?
-  status      AttendanceStatus @default(PRESENT)
-  notes       String?
-  createdAt   DateTime         @default(now())
+  id         String           @id @default(cuid())
+  employeeId String
+  tenantId   String
+  date       DateTime
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  notes      String?
+  createdAt  DateTime         @default(now())
 
-  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, date])
   @@index([employeeId])
@@ -3250,22 +3318,22 @@ enum PayrollEntryStatus {
 }
 
 model PayrollSetting {
-  id                    String   @id @default(cuid())
-  tenantId              String   @unique
-  epfEmployeeRate       Float    @default(8)
-  epfEmployerRate       Float    @default(12)
-  etfEmployerRate       Float    @default(3)
-  epfWageCap            Float?
-  salaryExpenseGlId     String?
-  epfExpenseGlId        String?
-  etfExpenseGlId        String?
-  epfPayableGlId        String?
-  etfPayableGlId        String?
-  bankGlId              String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  epfEmployeeRate   Float    @default(8)
+  epfEmployerRate   Float    @default(12)
+  etfEmployerRate   Float    @default(3)
+  epfWageCap        Float?
+  salaryExpenseGlId String?
+  epfExpenseGlId    String?
+  etfExpenseGlId    String?
+  epfPayableGlId    String?
+  etfPayableGlId    String?
+  bankGlId          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("payroll_settings")
 }
@@ -3280,23 +3348,23 @@ enum NumberSeriesResetPolicy {
 }
 
 model DocumentNumberSeries {
-  id             String                  @id @default(cuid())
-  tenantId       String
-  key            String
-  name           String
-  prefix         String
-  includeYear    Boolean                 @default(true)
-  includeMonth   Boolean                 @default(false)
-  padLength      Int                     @default(5)
-  resetPolicy    NumberSeriesResetPolicy @default(YEARLY)
-  nextValue      Int                     @default(1)
-  lastResetKey   String?
-  isActive       Boolean                 @default(true)
-  description    String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id           String                  @id @default(cuid())
+  tenantId     String
+  key          String
+  name         String
+  prefix       String
+  includeYear  Boolean                 @default(true)
+  includeMonth Boolean                 @default(false)
+  padLength    Int                     @default(5)
+  resetPolicy  NumberSeriesResetPolicy @default(YEARLY)
+  nextValue    Int                     @default(1)
+  lastResetKey String?
+  isActive     Boolean                 @default(true)
+  description  String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
-  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -3322,7 +3390,7 @@ model AccountingPreference {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
-  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("accounting_preferences")
 }
@@ -3392,7 +3460,7 @@ model CostCenter {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   budgetLines AccountingBudgetLine[]
 
   @@unique([tenantId, code])
@@ -3401,20 +3469,20 @@ model CostCenter {
 }
 
 model AccountingBudget {
-  id          String   @id @default(cuid())
-  tenantId    String
-  name        String
-  fiscalYear  Int
-  status      String   @default("DRAFT")
-  notes       String?
-  createdBy   String?
-  approvedBy  String?
-  approvedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  fiscalYear Int
+  status     String    @default("DRAFT")
+  notes      String?
+  createdBy  String?
+  approvedBy String?
+  approvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lines       AccountingBudgetLine[]
+  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  AccountingBudgetLine[]
 
   @@unique([tenantId, name, fiscalYear])
   @@index([tenantId, fiscalYear, status])
@@ -3432,9 +3500,9 @@ model AccountingBudgetLine {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  budget       AccountingBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  account      Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  costCenter   CostCenter?      @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  budget     AccountingBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account    Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter CostCenter?      @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
 
   @@unique([budgetId, accountId, costCenterId, month])
   @@index([budgetId, month])
@@ -3443,24 +3511,24 @@ model AccountingBudgetLine {
 }
 
 model RecurringJournal {
-  id            String   @id @default(cuid())
-  tenantId      String
-  name          String
-  description   String
-  frequency     String
-  startDate     DateTime
-  endDate       DateTime?
-  nextRunDate   DateTime
-  lastRunDate   DateTime?
-  autoPost      Boolean  @default(true)
-  isActive      Boolean  @default(true)
-  branchId      String?
-  lines         Json
-  createdBy     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  description String
+  frequency   String
+  startDate   DateTime
+  endDate     DateTime?
+  nextRunDate DateTime
+  lastRunDate DateTime?
+  autoPost    Boolean   @default(true)
+  isActive    Boolean   @default(true)
+  branchId    String?
+  lines       Json
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, isActive, nextRunDate])
   @@map("recurring_journals")
@@ -3479,7 +3547,7 @@ model ExchangeRate {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, fromCurrency, toCurrency, effectiveAt])
   @@index([tenantId, effectiveAt])
@@ -3500,7 +3568,7 @@ model PayrollComponent {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3508,30 +3576,30 @@ model PayrollComponent {
 }
 
 model PayrollRun {
-  id                String           @id @default(cuid())
-  tenantId          String
-  month             Int
-  year              Int
-  periodLabel       String
-  status            PayrollRunStatus @default(DRAFT)
-  employeeCount     Int              @default(0)
-  totalGross        Float            @default(0)
-  totalAllowances   Float            @default(0)
-  totalDeductions   Float            @default(0)
-  totalEpfEmployee  Float            @default(0)
-  totalEpfEmployer  Float            @default(0)
-  totalEtf          Float            @default(0)
-  totalNet          Float            @default(0)
-  journalEntryId    String?
-  notes             String?
-  approvedAt        DateTime?
-  paidAt            DateTime?
-  createdBy         String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  tenantId         String
+  month            Int
+  year             Int
+  periodLabel      String
+  status           PayrollRunStatus @default(DRAFT)
+  employeeCount    Int              @default(0)
+  totalGross       Float            @default(0)
+  totalAllowances  Float            @default(0)
+  totalDeductions  Float            @default(0)
+  totalEpfEmployee Float            @default(0)
+  totalEpfEmployer Float            @default(0)
+  totalEtf         Float            @default(0)
+  totalNet         Float            @default(0)
+  journalEntryId   String?
+  notes            String?
+  approvedAt       DateTime?
+  paidAt           DateTime?
+  createdBy        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  entries           Payroll[]
+  tenant  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entries Payroll[]
 
   @@unique([tenantId, month, year])
   @@index([tenantId])
@@ -3548,7 +3616,7 @@ model PayrollLine {
   amount      Float
   componentId String?
 
-  payroll     Payroll              @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  payroll Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
 
   @@index([payrollId])
   @@map("payroll_lines")
@@ -3565,9 +3633,9 @@ model Payslip {
   snapshot      Json     @default("{}")
   createdAt     DateTime @default(now())
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payroll       Payroll  @relation(fields: [payrollId], references: [id], onDelete: Cascade)
-  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payroll  Payroll  @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, periodLabel])
@@ -3576,36 +3644,36 @@ model Payslip {
 }
 
 model Payroll {
-  id              String   @id @default(cuid())
-  employeeId      String
-  tenantId        String
-  payrollRunId    String?
-  month           Int
-  year            Int
-  basicSalary     Float
-  allowances      Float    @default(0)
-  deductions      Float    @default(0)
-  bonus           Float    @default(0)
-  commission      Float    @default(0)
-  grossSalary     Float    @default(0)
-  epfWage         Float    @default(0)
-  epfEmployee     Float    @default(0)
-  epfEmployer     Float    @default(0)
-  etfEmployer     Float    @default(0)
-  netSalary       Float
-  status          PayrollEntryStatus @default(DRAFT)
-  isPaid          Boolean  @default(false)
-  paidAt          DateTime?
-  paymentMethod   String?
-  journalEntryId  String?
-  payslipNumber   String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String             @id @default(cuid())
+  employeeId     String
+  tenantId       String
+  payrollRunId   String?
+  month          Int
+  year           Int
+  basicSalary    Float
+  allowances     Float              @default(0)
+  deductions     Float              @default(0)
+  bonus          Float              @default(0)
+  commission     Float              @default(0)
+  grossSalary    Float              @default(0)
+  epfWage        Float              @default(0)
+  epfEmployee    Float              @default(0)
+  epfEmployer    Float              @default(0)
+  etfEmployer    Float              @default(0)
+  netSalary      Float
+  status         PayrollEntryStatus @default(DRAFT)
+  isPaid         Boolean            @default(false)
+  paidAt         DateTime?
+  paymentMethod  String?
+  journalEntryId String?
+  payslipNumber  String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  payrollRun      PayrollRun? @relation(fields: [payrollRunId], references: [id])
-  lines           PayrollLine[]
-  payslip         Payslip?
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun?   @relation(fields: [payrollRunId], references: [id])
+  lines      PayrollLine[]
+  payslip    Payslip?
 
   @@unique([employeeId, month, year])
   @@index([employeeId])
@@ -3615,20 +3683,20 @@ model Payroll {
 }
 
 model LeaveRequest {
-  id          String   @id @default(cuid())
-  employeeId  String
-  tenantId    String
-  startDate   DateTime
-  endDate     DateTime
-  leaveType   String   @default("CASUAL")
-  reason      String?
-  status      String   @default("PENDING")
-  approvedBy  String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  employeeId String
+  tenantId   String
+  startDate  DateTime
+  endDate    DateTime
+  leaveType  String   @default("CASUAL")
+  reason     String?
+  status     String   @default("PENDING")
+  approvedBy String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@map("leave_requests")
@@ -3644,7 +3712,7 @@ model HrDepartment {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  designations   HrDesignation[]
+  designations HrDesignation[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -3660,7 +3728,7 @@ model HrDesignation {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  department   HrDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department HrDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -3707,21 +3775,21 @@ model Shift {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  employees   EmployeeShift[]
+  employees EmployeeShift[]
 
   @@index([tenantId])
   @@map("shifts")
 }
 
 model EmployeeShift {
-  id          String   @id @default(cuid())
-  employeeId  String
-  shiftId     String
-  date        DateTime
-  isActive    Boolean  @default(true)
+  id         String   @id @default(cuid())
+  employeeId String
+  shiftId    String
+  date       DateTime
+  isActive   Boolean  @default(true)
 
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  shift       Shift    @relation(fields: [shiftId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift    Shift    @relation(fields: [shiftId], references: [id])
 
   @@index([employeeId])
   @@map("employee_shifts")
@@ -3745,8 +3813,8 @@ model Notification {
   scheduledAt DateTime?
   createdAt   DateTime            @default(now())
 
-  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userNotifs  UserNotification[]
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userNotifs UserNotification[]
 
   @@index([tenantId])
   @@index([tenantId, isRead, createdAt])
@@ -3755,15 +3823,15 @@ model Notification {
 }
 
 model UserNotification {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   notificationId String
-  isRead         Boolean  @default(false)
+  isRead         Boolean   @default(false)
   readAt         DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, notificationId])
   @@index([userId])
@@ -3788,7 +3856,7 @@ model FileUpload {
   storageProvider String   @default("local")
   createdAt       DateTime @default(now())
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("file_uploads")
@@ -3809,7 +3877,7 @@ model Report {
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("reports")
@@ -3832,8 +3900,8 @@ model AuditLog {
   userAgent  String?
   createdAt  DateTime @default(now())
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user       User?    @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -3845,15 +3913,15 @@ model AuditLog {
 }
 
 model ActivityLog {
-  id         String   @id @default(cuid())
-  userId     String
-  action     String
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
   description String?
-  metadata   Json     @default("{}")
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  metadata    Json     @default("{}")
+  ipAddress   String?
+  createdAt   DateTime @default(now())
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -3865,15 +3933,15 @@ model ActivityLog {
 // ============================================================
 
 model WorkflowDefinition {
-  id        String         @id @default(cuid())
+  id        String   @id @default(cuid())
   tenantId  String
   key       String
   name      String
-  version   Int            @default(1)
-  isActive  Boolean        @default(true)
-  config    Json           @default("{}")
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   steps     WorkflowStep[]
   instances WorkflowInstance[]
@@ -3883,37 +3951,37 @@ model WorkflowDefinition {
 }
 
 model WorkflowStep {
-  id             String             @id @default(cuid())
+  id             String  @id @default(cuid())
   definitionId   String
   stepOrder      Int
   name           String
   approverRole   String?
   approverUserId String?
-  isRequired     Boolean            @default(true)
+  isRequired     Boolean @default(true)
 
-  definition     WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
 
   @@index([definitionId])
   @@map("workflow_steps")
 }
 
 model WorkflowInstance {
-  id           String             @id @default(cuid())
+  id           String         @id @default(cuid())
   tenantId     String
   definitionId String
   entityType   String
   entityId     String
-  status       WorkflowStatus     @default(IN_PROGRESS)
-  currentStep  Int                @default(1)
+  status       WorkflowStatus @default(IN_PROGRESS)
+  currentStep  Int            @default(1)
   initiatedBy  String?
   completedAt  DateTime?
-  metadata     Json               @default("{}")
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  metadata     Json           @default("{}")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  definition   WorkflowDefinition @relation(fields: [definitionId], references: [id])
-  tasks        WorkflowTask[]
-  events       WorkflowEvent[]
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id])
+  tasks      WorkflowTask[]
+  events     WorkflowEvent[]
 
   @@unique([tenantId, entityType, entityId])
   @@index([tenantId, status])
@@ -3930,7 +3998,7 @@ model WorkflowTask {
   actedAt    DateTime?
   dueAt      DateTime?
 
-  instance   WorkflowInstance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
 
   @@index([instanceId, status])
   @@index([assigneeId, status])
@@ -3938,16 +4006,16 @@ model WorkflowTask {
 }
 
 model WorkflowEvent {
-  id         String           @id @default(cuid())
+  id         String   @id @default(cuid())
   instanceId String
   eventType  String
   fromStatus String?
   toStatus   String?
   actorId    String?
-  payload    Json             @default("{}")
-  createdAt  DateTime         @default(now())
+  payload    Json     @default("{}")
+  createdAt  DateTime @default(now())
 
-  instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
 
   @@index([instanceId, createdAt])
   @@map("workflow_events")
@@ -3985,8 +4053,8 @@ model PosCounter {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch    Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
   registers CashRegister[]
 
   @@unique([tenantId, branchId, code])
@@ -4022,12 +4090,12 @@ model CashRegister {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch             Branch             @relation(fields: [branchId], references: [id])
-  counter            PosCounter?        @relation(fields: [counterId], references: [id])
-  cashier            User               @relation("CashierRegisters", fields: [cashierId], references: [id])
-  approvedBy         User?              @relation("CashRegisterApprover", fields: [approvedById], references: [id])
-  movements          CashMovement[]
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch     Branch         @relation(fields: [branchId], references: [id])
+  counter    PosCounter?    @relation(fields: [counterId], references: [id])
+  cashier    User           @relation("CashierRegisters", fields: [cashierId], references: [id])
+  approvedBy User?          @relation("CashRegisterApprover", fields: [approvedById], references: [id])
+  movements  CashMovement[]
 
   @@index([tenantId, branchId, status])
   @@index([tenantId, counterId, status])
@@ -4048,9 +4116,9 @@ model CashMovement {
   createdById String?
   createdAt   DateTime         @default(now())
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  register    CashRegister     @relation(fields: [registerId], references: [id], onDelete: Cascade)
-  createdBy   User?            @relation(fields: [createdById], references: [id])
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  register  CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation(fields: [createdById], references: [id])
 
   @@index([registerId, createdAt])
   @@index([tenantId, type])
@@ -4068,18 +4136,18 @@ enum CalendarTaskStatus {
 }
 
 model CalendarNote {
-  id          String   @id @default(cuid())
-  tenantId    String
-  branchId    String?
-  date        DateTime
-  title       String
-  body        String?
-  color       String?
-  createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String
+  branchId  String?
+  date      DateTime
+  title     String
+  body      String?
+  color     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, date])
   @@map("calendar_notes")
@@ -4100,7 +4168,7 @@ model CalendarTask {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, date])
   @@index([tenantId, status])
@@ -4108,7 +4176,7 @@ model CalendarTask {
 }
 
 model CalendarMeeting {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
   branchId    String?
   title       String
@@ -4116,12 +4184,12 @@ model CalendarMeeting {
   location    String?
   startsAt    DateTime
   endsAt      DateTime?
-  attendees   String[] @default([])
+  attendees   String[]  @default([])
   createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, startsAt])
   @@map("calendar_meetings")
@@ -4447,13 +4515,13 @@ model FashionColor {
 }
 
 model ProductBundleComponent {
-  id                  String   @id @default(cuid())
-  tenantId            String
-  bundleProductId     String
-  componentVariantId  String
-  quantity            Float    @default(1)
-  sortOrder           Int      @default(0)
-  createdAt           DateTime @default(now())
+  id                 String   @id @default(cuid())
+  tenantId           String
+  bundleProductId    String
+  componentVariantId String
+  quantity           Float    @default(1)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
 
   bundleProduct    Product        @relation("BundleProduct", fields: [bundleProductId], references: [id], onDelete: Cascade)
   componentVariant ProductVariant @relation("BundleComponent", fields: [componentVariantId], references: [id], onDelete: Cascade)
@@ -4518,4 +4586,20 @@ model FittingSessionItem {
   @@index([sessionId])
   @@index([variantId])
   @@map("fitting_session_items")
+}
+
+/// Expand/contract audit trail: one row each time an older app version changed an INTEGER quantity
+/// on a row whose decimal column held a fraction (the fraction was lost). Written only by DB triggers.
+model QtySyncLog {
+  id          BigInt   @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  tableName   String
+  rowId       String
+  columnName  String
+  previousDec Float
+  previousInt Int
+  newInt      Int
+
+  @@index([tableName, rowId])
+  @@map("hx_qty_sync_log")
 }
