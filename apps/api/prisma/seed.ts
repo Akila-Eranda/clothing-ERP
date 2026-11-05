@@ -7,6 +7,7 @@ import {
 import type { Permission } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { getShopProfile, slugifyCategory } from '../src/shared/shop-profiles';
+import { PERMISSION_CATALOGUE, splitPermissionKey } from '../src/shared/security/permission-catalogue';
 
 const prisma = new PrismaClient();
 
@@ -111,41 +112,8 @@ async function main() {
   console.log(`✅ Branch: ${branch.name} (${branch.id})`);
 
   // ── Permissions ───────────────────────────────────────────
-  const permissionDefs = [
-    // Products
-    { resource: 'products', action: 'create' }, { resource: 'products', action: 'read' },
-    { resource: 'products', action: 'update' }, { resource: 'products', action: 'delete' },
-    // Inventory
-    { resource: 'inventory', action: 'create' }, { resource: 'inventory', action: 'read' },
-    { resource: 'inventory', action: 'update' },
-    // Sales
-    { resource: 'sales', action: 'create' }, { resource: 'sales', action: 'read' },
-    { resource: 'sales', action: 'update' },
-    // Customers
-    { resource: 'customers', action: 'create' }, { resource: 'customers', action: 'read' },
-    { resource: 'customers', action: 'update' }, { resource: 'customers', action: 'delete' },
-    // Suppliers
-    { resource: 'suppliers', action: 'create' }, { resource: 'suppliers', action: 'read' },
-    // Purchases
-    { resource: 'purchases', action: 'create' }, { resource: 'purchases', action: 'read' },
-    { resource: 'purchases', action: 'update' },
-    // Reports
-    { resource: 'reports', action: 'read' },
-    // Accounting
-    { resource: 'accounting', action: 'create' }, { resource: 'accounting', action: 'read' },
-    // Cash management
-    { resource: 'cash', action: 'create' }, { resource: 'cash', action: 'read' },
-    { resource: 'cash', action: 'update' },
-    // HR
-    { resource: 'hr', action: 'create' }, { resource: 'hr', action: 'read' },
-    { resource: 'hr', action: 'update' },
-    // Users
-    { resource: 'users', action: 'create' }, { resource: 'users', action: 'read' },
-    { resource: 'users', action: 'update' }, { resource: 'users', action: 'delete' },
-    // Roles
-    { resource: 'roles', action: 'create' }, { resource: 'roles', action: 'read' },
-    { resource: 'roles', action: 'update' },
-  ];
+  // Single source of truth for permissions (see src/shared/security/permission-catalogue.ts).
+  const permissionDefs = PERMISSION_CATALOGUE.map(splitPermissionKey);
 
   const permissions = await Promise.all(
     permissionDefs.map((p) =>

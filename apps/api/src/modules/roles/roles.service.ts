@@ -5,7 +5,6 @@ import { RoleType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SAFE_USER_SELECT } from '@/shared/security/sensitive-fields';
 import { isPlatformRoleType, TENANT_ASSIGNABLE_ROLE_TYPES } from '@/shared/platform-admin-roles';
-import { ensureSystemRoles } from './default-system-roles';
 
 export class CreateRoleDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(80) name: string;
@@ -52,8 +51,8 @@ export class RolesService {
     });
   }
 
+  /** Read-only: listing roles never changes them (it used to re-sync system roles on every call). */
   async findAll(tenantId: string) {
-    await ensureSystemRoles(this.prisma, tenantId);
     return this.prisma.role.findMany({
       where: { tenantId },
       include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
@@ -101,15 +100,6 @@ export class RolesService {
 
   async getAllPermissions() {
     return this.prisma.permission.findMany({ orderBy: [{ resource: 'asc' }, { action: 'asc' }] });
-  }
-
-  async seedPermissions(tenantId: string) {
-    const resources = ['users', 'roles', 'products', 'inventory', 'sales', 'customers', 'suppliers', 'purchases', 'accounting', 'hr', 'reports', 'branches', 'settings'];
-    const actions = ['create', 'read', 'update', 'delete', 'export'];
-    const perms = resources.flatMap((resource) =>
-      actions.map((action) => ({ resource, action })),
-    );
-    await this.prisma.permission.createMany({ data: perms, skipDuplicates: true });
   }
 
   private async assertPermissionsExist(permissionIds: string[] | undefined) {

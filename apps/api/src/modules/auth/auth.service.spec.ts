@@ -148,6 +148,36 @@ describe('AuthService', () => {
         expect.objectContaining({ userId: 'user-1', tenantId }),
       );
     });
+
+    it('gives every access and refresh token its own random jti, so same-second logins never collide', async () => {
+      const passwordHash = await bcrypt.hash(loginDto.password, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'user-1', tenantId, email: loginDto.email, firstName: 'Test', lastName: 'User', passwordHash,
+        status: 'ACTIVE', lockedUntil: null, loginAttempts: 0, twoFactorEnabled: false, emailVerified: true, branchId: null,
+        roles: [{ role: { name: 'Admin', type: 'TENANT_ADMIN', permissions: [] } }],
+      });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockPrisma.session.create.mockResolvedValue({});
+      mockPrisma.activityLog.create.mockResolvedValue({});
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: tenantId, status: 'ACTIVE', plan: 'PROFESSIONAL', trialEndsAt: null, settings: {} });
+      // Real-looking distinct tokens: echo the jwtid back so the stored session hash reflects it.
+      mockJwtService.signAsync.mockImplementation(async (_payload: unknown, opts: { jwtid?: string }) => `tok.${opts?.jwtid}`);
+      mockJwtService.signAsync.mockClear();
+      mockPrisma.session.create.mockClear();
+
+      await service.login(loginDto, '127.0.0.1', 'tab-1');
+      await service.login(loginDto, '127.0.0.1', 'tab-2');
+
+      const jtis = mockJwtService.signAsync.mock.calls.map((c) => (c[1] as { jwtid?: string }).jwtid);
+      expect(jtis).toHaveLength(4); // 2 logins × (access + refresh)
+      for (const jti of jtis) expect(jti).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      expect(new Set(jtis).size).toBe(4);
+      const storedTokens = mockPrisma.session.create.mock.calls.map((c) => (c[0] as { data: { token: string } }).data.token);
+      expect(storedTokens).toHaveLength(2);
+      expect(storedTokens[0]).not.toBe(storedTokens[1]);
+      mockJwtService.signAsync.mockReset().mockResolvedValue('mock-token');
+    });
   });
 
   describe('logout', () => {

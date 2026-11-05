@@ -6,6 +6,8 @@ export interface IJwtPayload {
   roles: string[];
   permissions: string[];
   impersonation?: boolean;
+  /** Unique token id (set via jwtid when signing). Optional: tokens issued before it existed stay valid. */
+  jti?: string;
   iat?: number;
   exp?: number;
   iss?: string;
@@ -15,6 +17,7 @@ export interface IJwtPayload {
 export interface IRefreshTokenPayload {
   sub: string;
   family: string;
+  jti?: string;
   iat?: number;
   exp?: number;
 }

@@ -15,6 +15,7 @@ import * as bcrypt from 'bcryptjs';
 import * as speakeasy from 'speakeasy';
 import * as qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserStatus } from '@prisma/client';
 import { enforceTenantSubscriptionActive } from '@/shared/tenant-subscription.helper';
@@ -26,7 +27,6 @@ import {
   ChangePasswordDto,
 } from './dto/login.dto';
 import { IJwtPayload, IRefreshTokenPayload } from '@/common/interfaces/jwt-payload.interface';
-import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
 import { hashSessionToken } from '@/shared/security/session-token';
 
 const BCRYPT_ROUNDS = 12;
@@ -191,8 +191,8 @@ export class AuthService {
       },
     });
 
-    // Keep system role permission packs in sync (e.g. cashier POS supplier create)
-    await ensureSystemRoles(this.prisma, user.tenantId);
+    // Roles are NOT synced on login: that silently rewrote every shop's system roles (customer-data
+    // policy). Existing shops change roles only through scripts/review-system-roles.ts.
     const userWithPerms = await this.prisma.user.findUnique({
       where: { id: user.id },
       include: {
@@ -527,16 +527,21 @@ export class AuthService {
 
     const refreshPayload: IRefreshTokenPayload = { sub: userId, family };
 
+    // Every token gets a unique, cryptographically random id (jti). Without it, two logins (or two
+    // refreshes) of the same user within the same second produced byte-identical tokens and the
+    // unique sessions.token / refresh_tokens.token constraint rejected the second one (409).
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, {
         secret: this.configService.get('jwt.accessSecret'),
         expiresIn: this.configService.get('jwt.accessExpiry'),
         issuer: this.configService.get('jwt.issuer'),
         audience: this.configService.get('jwt.audience'),
+        jwtid: randomUUID(),
       }),
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get('jwt.refreshSecret'),
         expiresIn: this.configService.get('jwt.refreshExpiry'),
+        jwtid: randomUUID(),
       }),
     ]);
 
