@@ -4,7 +4,8 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // Windows cannot create pnpm's symlinks while tracing standalone output.
+  output: process.platform === "win32" ? undefined : "standalone",
   // Nginx handles compression in production. Leaving Next's built-in
   // compression on caused streamed app responses to hang behind the proxy.
   compress: false,

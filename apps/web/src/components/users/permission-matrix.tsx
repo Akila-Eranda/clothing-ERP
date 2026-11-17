@@ -82,7 +82,7 @@ export function PermissionMatrix({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search permissions…"
+            placeholder="Search permissions…" aria-label="Search permissions"
             className="pl-9 h-9 text-sm"
           />
         </div>

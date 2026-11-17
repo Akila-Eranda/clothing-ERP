@@ -728,7 +728,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
             ))}
           </div>
           <ClientSideTable
-          fillHeight={false} data={stock} columns={columns} pageCount={Math.ceil(stock.length / 10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{ isShow: true, fileName: "inventory" }} />
+          fillHeight={false} data={stock} columns={columns} pageCount={Math.ceil(stock.length / 10)} searchableColumns={[{ id: "stockText", title: "Product / SKU / category", getValue: (i: InventoryItem) => `${i.variant?.product?.name ?? ""} ${i.variant?.name ?? ""} ${i.variant?.sku ?? ""} ${(i.variant as { barcode?: string } | undefined)?.barcode ?? ""} ${i.variant?.product?.category?.name ?? ""} ${i.locationLabel ?? ""}` }]} filterableColumns={[]} isShowExportButtons={{ isShow: true, fileName: "inventory" }} />
         </>
       )}
 

@@ -21,7 +21,7 @@ export type SaleFingerprintInput = {
     discount?: number | null;
     discountType?: string | null;
   }>;
-  payments: Array<{ method: string; amount: number; reference?: string | null }>;
+  payments: Array<{ method: string; amount: number; reference?: string | null; cardLast4?: string | null; qrCodeId?: string | null }>;
   discountAmount?: number | null;
   couponCode?: string | null;
   loyaltyPointsToRedeem?: number | null;
@@ -44,7 +44,12 @@ export function saleRequestFingerprint(input: SaleFingerprintInput): string {
     ].join('|'))
     .sort();
   const payments = input.payments
-    .map((p) => [p.method, n3(p.amount), p.reference?.trim() ?? ''].join('|'))
+    // cardLast4 / qrCodeId only when present, so fingerprints of older requests stay identical.
+    .map((p) => [
+      p.method, n3(p.amount), p.reference?.trim() ?? '',
+      ...(p.cardLast4?.trim() ? [`c4:${p.cardLast4.trim()}`] : []),
+      ...(p.qrCodeId?.trim() ? [`qr:${p.qrCodeId.trim()}`] : []),
+    ].join('|'))
     .sort();
   const canonical = JSON.stringify({
     c: input.customerId ?? null,

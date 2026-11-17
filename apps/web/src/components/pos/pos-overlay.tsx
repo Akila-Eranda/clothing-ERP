@@ -1,6 +1,8 @@
 ﻿"use client";
 import { LoadingCenter } from "@/components/ui/loading";
 import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { createNextSaleGuard } from "@/lib/pos-next-sale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +13,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
@@ -31,7 +34,7 @@ import { PosRetailFeatureBar } from "@/components/pos/layouts/pos-retail-feature
 import { getCardBg, PosProductThumb } from "@/components/pos/shared/pos-product-thumb";
 import { usePosTenantSettings } from "@/lib/use-pos-tenant-settings";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
-import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME, subscribeCustomerDisplayInput } from "@/lib/pos-customer-display";
+import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME, subscribeCustomerDisplayInput, type CustomerDisplayBankPayment, type CustomerDisplayQrPayment } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
@@ -53,6 +56,7 @@ import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
 import { PosTransferFundsModal } from "@/components/pos/pos-transfer-funds-modal";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
+import { newClientRequestId } from "@/lib/submit-key";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
 import { PosDemoProductPanel } from "@/components/pos/pos-demo-product-panel";
 import { PosReloadPanel } from "@/components/pos/pos-reload-panel";
@@ -85,9 +89,14 @@ import {
 import type { CartItem, Customer } from "@/types";
 import { parseApiList } from "@/lib/parse-api-list";
 import { checkoutRequestKey, checkoutSignature, clearCheckoutRequestKey } from "@/lib/pos-checkout-key";
+import { createCheckoutLatch } from "@/lib/pos-checkout-latch";
+import { isValidCardLast4, receiptPaymentLabel } from "@/lib/card-last4";
+import { PosQrPayment } from "@/components/pos/pos-qr-payment";
+import { computeQrFee, qrFeeSettingsOf, totalQrFee } from "@/lib/qr-fee";
+import { copyText, whatsappShareUrl } from "@/lib/bill-message";
 
 interface POSOverlayProps {
-  /** Cashier mode â€” no ERP shell; exit returns to POS landing only. */
+  /** Cashier mode — no ERP shell; exit returns to POS landing only. */
   posOnly?: boolean;
 }
 
@@ -101,6 +110,9 @@ interface ProductItem extends PosProductsPanelProduct {
   unit?: string | null;
   allowDecimalSelling?: boolean;
   weightScaleReady?: boolean;
+  isScaleBarcode?: boolean;
+  scaleBarcode?: string;
+  scaleQty?: number;
 }
 
 function hasMultiPurchasePrices(p: { purchasePrices?: { sellingPrice: number }[] } | null | undefined) {
@@ -285,7 +297,7 @@ interface SaleReceipt {
 function receiptItemName(productName: string, variantName?: string) {
   const variant = variantName?.trim();
   const hide = !variant || ["default", "demo", "custom"].includes(variant.toLowerCase());
-  return hide ? productName : `${productName} Â· ${variant}`;
+  return hide ? productName : `${productName} · ${variant}`;
 }
 
 function cartLineToReceiptItem(i: {
@@ -307,14 +319,26 @@ function cartLineToReceiptItem(i: {
 }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; qty: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; paymentMethod?: string; customer?: SaleCustomer | null; _count?: { items: number }; payments?: { method: string }[]; }
-interface CustomerBillRow { id: string; invoiceNumber: string; invoiceDate: string; total: number; amountPaid?: number; paymentStatus?: string; status: string; balanceDue?: number; _count?: { items: number } }
+interface CustomerBillRow { id: string; invoiceNumber: string; invoiceDate: string; total: number; amountPaid?: number; paymentStatus?: string; status: string; balanceDue?: number; _count?: { items: number }; payments?: { method: string; amount: number }[] }
 interface CustomerTopProduct { productName: string; qty: number; spent: number; variantId: string }
+interface CustomerHistoryEntry {
+  id: string;
+  createdAt: string;
+  category: string;
+  amount: number;
+  description: string;
+  paymentMethod?: string | null;
+  reference?: string | null;
+  walletBalanceAfter?: number | null;
+  creditBalanceAfter?: number | null;
+}
 interface CustomerInsight {
   sales: CustomerBillRow[];
   topProducts: CustomerTopProduct[];
   outstandingSales?: CustomerBillRow[];
   totalOrders?: number;
   totalSpent?: number;
+  walletBalance?: number;
   creditBalance?: number;
   creditLimit?: number;
   creditAvailable?: number;
@@ -330,7 +354,7 @@ const PAY_METHODS = [
   { value: "BANK_TRANSFER", label: "Bank", icon: Landmark },
   { value: "QR", label: "QR", icon: QrCode },
   { value: "CHEQUE", label: "Cheque", icon: FileCheck },
-  { value: "CUSTOMER_CREDIT", label: "Credit", icon: UserCheck },
+  { value: "CUSTOMER_CREDIT", label: "Credit / Wallet", icon: UserCheck },
   { value: "GIFT_VOUCHER", label: "Voucher", icon: Gift },
 ];
 
@@ -354,11 +378,21 @@ const BASE_NAV_ITEMS = [
 const RETAIL_FEATURE_BAR_SKIP = new Set(["demo-product", "reload", "hold-bills"]);
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"#0f2a22",color:"var(--pos-success)"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn-soft)"}, CANCELLED:{bg:"#3f1515",color:"#f87171"}, REFUNDED:{bg:"#2e1a4a",color:"#c4b5fd"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#78716c", silver:"#94a3b8", gold:"#22d3ee", platinum:"#8b5cf6", diamond:"#c084fc" };
+const PAYMENT_METHOD_COLOR: Record<string, string> = {
+  CASH: "#10b981",
+  CARD: "#3b82f6",
+  QR: "#a855f7",
+  BANK_TRANSFER: "#06b6d4",
+  CHEQUE: "#f59e0b",
+  WALLET: "#ec4899",
+};
+const paymentMethodLabel = (method: string) => method.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
 export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { posOpen, closePos } = useUIStore();
   const { user } = useAuthStore();
   const { profile, workspace } = useShopWorkspace();
+  const returnRequestKeyRef = React.useRef<string | null>(null);
   const showLoyalty = hasShopModule(profile, 'loyalty');
   const [reloadEnabled, setReloadEnabled] = React.useState(true);
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
@@ -418,7 +452,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(new Date());
-  const [todayStats, setTodayStats] = React.useState({ sales: 0, orders: 0, items: 0 });
+  const [todayStats, setTodayStats] = React.useState<{
+    sales: number;
+    orders: number;
+    items: number;
+    byCounter: { name: string; code: string; orders: number; amount: number }[];
+  }>({ sales: 0, orders: 0, items: 0, byCounter: [] });
   const [drawerCash, setDrawerCash] = React.useState<number | null>(null);
   const [liked, setLiked] = React.useState<Set<string>>(new Set());
   const [orders, setOrders] = React.useState<SaleRow[]>([]);
@@ -441,8 +480,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
   const [chequeNumber, setChequeNumber] = React.useState("");
-  const [cardLast3, setCardLast3] = React.useState("");
+  const [cardLast4, setCardLast4] = React.useState("");
   const [payBankAccountId, setPayBankAccountId] = React.useState("");
+  const [payQrCodeId, setPayQrCodeId] = React.useState("");
+  // What the QR panel shows (selected QR / bank account / exact amount): mirrored to the Customer Display.
+  const [qrDisplay, setQrDisplay] = React.useState<CustomerDisplayQrPayment | null>(null);
   const [bankAccounts, setBankAccounts] = React.useState<PosBankAccountOption[]>([]);
   const [voucherIssueAmt, setVoucherIssueAmt] = React.useState("");
   const [voucherIssueName, setVoucherIssueName] = React.useState("");
@@ -453,11 +495,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
   const [customerInsight, setCustomerInsight] = React.useState<CustomerInsight | null>(null);
   const [customerInsightLoading, setCustomerInsightLoading] = React.useState(false);
+  const [customerInsightError, setCustomerInsightError] = React.useState(false);
+  const [customerHistory, setCustomerHistory] = React.useState<CustomerHistoryEntry[]>([]);
+  const [customerHistoryCursor, setCustomerHistoryCursor] = React.useState<string | null>(null);
+  const [customerHistoryHasMore, setCustomerHistoryHasMore] = React.useState(false);
+  const [customerHistoryFull, setCustomerHistoryFull] = React.useState(false);
+  const [customerHistoryBranchScope, setCustomerHistoryBranchScope] = React.useState<{ walletAndCreditEntriesOmitted: boolean; balancesAreAllBranches: boolean } | null>(null);
+  const [customerHistoryLoading, setCustomerHistoryLoading] = React.useState(false);
+  const [customerHistoryError, setCustomerHistoryError] = React.useState(false);
+  const customerInsightRequestId = React.useRef(0);
   const [previewCustomerId, setPreviewCustomerId] = React.useState<string | null>(null);
   const [partialPayAmount, setPartialPayAmount] = React.useState("");
   const [creditPayAmount, setCreditPayAmount] = React.useState("");
   const [creditPayMethod, setCreditPayMethod] = React.useState("CASH");
   const [creditPayChequeNumber, setCreditPayChequeNumber] = React.useState("");
+  const [creditPayCardLast4, setCreditPayCardLast4] = React.useState("");
   const [creditPayChequeDue, setCreditPayChequeDue] = React.useState("");
   const [creditPayBusy, setCreditPayBusy] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
@@ -493,8 +545,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [returnReason, setReturnReason] = React.useState("");
   const [returnNotes, setReturnNotes] = React.useState("");
   const [returnRestock, setReturnRestock] = React.useState(true);
+  // Exchange settlement: how a balance the customer owes is paid; what happens to an excess
+  const [exchPayMethod, setExchPayMethod] = React.useState<"CASH"|"CARD"|"QR"|"BANK_TRANSFER">("CASH");
+  const [exchPayAmount, setExchPayAmount] = React.useState("");
+  const [exchPayLast4, setExchPayLast4] = React.useState("");
+  const [exchPayBank, setExchPayBank] = React.useState("");
+  const [exchExcessAs, setExchExcessAs] = React.useState<"REFUND"|"STORE_CREDIT">("REFUND");
   const [returnSubmitting, setReturnSubmitting] = React.useState(false);
-  const [returnResult, setReturnResult] = React.useState<{returnNumber:string;refundAmount:number}|null>(null);
+  const [returnResult, setReturnResult] = React.useState<{returnNumber:string;refundAmount:number;status?:string;settlement?:{due:number;change:number;excess:number;excessAs:"REFUND"|"STORE_CREDIT"|null;collected:{method:string;amount:number}[]}|null}|null>(null);
   const [returnType, setReturnType] = React.useState<"RETURN"|"EXCHANGE">("RETURN");
   const [exchangeItems, setExchangeItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
   const [exchangeSearch, setExchangeSearch] = React.useState("");
@@ -553,7 +611,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   });
   const { settings: receiptSettings } = useReceiptSettings();
   const [posColors, setPosColors] = usePosUiColors();
-  const { posLayout, settings: posTenantSettings } = usePosTenantSettings(posOpen);
+  const { posLayout, settings: posTenantSettings, reload: reloadPosTenantSettings } = usePosTenantSettings(posOpen);
   const posLayoutMeta = getPosLayoutMeta(posLayout);
   const posLayoutUi = getPosLayoutUi(posLayout);
   const { display: printerStatus, refresh: refreshPrinterStatus } = usePosPrinterStatus(posOpen, receiptSettings);
@@ -563,7 +621,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const partialPayInputRef = React.useRef<HTMLInputElement>(null);
   const giftVoucherInputRef = React.useRef<HTMLInputElement>(null);
   const chequeInputRef = React.useRef<HTMLInputElement>(null);
-  const cardLast3Ref = React.useRef<HTMLInputElement>(null);
+  const cardLast4Ref = React.useRef<HTMLInputElement>(null);
+  /** P-F11: synchronous guard — `checkoutLoading` is state and lags a render, so a double trigger could start two checkouts. */
+  const checkoutLatchRef = React.useRef(createCheckoutLatch());
+  /** P-F8: invoice number of a sale the server has CONFIRMED but whose on-screen finishing has not completed yet. */
+  const saleConfirmedRef = React.useRef<string | null>(null);
   const checkoutConfirmRef = React.useRef<HTMLButtonElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount, allowNegativeStock, setAllowNegativeStock } = useCartStore();
@@ -645,8 +707,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return;
     }
     if (activePayment === "CARD") {
-      cardLast3Ref.current?.focus();
-      cardLast3Ref.current?.select();
+      cardLast4Ref.current?.focus();
+      cardLast4Ref.current?.select();
       return;
     }
     setActivePayment("GIFT_VOUCHER");
@@ -659,10 +721,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   React.useEffect(() => {
     if (!checkoutOpen || activePayment !== "CARD") return;
     const t = setTimeout(() => {
-      const el = cardLast3Ref.current;
+      const el = cardLast4Ref.current;
       if (!el) return;
       el.focus();
-      // Only select-all when empty so â† â†’ can move the caret while editing
+      // Only select-all when empty so ← → can move the caret while editing
       if (!el.value) el.select();
     }, 50);
     return () => clearTimeout(t);
@@ -728,7 +790,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           percent: Math.round(equivalentPct * 100) / 100,
         });
         setDiscount(0, "percentage");
-        toast.info("Discount sent for manager approval â€” waitingâ€¦");
+        toast.info("Discount sent for manager approval — waiting…");
       } catch (e: unknown) {
         toast.error((e as Error).message ?? "Failed to submit discount for approval");
       }
@@ -739,7 +801,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setDiscount(v, type);
     setDiscountInput(String(v));
     if (type === "percentage") {
-      toast.success(`${v}% discount applied â€” LKR ${formatNumber(discAmt)} off`);
+      toast.success(`${v}% discount applied — LKR ${formatNumber(discAmt)} off`);
     } else {
       toast.success(`LKR ${formatNumber(v)} discount applied`);
     }
@@ -784,7 +846,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const loadTodayStats = React.useCallback(async () => {
     try {
       const [sumR, activeR] = await Promise.all([
-        api.get<{ totalSales: number; totalRevenue: number; totalItems?: number; cash?: { expectedInDrawer?: number } }>("/pos/summary"),
+        api.get<{
+          totalSales: number;
+          totalRevenue: number;
+          totalItems?: number;
+          byCounter?: { name: string; code: string; orders: number; amount: number }[];
+          cash?: { expectedInDrawer?: number };
+        }>("/pos/summary"),
         shiftReady ? api.get<{ status?: string; summary?: { expectedCash: number } } | null>("/cash/active").catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       ]);
       const d = sumR.data;
@@ -792,6 +860,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         sales: d.totalRevenue ?? 0,
         orders: d.totalSales ?? 0,
         items: d.totalItems ?? 0,
+        byCounter: d.byCounter ?? [],
       });
       const active = activeR.data;
       if (active?.status === "OPEN" && active.summary?.expectedCash != null) {
@@ -823,7 +892,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       setPartialPayAmount(numpad);
     }
   }, [numpad, activePayment, payState.allowPartial]);
-
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
   React.useEffect(() => { if (items.length === 0) setCheckoutOpen(false); }, [items.length]);
   React.useEffect(() => {
@@ -839,7 +907,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   }, [checkoutOpen, customer?.creditLimit, patchPayState]);
 
   React.useEffect(() => {
-    if (!checkoutOpen) return;
+    // Checkout (QR / bank tenders) and the Returns screen (exchange balance paid by QR / bank)
+    if (!checkoutOpen && activeNav !== "returns") return;
     let cancelled = false;
     void (async () => {
       try {
@@ -857,7 +926,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       }
     })();
     return () => { cancelled = true; };
-  }, [checkoutOpen]);
+  }, [checkoutOpen, activeNav]);
 
   const loadProducts = React.useCallback(async (opts?: {
     silent?: boolean;
@@ -919,7 +988,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       void loadProducts({ page: 1, search: q, category: activeCategory });
     }, q ? 280 : 0);
     return () => window.clearTimeout(handle);
-  }, [search, activeCategory, posOpen, shiftReady]); // eslint-disable-line react-hooks/exhaustive-deps â€” loadProducts identity changes often
+  }, [search, activeCategory, posOpen, shiftReady]); // eslint-disable-line react-hooks/exhaustive-deps -- loadProducts identity changes often
 
   const applySoldStockLocally = React.useCallback((sold: { variantId: string; quantity: number }[]) => {
     if (!sold.length) return;
@@ -954,7 +1023,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       setDiscountEditType("percentage");
       await loadHeldBills();
       await loadProducts();
-      toast.success("Bill held â€” stock reserved");
+      toast.success("Bill held — stock reserved");
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to hold bill");
     }
@@ -999,7 +1068,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       if (activeHeldBillId === id) clearCart();
       await loadHeldBills();
       await loadProducts();
-      toast.info("Held bill removed â€” stock released");
+      toast.info("Held bill removed — stock released");
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to delete held bill");
     }
@@ -1035,7 +1104,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const onCartResizeMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const drag = cartResizeRef.current;
     if (!drag) return;
-    // Dragging left edge: move left â†’ wider cart
+    // Dragging left edge: move left → wider cart
     const next = drag.startW + (drag.startX - e.clientX);
     setCartWidth(Math.min(POS_CART_WIDTH_MAX, Math.max(POS_CART_WIDTH_MIN, next)));
   }, []);
@@ -1145,7 +1214,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const onDoc = (e: MouseEvent) => {
       const el = cartCustomerDropdownRef.current;
       const target = e.target as Node;
-      // Register modal is portaled outside the dropdown â€” ignore clicks there
+      // Register modal is portaled outside the dropdown — ignore clicks there
       if ((target as Element)?.closest?.("[data-pos-register-customer-modal]")) return;
       if (el && !el.contains(target)) {
         setCartCustomerOpen(false);
@@ -1254,6 +1323,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     () => new Map(products.map((p) => [p.variantId, p.imageUrl])),
     [products],
   );
+  const bankDisplay = React.useMemo<CustomerDisplayBankPayment | null>(() => {
+    if (activePayment !== "BANK_TRANSFER" || !payBankAccountId) return null;
+    const bank = bankAccounts.find((account) => account.id === payBankAccountId);
+    if (!bank) return { status: "unavailable", bankAccountId: payBankAccountId, amount: totalAmt };
+    return {
+      status: "ready",
+      bankAccountId: bank.id,
+      amount: totalAmt,
+      bankName: bank.bankName,
+      accountNumber: bank.accountNumber,
+      accountHolderName: bank.accountHolderName,
+      branchName: bank.branchName,
+      branchCode: bank.branchCode,
+    };
+  }, [activePayment, bankAccounts, payBankAccountId, totalAmt]);
 
   usePosCustomerDisplayPublisher({
     enabled: posOpen && !pinLocked && shiftReady,
@@ -1275,6 +1359,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     totalAmount: totalAmt,
     reloadOpen: showReload,
     reloadPhone,
+    qrPayment: activePayment === "QR" ? qrDisplay : null,
+    bankPayment: bankDisplay,
   });
 
   const handleOpenCustomerDisplay = React.useCallback((event: React.MouseEvent) => {
@@ -1282,9 +1368,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (result === "focused") {
       toast.success("Customer display focused");
     } else if (result === "opened") {
-      toast.success("Customer display opened â€” drag to second monitor");
+      toast.success("Customer display opened — drag to second monitor");
     } else {
-      toast.success("Customer display opened in new tab â€” drag to second monitor");
+      toast.success("Customer display opened in new tab — drag to second monitor");
     }
   }, []);
   const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
@@ -1316,6 +1402,18 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     [items, discount, discountType, payState.couponDiscount, tierDiscountAmt, taxRate],
   );
   const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
+  // QR fee shown before the cashier confirms (the API works it out again and refuses the sale if it differs).
+  const qrFeeSettings = React.useMemo(() => qrFeeSettingsOf(posTenantSettings), [posTenantSettings]);
+  const qrBillAmount = (() => {
+    if (payState.allowPartial) {
+      const n = parseFloat(partialPayAmount);
+      if (n > 0 && n + 0.01 < totalAmt) return n;
+    }
+    return totalAmt;
+  })();
+  const qrSplitFee = payState.splitMode
+    ? totalQrFee(payState.paymentLines.filter((l) => l.method === "QR").map((l) => parseFloat(l.amount) || 0), qrFeeSettings)
+    : null;
   const popularItems = React.useMemo(() => {
     const freq = new Map<string, number>();
     for (const s of recentScans) freq.set(s.variantId, (freq.get(s.variantId) ?? 0) + 2);
@@ -1332,7 +1430,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     return top;
   }, [products, recentScans, liked]);
-  /** Current page only (~20) â€” server already filtered by search/category */
+  /** Current page only (~20) — server already filtered by search/category */
   const filteredProducts = products;
   const productCards = React.useMemo((): PosProductsPanelCard[] => {
     const sellPrices = (v: ProductItem) => {
@@ -1372,12 +1470,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const list = variants.length > 0 ? variants : [p];
     const selected = list.find((v) => v.variantId === p.variantId) ?? list.find((v) => v.stock > 0) ?? list[0];
     if (!selected) {
-      toast.error(`${p.productName} â€” Not found`);
+      toast.error(`${p.productName} — Not found`);
       playPosSound("scan_fail", soundAlerts);
       return;
     }
     if (!allowNegativeStock && list.every((v) => v.stock <= 0)) {
-      toast.error(`${p.productName} â€” Out of stock`);
+      toast.error(`${p.productName} — Out of stock`);
       playPosSound("scan_fail", soundAlerts);
       return;
     }
@@ -1387,9 +1485,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setAddPopup({ productName: title, selected, variants: list });
   }, [getVariants, soundAlerts, allowNegativeStock]);
 
-  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean; unitPrice?: number }) => {
+  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: {
+    keepSearchFocus?: boolean;
+    unitPrice?: number;
+    scaleBarcodes?: string[];
+  }) => {
     if (!allowNegativeStock && p.stock <= 0) {
-      toast.error(`${p.productName} (${p.variantName}) â€” Out of stock`);
+      toast.error(`${p.productName} (${p.variantName}) — Out of stock`);
       playPosSound("scan_fail", soundAlerts);
       return;
     }
@@ -1401,7 +1503,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       ? Math.max(minQty, qty)
       : Math.min(Math.max(minQty, qty), Math.max(minQty, p.stock));
     const priceCut = listPrice - finalPrice;
-    const hasPriceDiscount = priceCut > 0.001;
+    const hasPriceDiscount = !opts?.scaleBarcodes?.length && priceCut > 0.001;
     const lineTax = taxRate;
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
@@ -1415,6 +1517,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       productKind: p.productKind,
       unit: p.unit,
       allowDecimalSelling: weighted || !!p.allowDecimalSelling,
+      scaleBarcodes: opts?.scaleBarcodes,
     });
     setLastAddedVariantId(p.variantId);
     setRecentScans((prev) => [{
@@ -1427,11 +1530,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       time: new Date(),
     }, ...prev].slice(0, 8));
     playPosSound("scan_ok", soundAlerts);
-    const qtyLabel = weighted ? formatPosWeightQty(qtyClamped, p) : `Ã—${qtyClamped}`;
+    const qtyLabel = weighted ? formatPosWeightQty(qtyClamped, p) : `×${qtyClamped}`;
     if (hasPriceDiscount) {
       toast.success(`Price discount LKR ${formatNumber(priceCut * qtyClamped)} applied`, { duration: 900 });
     } else {
-      toast.success(`${p.productName} Â· ${variantDisplayLabel(p, profile)} ${qtyLabel}`, { duration: 700 });
+      toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ${qtyLabel}`, { duration: 700 });
     }
     if (opts?.keepSearchFocus !== false) {
       requestAnimationFrame(() => {
@@ -1453,6 +1556,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
+    const scaleScan = /^2\d{12}$/.test(trimmed);
 
     type BarcodeLookup = ProductItem & {
       requiresVariantPick?: boolean;
@@ -1465,6 +1569,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       setLastScanAt(new Date());
       setScanFlash(true);
       setTimeout(() => setScanFlash(false), 500);
+
+      if (
+        pick.isScaleBarcode
+        && pick.scaleBarcode
+        && Number.isFinite(pick.scaleQty)
+        && (pick.scaleQty ?? 0) >= 0.001
+        && isPosWeightedProduct(pick)
+      ) {
+        if (!allowNegativeStock && pick.stock < pick.scaleQty!) {
+          toast.error(`${pick.productName} (${pick.variantName}) — Insufficient stock`);
+          playPosSound("scan_fail", soundAlerts);
+          return;
+        }
+        commitAddProduct(pick, pick.scaleQty!, {
+          keepSearchFocus: true,
+          scaleBarcodes: [pick.scaleBarcode],
+        });
+        return;
+      }
 
       // Weight (kg/g) always needs gram entry. Qty popup when setting ON or multi PO prices.
       // Multi-variant / shared-barcode: auto-pick best match → cart (no slow popup) unless prices differ.
@@ -1490,7 +1613,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     };
 
     // Fast path: resolve from local barcode index (O(1)) before waiting on the API
-    const localMatches = lookupLocalBarcode(trimmed);
+    const localMatches = scaleScan ? [] : lookupLocalBarcode(trimmed);
     if (localMatches.length > 1) {
       const pick = localMatches.find((p) => p.stock > 0) ?? localMatches[0];
       finishScan(pick, localMatches);
@@ -1553,7 +1676,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       }
     }
 
-    if (!found) {
+    if (!found && !scaleScan) {
       found = lookupLocalBarcode(trimmed)[0] ?? findProductByBarcodeCode(trimmed, products);
       if (found) {
         const siblings = getVariants(found.productName);
@@ -1587,7 +1710,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
     if (!q) return;
-    // Always treat Enter in search as barcode/SKU scan when possible â€” never open the slow qty popup via card click.
+    // Always treat Enter in search as barcode/SKU scan when possible — never open the slow qty popup via card click.
     const barcodeLike =
       isLikelyBarcodeScan(q) ||
       matchesCachedBarcode(q, products) ||
@@ -1598,7 +1721,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       void scanAndAddProduct(q);
       return;
     }
-    // Name search with one clear match â†’ still scan-add (instant cart), not qty popup
+    // Name search with one clear match → still scan-add (instant cart), not qty popup
     if (productCards.length === 1) {
       const only = productCards[0].rep;
       setSearch("");
@@ -1673,7 +1796,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [pinEntry, pinBusy, loadTodayStats]);
 
-  /** Lock POS for cashier switch â€” clear unlock token so API stops attributing to previous cashier. */
+  /** Lock POS for cashier switch — clear unlock token so API stops attributing to previous cashier. */
   const lockCashier = React.useCallback(() => {
     posCashierStorage.clear();
     setActiveCashier(null);
@@ -1742,7 +1865,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const discRow = disc > 0
         ? `<div class="disc"><span>Discount</span><span>-${receiptMoney(disc)}</span></div>`
         : "";
-      return `<div class="item"><div class="iname">${i.name}</div><div class="irow"><span class="q">${i.qty} Ã— ${receiptMoney(listUnit)}</span><span class="a">${receiptMoney(i.price)}</span></div>${discRow}</div>`;
+      return `<div class="item"><div class="iname">${i.name}</div><div class="irow"><span class="q">${i.qty} × ${receiptMoney(listUnit)}</span><span class="a">${receiptMoney(i.price)}</span></div>${discRow}</div>`;
     }).join("");
     const logoHtml = s.logoUrl
       ? `<img class="logo" src="${resolvePublicAssetUrl(s.logoUrl)}" alt=""/>`
@@ -1820,7 +1943,7 @@ ${receiptSoftwareCreditHtml()}
         invoiceNumber: s.invoiceNumber,
         total: s.total,
         changeDue: s.changeDue ?? 0,
-        paymentMethod: s.payments?.map((p) => p.method).join(" + ") || s.paymentMethod,
+        paymentMethod: s.payments?.map((p) => receiptPaymentLabel(p)).join(" + ") || s.paymentMethod,
         customerName: formatSaleCustomerName(s.customer),
         items: s.items.map((i) => ({
           name: receiptItemName(i.productName, i.variantName),
@@ -1906,7 +2029,7 @@ ${receiptSoftwareCreditHtml()}
     setShowDemoProduct(true);
   }, []);
 
-  // Customer display â†’ POS: phone typed on second screen
+  // Customer display → POS: phone typed on second screen
   React.useEffect(() => {
     if (!showReload) return;
     return subscribeCustomerDisplayInput((ev) => {
@@ -1915,15 +2038,15 @@ ${receiptSoftwareCreditHtml()}
   }, [showReload]);
 
   const handleCheckout = React.useCallback(async (forceMethod?: string) => {
-    if(!items.length||checkoutLoading)return;
+    if(!items.length||checkoutLoading||checkoutLatchRef.current.busy)return;
     if (pendingDiscountApproval) {
-      toast.error("Waiting for manager discount approval â€” cannot checkout yet");
+      toast.error("Waiting for manager discount approval — cannot checkout yet");
       return;
     }
     const payMethod = forceMethod ?? activePayment;
     if (forceMethod) setActivePayment(forceMethod);
     const tenderPad = numpad;
-    // Cash: Cash Received must be typed â€” never auto-assume exact total
+    // Cash: Cash Received must be typed — never auto-assume exact total
     if (payMethod === "CASH" && !payState.splitMode) {
       const raw = numpad.trim();
       const tendered = parseFloat(raw);
@@ -1934,50 +2057,29 @@ ${receiptSoftwareCreditHtml()}
         return;
       }
     }
-    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount, cardLast3, payBankAccountId);
-    if (payMethod === "WALLET" && !payState.splitMode) {
-      if (!customer) { toast.error("Select a customer for wallet payment"); return; }
-      payments.length = 0;
-      payments.push({ method: "WALLET", amount: totalAmt });
-    }
+    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount, cardLast4, payBankAccountId, payQrCodeId);
     if (payMethod === "CUSTOMER_CREDIT" && !payState.splitMode) {
-      if (!customer) { toast.error("Select a customer for credit payment"); return; }
-      const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
-      const paidNow = payments.reduce((s, p) => s + p.amount, 0);
-      const isPartialNow = payState.allowPartial && paidNow > 0 && paidNow + 0.01 < totalAmt;
-      if (isPartialNow) {
-        const onCredit = totalAmt - paidNow;
-        if (onCredit > available + 0.01) {
-          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
-          return;
-        }
-      } else {
-        if (available <= 0) { toast.error("No credit available â€” set credit limit on customer profile"); return; }
-        const typed = numpad.trim() ? parseFloat(numpad) : totalAmt;
-        const creditAmt = Number.isFinite(typed) && typed > 0 ? Math.min(typed, totalAmt) : totalAmt;
-        if (creditAmt > available + 0.01) {
-          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
-          return;
-        }
-        if (creditAmt + 0.01 < totalAmt && !payState.allowPartial) {
-          toast.error("Credit amount is less than total â€” enable Partial pay or enter the full amount");
-          return;
-        }
-        payments.length = 0;
-        payments.push({ method: "CUSTOMER_CREDIT", amount: creditAmt });
+      if (!customer) { toast.error("Select a customer for Credit / Wallet payment"); return; }
+      const availableWallet = Math.max(0, customer.walletBalance ?? 0);
+      const availableCredit = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
+      if (availableWallet + availableCredit + 0.01 < totalAmt) {
+        toast.error(`Insufficient Credit / Wallet funds. Wallet: LKR ${formatNumber(availableWallet)} · Credit available: LKR ${formatNumber(availableCredit)}`);
+        return;
       }
+      payments.length = 0;
+      payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
     }
     if (payMethod === "CARD" && !payState.splitMode) {
-      const digits = cardLast3.replace(/\D/g, "");
-      if (digits.length !== 3) {
-        toast.error("Enter last 3 digits of the card");
-        cardLast3Ref.current?.focus();
+      const last4 = cardLast4.trim();
+      if (!isValidCardLast4(last4)) {
+        toast.error("Enter the last 4 digits of the card");
+        cardLast4Ref.current?.focus();
         return;
       }
       const paidNow = payments.reduce((s, p) => s + p.amount, 0);
       const amt = paidNow > 0 ? paidNow : totalAmt;
       payments.length = 0;
-      payments.push({ method: "CARD", amount: amt, reference: digits });
+      payments.push({ method: "CARD", amount: amt, reference: last4, cardLast4: last4 });
     }
     if ((payMethod === "BANK_TRANSFER" || payMethod === "QR") && !payState.splitMode) {
       if (!payBankAccountId.trim()) {
@@ -1985,13 +2087,18 @@ ${receiptSoftwareCreditHtml()}
         return;
       }
       if (bankAccounts.length === 0) {
-        toast.error("No bank accounts found â€” add one in Accounting â†’ Banking first");
+        toast.error("No bank accounts found — add one in Accounting → Banking first");
         return;
       }
       const paidNow = payments.reduce((s, p) => s + p.amount, 0);
       const amt = paidNow > 0 ? paidNow : totalAmt;
       payments.length = 0;
-      payments.push({ method: payMethod, amount: amt, bankAccountId: payBankAccountId.trim() });
+      payments.push({
+        method: payMethod,
+        amount: amt,
+        bankAccountId: payBankAccountId.trim(),
+        ...(payMethod === "QR" && payQrCodeId ? { qrCodeId: payQrCodeId } : {}),
+      });
     }
     if (payMethod === "CHEQUE" && !payState.splitMode) {
       if (!chequeNumber.trim()) { toast.error("Enter cheque number"); return; }
@@ -2003,10 +2110,9 @@ ${receiptSoftwareCreditHtml()}
       if (missingCheque) { toast.error("Enter cheque number on CHEQUE payment lines"); return; }
       const missingCard = payments.some((p) => {
         if (p.method !== "CARD") return false;
-        const d = ((p as { reference?: string }).reference ?? "").replace(/\D/g, "");
-        return d.length !== 3;
+        return !isValidCardLast4((p as { reference?: string }).reference ?? "");
       });
-      if (missingCard) { toast.error("Enter last 3 card digits on CARD payment lines"); return; }
+      if (missingCard) { toast.error("Enter the last 4 card digits on every Card payment line"); return; }
       const missingBank = payments.some((p) =>
         (p.method === "BANK_TRANSFER" || p.method === "QR") &&
         !(p as { bankAccountId?: string }).bankAccountId,
@@ -2024,7 +2130,7 @@ ${receiptSoftwareCreditHtml()}
         payments.length = 0;
         payments.push({ method: "GIFT_VOUCHER", amount: applyAmt, reference: giftVoucherCode.trim().toUpperCase() });
         if (applyAmt + 0.01 < totalAmt) {
-          toast.error(`Voucher covers LKR ${applyAmt.toFixed(2)} â€” use split pay for the remainder`);
+          toast.error(`Voucher covers LKR ${applyAmt.toFixed(2)} — use split pay for the remainder`);
           return;
         }
       } catch (e: unknown) {
@@ -2034,19 +2140,12 @@ ${receiptSoftwareCreditHtml()}
     }
     if (!payState.splitMode && !payState.allowPartial) {
       if (payMethod === "CASH" && tenderPad && parseFloat(tenderPad) < totalAmt) {
-        toast.error("Cash tendered less than total â€” enable Partial pay for credit customers");
+        toast.error("Cash tendered less than total — enable Partial pay for credit customers");
         return;
       }
       const paid = payments.reduce((s, p) => s + p.amount, 0);
       if (paid + 0.01 < totalAmt && payMethod !== "CASH") {
         toast.error("Payment amount is less than total");
-        return;
-      }
-    }
-    if (payState.allowPartial && !payState.splitMode && payMethod !== "CUSTOMER_CREDIT") {
-      const paid = payments.reduce((s, p) => s + p.amount, 0);
-      if (paid + 0.01 < totalAmt && paid > 0 && !customer?.id) {
-        toast.error("Select a customer â€” unpaid balance goes on credit account");
         return;
       }
     }
@@ -2057,15 +2156,22 @@ ${receiptSoftwareCreditHtml()}
     const paidCheck = payments.reduce((s, p) => s + p.amount, 0);
     const isPartialBill = paidCheck + 0.01 < totalAmt;
     if ((payState.allowPartial || isPartialBill) && isPartialBill) {
+      if (!payments.some((payment) => payment.method === "CUSTOMER_CREDIT")) {
+        toast.error("Cash, card, bank, QR, and cheque cannot create customer credit or wallet balance. Select Customer Credit for the unpaid amount.");
+        return;
+      }
       if (!customer?.id) {
-        toast.error("Select a customer â€” unpaid balance goes on credit account");
+        toast.error("Select a customer — unpaid balance goes on credit account");
         return;
       }
       if ((customer.creditLimit ?? 0) <= 0) {
-        toast.error("Customer has no credit limit â€” set a limit or collect full payment");
+        toast.error("Customer has no credit limit — set a limit or collect full payment");
         return;
       }
     }
+    // Everything above is synchronous (no await), so taking the latch here is race-free.
+    if (!checkoutLatchRef.current.tryEnter()) return;
+    saleConfirmedRef.current = null;
     setCheckoutLoading(true);
     try {
       const pm = new Map<string, ProductItem>(products.map((p) => [p.variantId, p]));
@@ -2083,6 +2189,7 @@ ${receiptSoftwareCreditHtml()}
           discount:i.discountAmount??0,
           discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",
           taxRate:taxRate,
+          ...(i.scaleBarcodes?.length ? { scaleBarcodes: i.scaleBarcodes } : {}),
           ...(i.reloadType ? {
             reloadType: i.reloadType,
             reloadOperatorId: i.reloadOperatorId,
@@ -2091,7 +2198,8 @@ ${receiptSoftwareCreditHtml()}
             reloadFaceValue: i.reloadFaceValue ?? i.unitPrice,
           } : {}),
         })),
-        payments,
+        // each QR line carries the fee the cashier saw; the API refuses the sale (409) if its own figure differs
+        payments: payments.map((p) => (p.method === "QR" ? { ...p, expectedQrFee: computeQrFee(p.amount, qrFeeSettings).feeAmount } : p)),
         discountAmount:discountAmount(),
         couponCode:couponCode??undefined,
         loyaltyPointsToRedeem:loyaltyPointsToRedeem>0?loyaltyPointsToRedeem:undefined,
@@ -2103,9 +2211,11 @@ ${receiptSoftwareCreditHtml()}
       };
       // Same cart retried (double click / timeout / reload) re-sends the same key → API returns the original sale.
       const clientRequestId = checkoutRequestKey(checkoutSignature(payload));
-      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;amountPaid?:number;paymentStatus?:string;idempotentReplay?:boolean}>("/pos/sale",{...payload, clientRequestId});
-      clearCheckoutRequestKey();
+      const res=await api.post<{id?:string;invoiceNumber:string;total:number;changeDue:number;amountPaid?:number;paymentStatus?:string;idempotentReplay?:boolean}>("/pos/sale",{...payload, clientRequestId});
       const s=res.data;
+      // The server has recorded the sale. From here on the idempotency key stays in place until the cart is reset,
+      // so a failure of the on-screen finishing can never turn a retry into a second sale.
+      saleConfirmedRef.current = s.invoiceNumber;
       const saleTotal = Number(s.total) || totalAmt;
       const cashTendered =
         payMethod === "CASH" && tenderPad.trim()
@@ -2118,7 +2228,7 @@ ${receiptSoftwareCreditHtml()}
         payMethod === "CASH" && cashTendered != null && Number.isFinite(cashTendered)
           ? Math.max(0, cashTendered - saleTotal)
           : 0;
-      // Prefer the larger of API vs local â€” Partial-pay overpay can otherwise report changeDue=0.
+      // Prefer the larger of API vs local — Partial-pay overpay can otherwise report changeDue=0.
       const resolvedChangeDue = Math.max(
         Number.isFinite(apiChange) ? apiChange : 0,
         localChange,
@@ -2129,7 +2239,7 @@ ${receiptSoftwareCreditHtml()}
         discount: discountAmount() + payState.couponDiscount + tierDiscountAmt + loyaltyDiscountAmt,
         tax: taxAmount(),
         customerName: customer?.name,
-        paymentMethod: payments.map((p) => p.method).join(" + "),
+        paymentMethod: payments.map((p) => receiptPaymentLabel(p)).join(" + "),
         cashTendered: cashTendered != null && Number.isFinite(cashTendered) ? cashTendered : undefined,
         savings: items.reduce((sum, i) => {
           const lineDisc = calcPosLineDiscount(i);
@@ -2137,8 +2247,53 @@ ${receiptSoftwareCreditHtml()}
           return sum + lineDisc + mrpExtra;
         }, 0) + discountAmount() + payState.couponDiscount + tierDiscountAmt + loyaltyDiscountAmt,
       };
-      setTodayStats(prev=>({sales:prev.sales+saleTotal,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
+      setTodayStats(prev=>({ ...prev, sales:prev.sales+saleTotal,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0) }));
+      if (customer?.id) {
+        void Promise.all([
+          api.get<ApiCustomerRow & {
+            sales?: CustomerBillRow[];
+            topProducts?: CustomerTopProduct[];
+            totalOrders?: number;
+            totalSpent?: number;
+            creditAvailable?: number;
+          }>(`/customers/${customer.id}`),
+          api.get<{
+            entries: CustomerHistoryEntry[];
+            pageInfo: { hasMore: boolean; nextCursor: string | null };
+            branchScope: { walletAndCreditEntriesOmitted: boolean; balancesAreAllBranches: boolean };
+          }>(`/customers/${customer.id}/transaction-history?limit=5&recent=true`),
+        ]).then(([{ data }, historyResponse]) => {
+          setCustomer({
+            ...customer,
+            walletBalance: data.walletBalance ?? 0,
+            outstandingBalance: data.creditBalance ?? 0,
+            creditLimit: data.creditLimit ?? customer.creditLimit,
+          });
+          setInlineCustomers((current) => current.map((entry) => entry.id === customer.id
+            ? { ...entry, walletBalance: data.walletBalance ?? 0, creditBalance: data.creditBalance ?? 0, creditLimit: data.creditLimit ?? entry.creditLimit }
+            : entry));
+          setCustomerInsight((current) => current ? {
+            ...current,
+            sales: data.sales ?? current.sales,
+            topProducts: data.topProducts ?? current.topProducts,
+            totalOrders: data.totalOrders ?? current.totalOrders,
+            totalSpent: data.totalSpent ?? current.totalSpent,
+            walletBalance: data.walletBalance ?? 0,
+            creditBalance: data.creditBalance ?? 0,
+            creditLimit: data.creditLimit ?? 0,
+            creditAvailable: data.creditAvailable ?? 0,
+          } : current);
+          setCustomerHistory(historyResponse.data.entries ?? []);
+          setCustomerHistoryCursor(historyResponse.data.pageInfo?.nextCursor ?? null);
+          setCustomerHistoryHasMore(Boolean(historyResponse.data.pageInfo?.hasMore));
+          setCustomerHistoryBranchScope(historyResponse.data.branchScope ?? null);
+          setCustomerHistoryFull(false);
+        }).catch((error: unknown) => {
+          toast.error(`Sale completed, but customer account refresh failed: ${(error as Error).message ?? "unknown error"}`);
+        });
+      }
       setThankYouSale({
+        saleId: s.id,
         invoiceNumber: s.invoiceNumber,
         total: saleTotal,
         changeDue: resolvedChangeDue,
@@ -2155,29 +2310,34 @@ ${receiptSoftwareCreditHtml()}
       if (waBillEnabled) {
         const phone = (customer?.phone ?? "").trim();
         if (!phone) {
-          toast.message("WhatsApp bill skipped â€” select a customer with a phone number.");
+          toast.message("WhatsApp bill skipped — select a customer with a phone number.");
         } else {
           const itemsSummary = saleSnapshot.items
             .slice(0, 12)
-            .map((i) => `â€¢ ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} Ã—${i.quantity}`)
+            .map((i) => `• ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} ×${i.quantity}`)
             .join("\n");
           void (async () => {
             try {
               const wa = await api.get<{ status?: string }>("/whatsapp/status");
               if (wa.data?.status !== "connected") {
-                toast.message("WhatsApp not connected â€” bill not sent. Connect QR in Settings â†’ WhatsApp.");
+                toast.message("WhatsApp not connected — bill not sent. Connect QR in Settings → WhatsApp.");
                 return;
               }
-              await api.post("/whatsapp/send-bill", {
-                phone,
-                invoiceNumber: s.invoiceNumber,
-                customerName: saleSnapshot.customerName,
-                total: formatNumber(s.total),
-                paymentMethod: saleSnapshot.paymentMethod,
-                itemsSummary,
-                shopName: receiptSettings.shopName || APP_NAME,
-              });
-              toast.success(`Bill sent on WhatsApp Â· ${phone}`);
+              if (s.id) {
+                // Same text as the "Copy bill message" button: shop template, real invoice, current credit balance.
+                await api.post("/whatsapp/send-sale-bill", { saleId: s.id, phone });
+              } else {
+                await api.post("/whatsapp/send-bill", {
+                  phone,
+                  invoiceNumber: s.invoiceNumber,
+                  customerName: saleSnapshot.customerName,
+                  total: formatNumber(s.total),
+                  paymentMethod: saleSnapshot.paymentMethod,
+                  itemsSummary,
+                  shopName: receiptSettings.shopName || APP_NAME,
+                });
+              }
+              toast.success(`Bill sent on WhatsApp · ${phone}`);
             } catch (e) {
               toast.error((e as Error).message ?? "WhatsApp send failed");
             }
@@ -2188,8 +2348,10 @@ ${receiptSoftwareCreditHtml()}
       if (taxRate > 0) writePosSavedTaxRate(taxRate);
       clearCart();
       setTaxRate(0);
+      clearCheckoutRequestKey(); // the cart is reset: the next cart gets a fresh key
+      saleConfirmedRef.current = null;
       setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setDiscountEditType("percentage");setPendingDiscountApproval(null);setCheckoutOpen(false);
-      setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber(""); setCardLast3(""); setPayBankAccountId("");
+      setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber(""); setCardLast4(""); setPayBankAccountId(""); setPayQrCodeId("");
       setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setPartialPayAmount("");
@@ -2218,25 +2380,32 @@ ${receiptSoftwareCreditHtml()}
           title: `Receipt ${s.invoiceNumber}`,
         }).catch((e) => toast.error((e as Error).message ?? "Receipt print failed"));
       }
-      // Reset for next sale immediately â€” do not block scanner on full catalog reload
+      // Reset for next sale immediately — do not block scanner on full catalog reload
       setTimeout(() => searchRef.current?.focus(), 80);
       void loadHeldBills();
       applySoldStockLocally(saleSnapshot.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })));
       void loadTodayStats();
       void refreshPrinterStatus();
-      const partialNote = s.paymentStatus === "PENDING" ? " (partial â€” balance on account)" : "";
-      const changeNote = resolvedChangeDue > 0.009 ? ` Â· Change LKR ${formatNumber(resolvedChangeDue)}` : "";
+      const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
+      const changeNote = resolvedChangeDue > 0.009 ? ` · Change LKR ${formatNumber(resolvedChangeDue)}` : "";
       const replayNote = s.idempotentReplay ? " (already recorded — not charged twice)" : "";
-      toast.success(`Sale complete Â· ${s.invoiceNumber} â€” ${payState.currency} ${saleTotal.toLocaleString()}${partialNote}${changeNote}${replayNote}`,{duration:3500});
+      toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${saleTotal.toLocaleString()}${partialNote}${changeNote}${replayNote}`,{duration:3500});
     } catch(e:unknown){
+      if (saleConfirmedRef.current) {
+        // The sale IS recorded; only the screen update failed. Keep the key: pressing pay again returns this same
+        // sale ("already recorded") and the customer will not be charged twice.
+        toast.warning(`Sale ${saleConfirmedRef.current} was recorded, but the screen could not finish updating. The customer will not be charged twice - press Pay again to finish, or check Sales.`, { duration: 8000 });
+        return;
+      }
       const msg=(e as Error).message??"Checkout failed";
       toast.error(msg);
+      if (/QR fee changed/i.test(msg)) void reloadPosTenantSettings(); // an admin changed the fee: show the new figure
       if (/no longer in catalog|variant that no longer exists/i.test(msg)) {
         clearCart();
         setSelectedCartIdx(-1);
       }
-    } finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
+    } finally{setCheckoutLoading(false);checkoutLatchRef.current.leave();}
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast4,payBankAccountId,payQrCodeId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled,qrFeeSettings,reloadPosTenantSettings,changeAmt]);
 
   /** Quick Pay reload: post as its own cash sale immediately — current cart is untouched. */
   const recordQuickReloadSale = React.useCallback(async (item: CartItem): Promise<boolean> => {
@@ -2288,7 +2457,7 @@ ${receiptSoftwareCreditHtml()}
         customerName: customer?.name,
         cashTendered: saleTotal,
       });
-      setTodayStats((prev) => ({ sales: prev.sales + saleTotal, orders: prev.orders + 1, items: prev.items + item.quantity }));
+      setTodayStats((prev) => ({ ...prev, sales: prev.sales + saleTotal, orders: prev.orders + 1, items: prev.items + item.quantity }));
       playPosSound("sale_ok", soundAlerts);
       const receipt: SaleReceipt = {
         invoiceNumber: s.invoiceNumber,
@@ -2325,7 +2494,7 @@ ${receiptSoftwareCreditHtml()}
     const now = new Date();
     const dateStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     const rows = items.map((i) =>
-      `<div class="item"><div class="iname">${receiptItemName(i.productName, i.variantName)}</div><div class="irow"><span class="q">${i.quantity} Ã— ${receiptMoney(i.unitPrice)}</span><span class="a">${receiptMoney(i.quantity * i.unitPrice)}</span></div></div>`,
+      `<div class="item"><div class="iname">${receiptItemName(i.productName, i.variantName)}</div><div class="irow"><span class="q">${i.quantity} × ${receiptMoney(i.unitPrice)}</span><span class="a">${receiptMoney(i.quantity * i.unitPrice)}</span></div></div>`,
     ).join("");
     const logoHtml = s.logoUrl
       ? `<img class="logo" src="${resolvePublicAssetUrl(s.logoUrl)}" alt=""/>`
@@ -2349,7 +2518,7 @@ ${rows}
 <hr class="d"/>
 <div class="tot"><span>TOTAL</span><span>${receiptMoney(totalAmt)}</span></div>
 <hr class="d"/>
-<div class="foot strong">Not a receipt â€” pending payment</div>
+<div class="foot strong">Not a receipt — pending payment</div>
 </body></html>`;
     try {
       await executeReceiptPrint({ html, printType: "PRE_BILL", settings: s, title: "Pre-Bill" });
@@ -2375,10 +2544,18 @@ ${rows}
     }
   }, [receiptSettings]);
 
-  const loadCustomerInsight = React.useCallback(async (customerId: string) => {
-    if (!customerId) { setCustomerInsight(null); setPreviewCustomerId(null); return; }
+  const loadCustomerInsight = React.useCallback(async (customerId: string, quiet = false) => {
+    const requestId = ++customerInsightRequestId.current;
+    if (!customerId) {
+      setCustomerInsight(null);
+      setCustomerHistory([]);
+      setPreviewCustomerId(null);
+      return;
+    }
     setPreviewCustomerId(customerId);
-    setCustomerInsightLoading(true);
+    if (!quiet) setCustomerInsightLoading(true);
+    setCustomerInsightError(false);
+    setCustomerHistoryError(false);
     try {
       const res = await api.get<{
         sales?: CustomerBillRow[];
@@ -2386,10 +2563,12 @@ ${rows}
         outstandingSales?: CustomerBillRow[];
         totalOrders?: number;
         totalSpent?: number;
+        walletBalance?: number;
         creditBalance?: number;
         creditLimit?: number;
         creditAvailable?: number;
       }>(`/customers/${customerId}`);
+      if (requestId !== customerInsightRequestId.current) return;
       const data = res.data;
       setCustomerInsight({
         sales: Array.isArray(data.sales) ? data.sales : [],
@@ -2397,19 +2576,73 @@ ${rows}
         outstandingSales: Array.isArray(data.outstandingSales) ? data.outstandingSales : [],
         totalOrders: data.totalOrders,
         totalSpent: data.totalSpent,
+        walletBalance: data.walletBalance,
         creditBalance: data.creditBalance,
         creditLimit: data.creditLimit,
         creditAvailable: data.creditAvailable,
       });
-    } catch {
-      setCustomerInsight({ sales: [], topProducts: [] });
+      setCustomerInsightError(false);
+      try {
+        const historyRes = await api.get<{
+          entries: CustomerHistoryEntry[];
+          pageInfo: { hasMore: boolean; nextCursor: string | null };
+          branchScope: { walletAndCreditEntriesOmitted: boolean; balancesAreAllBranches: boolean };
+        }>(`/customers/${customerId}/transaction-history?limit=5&recent=true`);
+        if (requestId !== customerInsightRequestId.current) return;
+        setCustomerHistory(Array.isArray(historyRes.data.entries) ? historyRes.data.entries : []);
+        setCustomerHistoryCursor(historyRes.data.pageInfo?.nextCursor ?? null);
+        setCustomerHistoryHasMore(Boolean(historyRes.data.pageInfo?.hasMore));
+        setCustomerHistoryBranchScope(historyRes.data.branchScope ?? null);
+        if (!quiet) setCustomerHistoryFull(false);
+        setCustomerHistoryError(false);
+      } catch (error) {
+        if (requestId !== customerInsightRequestId.current) return;
+        setCustomerHistoryError(true);
+        if (!quiet) toast.error((error as Error).message ?? "Customer transaction history could not be loaded");
+      }
+    } catch (error) {
+      if (requestId !== customerInsightRequestId.current) return;
+      setCustomerInsightError(true);
+      if (!quiet) toast.error((error as Error).message ?? "Customer account could not be loaded");
     } finally {
-      setCustomerInsightLoading(false);
+      if (requestId === customerInsightRequestId.current && !quiet) setCustomerInsightLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeNav !== "customers" || !previewCustomerId || customerHistoryFull) return;
+    const timer = window.setInterval(() => {
+      void loadCustomerInsight(previewCustomerId, true);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [activeNav, previewCustomerId, customerHistoryFull, loadCustomerInsight]);
+
+  const loadCompleteCustomerHistory = React.useCallback(async (customerId: string, cursor?: string | null, append = false) => {
+    setCustomerHistoryLoading(true);
+    setCustomerHistoryError(false);
+    setCustomerHistoryFull(true);
+    try {
+      const query = new URLSearchParams({ limit: "50" });
+      if (cursor) query.set("cursor", cursor);
+      const response = await api.get<{
+        entries: CustomerHistoryEntry[];
+        pageInfo: { hasMore: boolean; nextCursor: string | null };
+        branchScope: { walletAndCreditEntriesOmitted: boolean; balancesAreAllBranches: boolean };
+      }>(`/customers/${customerId}/transaction-history?${query.toString()}`);
+      setCustomerHistory((current) => append ? [...current, ...response.data.entries] : response.data.entries);
+      setCustomerHistoryCursor(response.data.pageInfo?.nextCursor ?? null);
+      setCustomerHistoryHasMore(Boolean(response.data.pageInfo?.hasMore));
+      setCustomerHistoryBranchScope(response.data.branchScope ?? null);
+    } catch (error) {
+      setCustomerHistoryError(true);
+      toast.error((error as Error).message ?? "Complete customer history could not be loaded");
+    } finally {
+      setCustomerHistoryLoading(false);
     }
   }, []);
 
   const applyCustomer = React.useCallback((c: CustomerItem) => {
-    if (!c?.id) { toast.error("Invalid customer â€” try again"); return; }
+    if (!c?.id) { toast.error("Invalid customer — try again"); return; }
     setCustomer({
       id: c.id, name: c.name, phone: c.phone, email: c.email,
       membershipTier: (c.tier?.toLowerCase() ?? "bronze") as Customer["membershipTier"],
@@ -2432,47 +2665,57 @@ ${rows}
     if (!(amt > 0)) { toast.error("Enter payment amount"); return; }
     const owed = customerInsight?.creditBalance ?? 0;
     if (owed <= 0) { toast.error("No outstanding balance"); return; }
-    if (amt > owed + 0.01) {
-      toast.error(`Amount exceeds outstanding (LKR ${formatNumber(owed)})`);
-      return;
-    }
     if (creditPayMethod === "CHEQUE" && !creditPayChequeNumber.trim()) {
       toast.error("Enter cheque number");
       return;
     }
+    if (creditPayMethod === "CARD" && !isValidCardLast4(creditPayCardLast4)) {
+      toast.error("Enter the last 4 digits of the card");
+      return;
+    }
     setCreditPayBusy(true);
     try {
-      await api.post(`/customers/${customerId}/credit/payment`, {
+      const request = {
         amount: amt,
         paymentMethod: creditPayMethod,
-        description: `POS credit settlement â€” ${customerName}`,
+        description: `POS credit settlement — ${customerName}`,
         ...(creditPayMethod === "CHEQUE"
           ? {
               chequeNumber: creditPayChequeNumber.trim(),
               chequeDueDate: creditPayChequeDue || undefined,
             }
           : {}),
+        ...(creditPayMethod === "CARD" ? { cardLast4: creditPayCardLast4.trim() } : {}),
+      };
+      const requestSlot = `customer-payment:${customerId}` as const;
+      const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
+      const result = await api.post<{ creditBalance: number; walletBalance: number }>(`/customers/${customerId}/credit/payment`, {
+        ...request,
+        clientRequestId,
       });
+      clearCheckoutRequestKey(requestSlot);
       toast.success(`Received LKR ${formatNumber(amt)} from ${customerName}`);
       setCreditPayAmount("");
+      setCreditPayCardLast4("");
       setCreditPayChequeNumber("");
       setCreditPayChequeDue("");
-      void loadCustomerInsight(customerId);
+      await loadCustomerInsight(customerId);
       if (customer?.id === customerId) {
         setCustomer({
           ...customer,
-          outstandingBalance: Math.max(0, (customer.outstandingBalance ?? 0) - amt),
+          outstandingBalance: result.data.creditBalance,
+          walletBalance: result.data.walletBalance,
         });
       }
       setInlineCustomers((prev) =>
-        prev.map((c) => (c.id === customerId ? { ...c, creditBalance: Math.max(0, (c.creditBalance ?? 0) - amt) } : c)),
+        prev.map((c) => (c.id === customerId ? { ...c, creditBalance: result.data.creditBalance, walletBalance: result.data.walletBalance } : c)),
       );
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Payment failed");
     } finally {
       setCreditPayBusy(false);
     }
-  }, [creditPayAmount, creditPayMethod, creditPayChequeNumber, creditPayChequeDue, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
+  }, [creditPayAmount, creditPayMethod, creditPayChequeNumber, creditPayChequeDue, creditPayCardLast4, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
 
   const resetNewCustomerForm = React.useCallback(() => {
     setNewCustFirst("");
@@ -2494,7 +2737,7 @@ ${rows}
     resetNewCustomerForm();
     const phone = (prefillPhone ?? "").trim();
     if (phone && /^\d[\d\s+()-]*$/.test(phone)) setNewCustPhone(phone.replace(/\s+/g, ""));
-    // Always use the global modal flag â€” cart dropdown outside-click must not kill it
+    // Always use the global modal flag — cart dropdown outside-click must not kill it
     setCartShowNewCust(false);
     setCartCustomerOpen(false);
     setShowNewCust(true);
@@ -2571,7 +2814,7 @@ ${rows}
 
   const handleSplitBill = React.useCallback(async () => {
     if (selectedCartIdx < 0 || !items[selectedCartIdx]) {
-      toast.error("Select a cart line (â†‘â†“) then split");
+      toast.error("Select a cart line (↑↓) then split");
       return;
     }
     const splitItem = items[selectedCartIdx];
@@ -2582,14 +2825,14 @@ ${rows}
     try {
       const payload = getHoldPayload();
       await api.post("/pos/hold", {
-        label: `Split Â· ${splitItem.productName}`,
+        label: `Split · ${splitItem.productName}`,
         data: { ...payload, items: [splitItem], notes: `Split from active bill` },
       });
       removeItem(splitItem.variantId);
       setSelectedCartIdx(-1);
       await loadHeldBills();
       await loadProducts();
-      toast.success(`${splitItem.productName} moved to held bills â€” checkout the rest`);
+      toast.success(`${splitItem.productName} moved to held bills — checkout the rest`);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Split bill failed");
     }
@@ -2625,7 +2868,12 @@ ${rows}
   }, [selectedCartIdx, items]);
 
   const closeQtyPopup = React.useCallback(() => setAddPopup(null), []);
+  const nextSaleGuardRef = React.useRef(createNextSaleGuard());
+  const thankYouKeyRef = React.useRef<string | null>(null);
+  thankYouKeyRef.current = thankYouSale ? (thankYouSale.saleId ?? thankYouSale.invoiceNumber ?? "sale") : null;
   const dismissSaleComplete = React.useCallback(() => {
+    // Shared by F9, the Next Sale button and double clicks: acknowledge each sale once.
+    if (!nextSaleGuardRef.current.tryAcknowledge(thankYouKeyRef.current)) return;
     setThankYouSale(null);
     setTimeout(() => {
       searchRef.current?.focus();
@@ -2893,7 +3141,9 @@ ${rows}
 
     // CUSTOMERS
     if (activeNav === "customers") {
-      const insightCustomer = customer ?? inlineCustomers.find((c) => c.id === previewCustomerId) ?? null;
+      const insightCustomer = previewCustomerId
+        ? inlineCustomers.find((c) => c.id === previewCustomerId) ?? (customer?.id === previewCustomerId ? customer : null)
+        : customer ?? null;
       const cf = posCustomerFormStyles(isPosLight);
       const warnRowStyle = { background: "var(--pos-warn-bg)", border: "1px solid var(--pos-warn-border)" } as const;
       const warnText = { color: "#ffffff" } as const;
@@ -2943,7 +3193,7 @@ ${rows}
         {/* List + insight */}
         <div className="flex-1 min-h-0 grid gap-3 lg:grid-cols-2" style={{gridTemplateColumns:"minmax(280px,1fr) minmax(300px,1.15fr)"}}>
           <div className="min-h-0 overflow-y-auto rounded-xl border p-2.5" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
-            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet â€” register a new customer</p></div>}
+            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
             {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
               <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"var(--pos-muted-2)"}}>
                 <AlertCircle className="h-8 w-8 opacity-30"/>
@@ -2978,20 +3228,119 @@ ${rows}
               <>
                 <div className="shrink-0 pb-3 border-b" style={{ borderColor: "var(--pos-border)" }}>
                   <p className="text-sm font-bold truncate" style={{ color: "var(--pos-text)" }}>{insightCustomer?.name ?? "Customer"}</p>
+                  {insightCustomer?.phone && <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>{insightCustomer.phone}</p>}
                   <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                     {typeof customerInsight?.totalOrders === "number" ? `${customerInsight.totalOrders} orders` : `${customerInsight?.sales.length ?? 0} recent bills`}
                     {typeof customerInsight?.totalSpent === "number" ? ` · LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
                   </p>
-                  {(customerInsight?.creditBalance ?? 0) > 0 && (
-                    <div className="mt-2 flex items-center justify-between px-3 py-2.5 rounded-xl" style={warnRowStyle}>
-                      <span className="text-[10px] font-bold uppercase tracking-wide" style={warnText}>Outstanding</span>
-                      <span className="text-sm font-bold tabular-nums" style={warnText}>LKR {formatNumber(customerInsight!.creditBalance!)}</span>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="rounded-lg px-3 py-2" style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)" }}>
+                      <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>Available wallet</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: "var(--pos-success-soft)" }}>LKR {formatNumber(customerInsight?.walletBalance ?? 0)}</p>
+                    </div>
+                    <div className="rounded-lg px-3 py-2" style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)" }}>
+                      <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>Outstanding credit</p>
+                      <p className="text-sm font-bold tabular-nums" style={warnText}>LKR {formatNumber(customerInsight?.creditBalance ?? 0)}</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] mt-2" style={{ color: "var(--pos-muted)" }}>
+                    Credit limit LKR {formatNumber(customerInsight?.creditLimit ?? 0)} · Available LKR {formatNumber(customerInsight?.creditAvailable ?? 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border p-3 space-y-2" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-text)" }}>
+                      {customerHistoryFull ? "Complete customer history" : "Recent account activity"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={customerInsightLoading || customerHistoryLoading}
+                        onClick={() => customerHistoryFull
+                          ? void loadCompleteCustomerHistory(previewCustomerId!, null, false)
+                          : void loadCustomerInsight(previewCustomerId!)}
+                        className="text-[10px] font-bold underline disabled:opacity-50"
+                        style={{ color: "var(--pos-accent-soft)" }}
+                      >
+                        Refresh
+                      </button>
+                      {!customerHistoryFull && (
+                        <button
+                          type="button"
+                          onClick={() => void loadCompleteCustomerHistory(previewCustomerId!)}
+                          className="text-[10px] font-bold underline"
+                          style={{ color: "var(--pos-accent-soft)" }}
+                        >
+                          View full history
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {customerHistoryBranchScope?.walletAndCreditEntriesOmitted && (
+                    <p className="text-[10px] leading-relaxed" style={{ color: "var(--pos-warn-soft)" }}>
+                      Wallet and credit history is omitted for this branch-filtered view because account transactions have no branch attribution. Balances shown above are all-branch.
+                    </p>
+                  )}
+                  {customerInsightError || customerHistoryError ? (
+                    <div className="text-center py-2">
+                      <p className="text-[10px] mb-2" style={{ color: "var(--pos-warn-soft)" }}>Customer history could not be loaded.</p>
+                      <button
+                        type="button"
+                        onClick={() => customerHistoryFull
+                          ? void loadCompleteCustomerHistory(previewCustomerId!, customerHistoryCursor, Boolean(customerHistoryCursor))
+                          : void loadCustomerInsight(previewCustomerId!)}
+                        className="text-[10px] font-bold underline"
+                        style={{ color: "var(--pos-accent-soft)" }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : customerHistory.length === 0 ? (
+                    <p className="text-[10px] py-2 text-center" style={{ color: "var(--pos-muted)" }}>No customer transactions yet</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {customerHistory.map((entry) => {
+                        const amount = ["CREDIT_SETTLEMENT", "WALLET_PAYMENT"].includes(entry.category)
+                          ? -Math.abs(entry.amount)
+                          : Math.abs(entry.amount);
+                        const balanceEffect = [
+                          entry.walletBalanceAfter !== null && entry.walletBalanceAfter !== undefined ? `Wallet ${formatNumber(entry.walletBalanceAfter)}` : null,
+                          entry.creditBalanceAfter !== null && entry.creditBalanceAfter !== undefined ? `Credit ${formatNumber(entry.creditBalanceAfter)}` : null,
+                        ].filter(Boolean).join(" · ");
+                        const categoryLabel = entry.category.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+                        return (
+                          <div key={entry.id} className="rounded-lg px-2.5 py-2" style={{ background: "var(--pos-panel)", border: "1px solid var(--pos-border)" }}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold truncate" style={{ color: "var(--pos-text)" }}>{categoryLabel}</p>
+                                <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>
+                                  {new Date(entry.createdAt).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}
+                                  {entry.reference ? ` · ${entry.reference}` : ""}
+                                </p>
+                                {entry.description && <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>{entry.description}</p>}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-[10px] font-bold tabular-nums" style={{ color: amount < 0 ? "var(--pos-success-soft)" : "var(--pos-text)" }}>
+                                  {amount > 0 ? "+" : ""}LKR {formatNumber(amount)}
+                                </p>
+                                {balanceEffect && <p className="text-[9px] tabular-nums" style={{ color: "var(--pos-muted)" }}>{balanceEffect}</p>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  {(customerInsight?.creditLimit ?? 0) > 0 && (
-                    <p className="text-[11px] mt-2" style={{color:"var(--pos-text-soft)"}}>
-                      Credit limit LKR {formatNumber(customerInsight!.creditLimit!)} · Available LKR {formatNumber(customerInsight!.creditAvailable ?? 0)}
-                    </p>
+                  {customerHistoryFull && customerHistoryHasMore && !customerHistoryError && (
+                    <button
+                      type="button"
+                      disabled={customerHistoryLoading}
+                      onClick={() => void loadCompleteCustomerHistory(previewCustomerId!, customerHistoryCursor, true)}
+                      className="w-full text-[10px] font-bold py-1 disabled:opacity-50"
+                      style={{ color: "var(--pos-accent-soft)" }}
+                    >
+                      {customerHistoryLoading ? "Loading…" : "Load more transactions"}
+                    </button>
                   )}
                 </div>
                 {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
@@ -3021,6 +3370,26 @@ ${rows}
                         <option value="CHEQUE">Cheque</option>
                       </select>
                     </div>
+                    {Number(creditPayAmount) > (customerInsight?.creditBalance ?? 0) + 0.01 && (
+                      <p className="text-xs font-semibold" style={{ color: "var(--pos-success)" }}>
+                        + LKR {formatNumber(Number(creditPayAmount) - (customerInsight?.creditBalance ?? 0))} will be saved to wallet
+                      </p>
+                    )}
+                    {creditPayMethod === "CARD" && (
+                      <input
+                        type="text"
+                        value={creditPayCardLast4}
+                        onChange={(e) => setCreditPayCardLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        inputMode="numeric"
+                        maxLength={4}
+                        required
+                        autoComplete="off"
+                        aria-label="Card last 4 digits"
+                        placeholder="Card last 4 digits"
+                        className="h-9 w-full rounded-xl px-3 text-sm text-white outline-none font-mono tracking-widest"
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                      />
+                    )}
                     {creditPayMethod === "CHEQUE" && (
                       <div className="grid grid-cols-2 gap-2">
                         <input
@@ -3037,7 +3406,7 @@ ${rows}
                           min="2000-01-01"
                           max="2099-12-31"
                           onChange={(e) => setCreditPayChequeDue(e.target.value)}
-                          title="Cheque Date â€” future dates allowed"
+                          title="Cheque Date — future dates allowed"
                           className="h-9 rounded-xl px-3 text-sm text-white outline-none"
                           style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",colorScheme:"dark"}}
                         />
@@ -3046,56 +3415,33 @@ ${rows}
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setCreditPayAmount(String(customerInsight!.creditBalance!))}
-                        className="flex-1 h-8 rounded-lg text-[10px] font-bold"
-                        style={{background:"var(--pos-input)",color:"var(--pos-accent-soft)",border:"1px solid var(--pos-border)"}}
-                      >
-                        Pay full
-                      </button>
-                      <button
-                        type="button"
                         disabled={creditPayBusy}
-                        onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
-                        className="flex-1 h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
+                        className="w-full h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
                         style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}
+                        onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
                       >
-                        {creditPayBusy ? "Payingâ€¦" : "Receive payment"}
+                        {creditPayBusy ? "Paying…" : "Receive payment"}
                       </button>
-                    </div>
-                  </div>
-                )}
-                {(customerInsight?.outstandingSales?.length ?? 0) > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-3.5 w-3.5" style={{color:"#ffffff"}}/>
-                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Unpaid bills</p>
-                    </div>
-                    <div className="space-y-1.5 rounded-xl p-2" style={warnRowStyle}>
-                      {customerInsight!.outstandingSales!.map((sale) => (
-                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg" style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.12)"}}>
-                          <div className="min-w-0">
-                            <p className="text-xs font-mono font-bold truncate" style={warnText}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px] mt-0.5" style={warnSubtext}>
-                              {new Date(sale.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
-                              {" · "}Due LKR {formatNumber(sale.balanceDue ?? sale.total - (sale.amountPaid ?? 0))}
-                            </p>
-                          </div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wide" style={{background:"var(--pos-warn-pill)",color:"#ffffff"}}>Pending</span>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 )}
                 <div className="space-y-2 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
                   <div className="flex items-center gap-2 pt-2">
                     <Receipt className="h-3.5 w-3.5" style={{color:"var(--pos-accent)"}}/>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Previous bills</p>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Customer history</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(PAYMENT_METHOD_COLOR).map(([method, color]) => (
+                      <span key={method} className="text-[9px] font-semibold px-2 py-1 rounded-md" style={{ color, background: `${color}22`, border: `1px solid ${color}66` }}>
+                        {paymentMethodLabel(method)}
+                      </span>
+                    ))}
                   </div>
                   {(customerInsight?.sales.length ?? 0) === 0 ? (
-                    <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No previous bills</p>
+                    <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No customer history</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {customerInsight!.sales.slice(0, 10).map((sale) => {
+                      {customerInsight!.sales.map((sale) => {
                         const isPending = sale.paymentStatus === "PENDING";
                         const due = sale.balanceDue ?? (isPending ? sale.total - (sale.amountPaid ?? 0) : 0);
                         return (
@@ -3103,6 +3449,12 @@ ${rows}
                           <div className="min-w-0">
                             <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"#ffffff":"var(--pos-accent)"}}>{sale.invoiceNumber}</p>
                             <p className="text-[10px] mt-0.5" style={{color:isPending?"rgba(255,255,255,0.78)":"var(--pos-muted)"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(sale.payments?.length ? sale.payments : [{ method: isPending ? "CREDIT" : "CASH", amount: sale.amountPaid ?? sale.total }]).map((payment, index) => {
+                                const color = PAYMENT_METHOD_COLOR[payment.method] ?? "#f97316";
+                                return <span key={`${payment.method}-${index}`} className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ color: isPending && payment.method === "CREDIT" ? "#ffffff" : color, background: isPending && payment.method === "CREDIT" ? "rgba(255,255,255,0.18)" : `${color}22` }}>{paymentMethodLabel(payment.method)} · LKR {formatNumber(payment.amount)}</span>;
+                              })}
+                            </div>
                           </div>
                           <p className="text-xs font-bold font-mono shrink-0 tabular-nums" style={{ color: isPending ? "#ffffff" : "var(--pos-text)" }}>LKR {formatNumber(sale.total)}</p>
                         </div>
@@ -3125,7 +3477,7 @@ ${rows}
                           <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold truncate" style={{ color: "var(--pos-text)" }}>{p.productName}</p>
-                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{p.qty} sold Â· LKR {formatNumber(p.spent)}</p>
+                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{p.qty} sold · LKR {formatNumber(p.spent)}</p>
                           </div>
                         </div>
                       ))}
@@ -3144,7 +3496,7 @@ ${rows}
     if (activeNav === "hold-bills") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"var(--pos-muted)"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"var(--pos-accent)"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
-        {holdsLoading?(<LoadingCenter className="flex-1 py-0" size={88} />):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 â€” stock is reserved on the server</p></div>):(
+        {holdsLoading?(<LoadingCenter className="flex-1 py-0" size={88} />):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
           <div className="flex-1 overflow-y-auto grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",alignContent:"start"}}>
             {serverHeldBills.map((bill,idx)=>{
               const billItems = bill.data?.items ?? [];
@@ -3154,7 +3506,7 @@ ${rows}
                 <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"var(--pos-card)",borderColor:kbFocus?"var(--pos-accent)":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(var(--pos-accent-rgb),0.35)":"none"}}>
                   <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn)"}}>Reserved</span></div>
                   {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(var(--pos-accent-rgb),0.1)"}}><User className="h-3 w-3" style={{color:"var(--pos-accent)"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
-                  <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} {i.variantName} Ã—{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more items</p>}</div>
+                  <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more items</p>}</div>
                   <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-success)"}}>Restore</button></div></div>
                 </div>
               );
@@ -3164,7 +3516,7 @@ ${rows}
       </div>
     );
 
-    // ORDERS â€” today's sales + reprint
+    // ORDERS — today's sales + reprint
     if (activeNav === "orders") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         <div className="flex items-center justify-between shrink-0">
@@ -3218,7 +3570,7 @@ ${rows}
             amount: amt,
             issuedToName: voucherIssueName || undefined,
           });
-          toast.success(`Issued ${r.data.code} Â· LKR ${formatNumber(r.data.balance)}`);
+          toast.success(`Issued ${r.data.code} · LKR ${formatNumber(r.data.balance)}`);
           setVoucherIssueAmt(""); setVoucherIssueName("");
           loadVouchers();
         } catch (e: unknown) {
@@ -3331,13 +3683,21 @@ ${rows}
       const submitReturn = async () => {
         if (!returnSale || !returnReason || !selectedItems.length) return;
         if (returnType === "EXCHANGE" && !selectedExchangeItems.length) { toast.error("Select exchange item"); return; }
+        if (returnType === "EXCHANGE" && exchangeDue > 0) {
+          if (exchPayMethod === "CARD" && !/^\d{4}$/.test(exchPayLast4)) { toast.error("Enter the last 4 digits of the card"); return; }
+          if ((exchPayMethod === "QR" || exchPayMethod === "BANK_TRANSFER") && !exchPayBank) { toast.error("Select the bank account the balance was paid into"); return; }
+          const paid = parseFloat(exchPayAmount) || exchangeDue;
+          if (paid + 0.004 < exchangeDue) { toast.error(`Collect LKR ${formatNumber(exchangeDue)} from the customer`); return; }
+          if (exchPayMethod !== "CASH" && paid > exchangeDue + 0.004) { toast.error("Card / QR / bank must be the exact balance"); return; }
+        }
         setReturnSubmitting(true);
         try {
-          const r = await api.post<{returnNumber:string;refundAmount:number}>("/returns", { originalSaleId:returnSale.id, reason:returnReason, returnType, notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})), exchangeItems:returnType==="EXCHANGE"?selectedExchangeItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice,productName:s.name,variantName:s.name,sku:products.find(p=>p.variantId===variantId)?.sku})):undefined });
-          setReturnResult({returnNumber:r.data.returnNumber,refundAmount:r.data.refundAmount});
+          const r = await withManagerApproval("Approve refund", (headers) => api.post<{returnNumber:string;refundAmount:number;status?:string;exchangeSettlement?:{due:number;change:number;excess:number;excessAs:"REFUND"|"STORE_CREDIT"|null;collected:{method:string;amount:number}[]}|null}>("/returns", { clientRequestId: returnRequestKeyRef.current ?? (returnRequestKeyRef.current = newClientRequestId()), originalSaleId:returnSale.id, reason:returnReason, returnType, notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})), exchangePayments:returnType==="EXCHANGE"&&exchangeDue>0?[{method:exchPayMethod,amount:parseFloat(exchPayAmount)||exchangeDue,...(exchPayMethod==="CARD"?{cardLast4:exchPayLast4}:{}),...(exchPayMethod==="QR"||exchPayMethod==="BANK_TRANSFER"?{bankAccountId:exchPayBank}:{})}]:undefined, exchangeExcessAs:returnType==="EXCHANGE"&&netRefund>0?exchExcessAs:undefined, exchangeItems:returnType==="EXCHANGE"?selectedExchangeItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice,productName:s.name,variantName:s.name,sku:products.find(p=>p.variantId===variantId)?.sku})):undefined }, headers ? { headers } : undefined));
+          setReturnResult({returnNumber:r.data.returnNumber,refundAmount:r.data.refundAmount,status:r.data.status,settlement:r.data.exchangeSettlement??null});
+          returnRequestKeyRef.current = null;
           setReturnStep("done"); toast.success(`Return ${r.data.returnNumber} created`);
           await loadProducts();
-        } catch(e:unknown){ toast.error((e as Error).message??"Return failed"); } finally { setReturnSubmitting(false); }
+        } catch(e:unknown){ toast.error(e instanceof ManagerApprovalCancelled ? "Refund not approved — nothing was refunded" : (e as Error).message??"Return failed"); } finally { setReturnSubmitting(false); }
       };
 
       return (
@@ -3359,7 +3719,7 @@ ${rows}
               </div>
             </div>
             {returnStep !== "search" && returnStep !== "done" && (
-              <button onClick={()=>{setReturnStep("search");setReturnSale(null);setReturnSearchRes([]);}} className="flex items-center gap-1.5 px-3 h-7 rounded-lg text-xs" style={{color:"var(--pos-muted)",border:"1px solid var(--pos-border)"}}>? Back to Search</button>
+              <button onClick={()=>{setReturnStep("search");setReturnSale(null);setReturnSearchRes([]);}} className="flex items-center gap-1.5 px-3 h-7 rounded-lg text-xs" style={{color:"var(--pos-muted)",border:"1px solid var(--pos-border)"}}>← Back to Search</button>
             )}
           </div>
 
@@ -3372,13 +3732,13 @@ ${rows}
               </div>
               {returnSearchRes.length > 0 && (
                 <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
-                  <div className="px-3 py-2 border-b" style={{borderColor:"var(--pos-border)"}}><p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>{returnSearchRes.length} sale(s) found â€” click to select</p></div>
+                  <div className="px-3 py-2 border-b" style={{borderColor:"var(--pos-border)"}}><p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
                   {returnSearchRes.map(row=>(
                     <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"var(--pos-border)"}}>
                       {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"var(--pos-accent)"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"var(--pos-accent)"}}/>}
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
-                        <p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(row.customer)} Â· {new Date(row.invoiceDate).toLocaleDateString()}</p>
+                        <p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(row.customer)} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-white font-bold text-sm">LKR {formatNumber(row.total)}</p>
@@ -3400,7 +3760,7 @@ ${rows}
             <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
               <div className="flex-1 flex flex-col gap-2 overflow-hidden">
                 <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
-                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(returnSale.customer)} Â· {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
+                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(returnSale.customer)} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
                   <div className="ml-auto text-right"><p className="text-white font-bold">LKR {formatNumber(returnSale.total)}</p><span className="text-[10px]" style={{color:STATUS_STYLE[returnSale.status]?.color??"#9ca3af"}}>{returnSale.status}</span></div>
                 </div>
                 <p className="text-xs font-semibold shrink-0" style={{color:"var(--pos-muted)"}}>SELECT ITEMS TO RETURN</p>
@@ -3413,7 +3773,7 @@ ${rows}
                         <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"var(--pos-accent)":"transparent",borderColor:isSelected?"var(--pos-accent)":"var(--pos-border-strong)"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-xs font-semibold truncate">{it.productName}</p>
-                          <p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{it.variantName} Â· SKU: {it.sku}</p>
+                          <p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{it.variantName} · SKU: {it.sku}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty>0)n.set(it.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
@@ -3422,7 +3782,7 @@ ${rows}
                         </div>
                         <div className="text-right shrink-0 w-24">
                           <p className="text-white text-xs font-bold">LKR {formatNumber(it.unitPrice * (sel?.qty??0))}</p>
-                          <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>of {it.quantity} Â· LKR {formatNumber(it.unitPrice)} ea</p>
+                          <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>of {it.quantity} · LKR {formatNumber(it.unitPrice)} ea</p>
                         </div>
                       </div>
                     );
@@ -3456,7 +3816,7 @@ ${rows}
                     ) : null}
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-semibold shrink-0" style={{color:"var(--pos-muted)"}}>EXCHANGE ITEM</p>
-                      <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
+                      <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." aria-label="Search product / SKU" className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
                     </div>
                     <div className="grid gap-1 overflow-y-auto" style={{gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",maxHeight:"170px"}}>
                       {exchangeProducts.map(p=>{
@@ -3464,7 +3824,7 @@ ${rows}
                         return(
                           <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(var(--pos-accent-rgb),0.12)":"var(--pos-card)",borderColor:(ex?.qty??0)>0?"var(--pos-accent)":"var(--pos-border)"}}>
                             <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color, lightUi)} iconClassName="h-4 w-4" />
-                            <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{p.variantName} Â· {p.sku}</p></div>
+                            <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{p.variantName} · {p.sku}</p></div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
                               <span className="text-white text-xs font-bold w-4 text-center">{ex?.qty??0}</span>
@@ -3511,7 +3871,7 @@ ${rows}
                     </div>
                   )}
                 </div>
-                <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}>Review Return ?</button>
+                <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}>Review Return →</button>
               </div>
             </div>
           )}
@@ -3533,7 +3893,7 @@ ${rows}
                 {selectedItems.map(([variantId,sel])=>(
                   <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                     <p className="text-white text-xs font-semibold">{sel.name}</p>
-                    <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>Ã—{sel.qty} Â· <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                    <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
                   </div>
                 ))}
               </div>
@@ -3544,11 +3904,39 @@ ${rows}
                     {selectedExchangeItems.map(([variantId,sel])=>(
                       <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                         <p className="text-white text-xs font-semibold">{sel.name}</p>
-                        <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>Ã—{sel.qty} Â· <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                        <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
                       </div>
                     ))}
                   </div>
                 </>
+              )}
+              {returnType==="EXCHANGE"&&exchangeDue>0&&(
+                <div className="p-3 rounded-xl border space-y-2" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                  <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>COLLECT THE BALANCE</p>
+                  <div className="flex flex-wrap gap-2">
+                    {([["CASH","Cash"],["CARD","Card"],["QR","QR"],["BANK_TRANSFER","Bank"]] as const).map(([m,l])=>(
+                      <button key={m} type="button" onClick={()=>setExchPayMethod(m)} aria-pressed={exchPayMethod===m} className="h-8 px-3 rounded-lg text-xs font-bold border" style={{background:exchPayMethod===m?"rgba(var(--pos-accent-rgb),0.2)":"transparent",borderColor:exchPayMethod===m?"var(--pos-accent)":"var(--pos-border)",color:"white"}}>{l}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input aria-label="Amount received" type="number" min={0} step="0.01" placeholder={formatNumber(exchangeDue)} value={exchPayAmount} onChange={e=>setExchPayAmount(e.target.value)} className="h-9 w-32 rounded-lg px-2 text-sm text-white border" style={{background:"var(--pos-input)",borderColor:"var(--pos-border)"}} />
+                    {exchPayMethod==="CARD"&&<input aria-label="Card last 4 digits" inputMode="numeric" maxLength={4} placeholder="Last 4" value={exchPayLast4} onChange={e=>setExchPayLast4(e.target.value.replace(/\D/g,"").slice(0,4))} className="h-9 w-24 rounded-lg px-2 text-sm text-white border" style={{background:"var(--pos-input)",borderColor:"var(--pos-border)"}} />}
+                    {(exchPayMethod==="QR"||exchPayMethod==="BANK_TRANSFER")&&(
+                      <select aria-label="Bank account" value={exchPayBank} onChange={e=>setExchPayBank(e.target.value)} className="h-9 min-w-0 flex-1 rounded-lg px-2 text-sm text-white border" style={{background:"var(--pos-input)",borderColor:"var(--pos-border)"}}>
+                        <option value="">{bankAccounts.length?"Paid into…":"No bank accounts"}</option>
+                        {bankAccounts.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  {exchPayMethod==="CASH"&&(parseFloat(exchPayAmount)||0)>exchangeDue&&<p className="text-xs" style={{color:"var(--pos-success)"}}>Change LKR {formatNumber((parseFloat(exchPayAmount)||0)-exchangeDue)}</p>}
+                </div>
+              )}
+              {returnType==="EXCHANGE"&&netRefund>0&&(
+                <div className="flex gap-2" role="radiogroup" aria-label="Excess value">
+                  {([["REFUND","Refund the difference"],["STORE_CREDIT","Store credit"]] as const).map(([v,l])=>(
+                    <button key={v} type="button" role="radio" aria-checked={exchExcessAs===v} disabled={v==="STORE_CREDIT"&&!returnSale?.customer} onClick={()=>setExchExcessAs(v)} className="h-8 px-3 rounded-lg text-xs font-bold border disabled:opacity-40" style={{background:exchExcessAs===v?"rgba(var(--pos-accent-rgb),0.2)":"transparent",borderColor:exchExcessAs===v?"var(--pos-accent)":"var(--pos-border)",color:"white"}}>{l}</button>
+                  ))}
+                </div>
               )}
               <div className="flex justify-between items-center p-4 rounded-xl border mt-1" style={{background:exchangeDue>0?"var(--pos-warn-bg)":"rgba(16,185,129,0.08)",borderColor:exchangeDue>0?"var(--pos-warn-border)":"rgba(16,185,129,0.3)"}}>
                 <div>
@@ -3580,25 +3968,28 @@ ${rows}
                 )}
                 <div className="px-5 py-4 text-center">
                   {returnType==="EXCHANGE"&&exchangeDue>0&&(<>
-                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-warn)"}}>Customer Pays Balance</p>
-                    <p className="text-4xl font-bold" style={{color:"var(--pos-warn)"}}>LKR {formatNumber(exchangeDue)}</p>
-                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Collect from customer before completing exchange</p>
+                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-warn)"}}>Customer Paid Balance</p>
+                    <p className="text-4xl font-bold" style={{color:"var(--pos-warn)"}}>LKR {formatNumber(returnResult.settlement?.due ?? exchangeDue)}</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>
+                      {(returnResult.settlement?.collected ?? []).map((c) => `${c.method === "BANK_TRANSFER" ? "Bank" : c.method === "CASH" ? "Cash" : c.method === "CARD" ? "Card" : c.method} LKR ${formatNumber(c.amount)}`).join(" + ") || "Collected"}
+                      {(returnResult.settlement?.change ?? 0) > 0 ? ` · Change LKR ${formatNumber(returnResult.settlement!.change)}` : ""}
+                    </p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund>0&&(<>
-                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-success)"}}>Refund to Customer</p>
-                    <p className="text-4xl font-bold" style={{color:"var(--pos-success)"}}>LKR {formatNumber(netRefund)}</p>
-                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Return the difference to customer</p>
+                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-success)"}}>{returnResult.settlement?.excessAs === "STORE_CREDIT" ? "Store Credit" : "Refund to Customer"}</p>
+                    <p className="text-4xl font-bold" style={{color:"var(--pos-success)"}}>LKR {formatNumber(returnResult.settlement?.excess ?? netRefund)}</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>{returnResult.settlement?.excessAs === "STORE_CREDIT" ? "Added to the customer's wallet" : "Refunded to the original payment"}</p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund===0&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-accent)"}}>Even Exchange</p>
                     <p className="text-4xl font-bold" style={{color:"var(--pos-price)"}}>LKR 0.00</p>
-                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Equal value â€” no money changes hands</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Equal value — no money changes hands</p>
                   </>)}
                   {returnType!=="EXCHANGE"&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-success)"}}>Refund Amount</p>
                     <p className="text-4xl font-bold" style={{color:"var(--pos-success)"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
                   </>)}
-                  <p className="text-xs mt-3 font-semibold px-3 py-1 rounded-full inline-block" style={{background:"rgba(var(--pos-accent-rgb),0.15)",color:"var(--pos-accent)"}}>INITIATED Â· Awaiting Approval</p>
+                  <p className="text-xs mt-3 font-semibold px-3 py-1 rounded-full inline-block" style={{background:"rgba(var(--pos-accent-rgb),0.15)",color:"var(--pos-accent)"}}>{returnResult.status === "APPROVED" || returnResult.status === "COMPLETED" ? "Completed" : returnResult.status ? `${returnResult.status} · Awaiting Approval` : "Recorded"}</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -3612,8 +4003,8 @@ ${rows}
                         ?`<div class="row tot grn"><span>REFUND</span><span>LKR ${netRefund.toFixed(2)}</span></div>`
                         :`<div class="row tot blu"><span>EVEN EXCHANGE</span><span>LKR 0.00</span></div>`))
                     :`<div class="row tot grn"><span>REFUND</span><span>LKR ${returnResult.refundAmount.toFixed(2)}</span></div>`;
-                  const exchRows=isExc&&selectedExchangeItems.length>0?`<hr class="d"/><div class="label">EXCHANGE ITEMS</div>${selectedExchangeItems.map(([,s])=>`<div class="row"><span>${s.name} Ã—${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Exchange Total</span><span>LKR ${exchangeTotal.toFixed(2)}</span></div>`:"";
-                  w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:var(--pos-success-2)}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} Ã—${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed Â· Awaiting Approval ***</div></body></html>`);
+                  const exchRows=isExc&&selectedExchangeItems.length>0?`<hr class="d"/><div class="label">EXCHANGE ITEMS</div>${selectedExchangeItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Exchange Total</span><span>LKR ${exchangeTotal.toFixed(2)}</span></div>`:"";
+                  w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:var(--pos-success-2)}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed · Awaiting Approval ***</div></body></html>`);
                   w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);
                 }} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-text-secondary)"}}><Printer className="h-4 w-4"/>Print Receipt</button>
                 <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}><RotateCcw className="h-4 w-4"/>New Return</button>
@@ -3631,7 +4022,7 @@ ${rows}
         const v = Math.min(100, Math.max(0, raw));
         if (v > 0) writePosSavedTaxRate(v);
         setTaxRate(v);
-        toast.success(v === 0 ? "Tax disabled â€” no tax on POS sales" : `Tax ${v}% â€” applied from POS settings`);
+        toast.success(v === 0 ? "Tax disabled — no tax on POS sales" : `Tax ${v}% — applied from POS settings`);
       };
       return (
         <div className="h-full min-h-0 overflow-y-auto p-6 space-y-5">
@@ -3920,7 +4311,7 @@ ${rows}
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold">Allow negative stock</p>
                 <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
-                  Sell when stock is 0 â€” inventory can go minus. Admin setting.
+                  Sell when stock is 0 — inventory can go minus. Admin setting.
                 </p>
               </div>
               <button
@@ -3931,7 +4322,7 @@ ${rows}
                   writePosAllowNegativeStock(next);
                   setAllowNegativeStock(next);
                   void api.put("/tenants/pos-settings", { allowNegativeStock: next })
-                    .then(() => toast.success(next ? "Negative stock ON â€” out-of-stock sales allowed" : "Negative stock OFF â€” out-of-stock blocked"))
+                    .then(() => toast.success(next ? "Negative stock ON — out-of-stock sales allowed" : "Negative stock OFF — out-of-stock blocked"))
                     .catch((e: unknown) => {
                       writePosAllowNegativeStock(prev);
                       setAllowNegativeStock(prev);
@@ -3953,8 +4344,8 @@ ${rows}
                 <h3 className="text-white font-bold text-base">Tax Rate</h3>
                 <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                   {taxRate > 0
-                    ? `Tax is ON â€” ${taxRate}% added to every sale from this POS setting`
-                    : "Tax is OFF â€” no tax added to sales (set a rate below to enable)"}
+                    ? `Tax is ON — ${taxRate}% added to every sale from this POS setting`
+                    : "Tax is OFF — no tax added to sales (set a rate below to enable)"}
                 </p>
               </div>
               <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0" style={{
@@ -3973,7 +4364,7 @@ ${rows}
               <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"var(--pos-accent)":"var(--pos-input)",color:taxRate===v?"#fff":"var(--pos-muted)"}}>{v===0?"Off":`${v}%`}</button>))}</div>
             </div>
           </div>
-          {/* PIN Security â€” per-user, switch cashiers without re-login */}
+          {/* PIN Security — per-user, switch cashiers without re-login */}
           <div className="rounded-2xl border p-5 space-y-4" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(var(--pos-accent-rgb),0.15)"}}><Lock className="h-5 w-5" style={{color:"var(--pos-accent)"}}/></div>
@@ -3981,7 +4372,7 @@ ${rows}
                 <h3 className="text-white font-bold text-base">Your cashier PIN</h3>
                 <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                   {pinIsSet
-                    ? "Each cashier sets their own 4-digit PIN. Lock (F12) â†’ next cashier enters their PIN â†’ bills go to them."
+                    ? "Each cashier sets their own 4-digit PIN. Lock (F12) → next cashier enters their PIN → bills go to them."
                     : "Set a 4-digit PIN so you can unlock POS and take over sales without logging in again."}
                 </p>
               </div>
@@ -3990,11 +4381,11 @@ ${rows}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold block mb-1.5" style={{color:"var(--pos-muted)"}}>{pinIsSet?"New PIN":"Create PIN"} (4 digits)</label>
-                <input type="password" maxLength={4} inputMode="numeric" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="â€¢â€¢â€¢â€¢" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               </div>
               <div>
                 <label className="text-xs font-semibold block mb-1.5" style={{color:"var(--pos-muted)"}}>Confirm PIN</label>
-                <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="â€¢â€¢â€¢â€¢" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -4008,7 +4399,7 @@ ${rows}
                     setHasServerPin(true);
                     setSettingNewPin("");
                     setSettingConfirmPin("");
-                    toast.success("PIN saved â€” lock with F12; other cashiers unlock with their own PIN");
+                    toast.success("PIN saved — lock with F12; other cashiers unlock with their own PIN");
                   } catch (e: unknown) {
                     toast.error((e as Error).message || "Failed to save PIN");
                   }
@@ -4153,7 +4544,7 @@ ${rows}
           />
         )}
 
-        {/* SHIFT GATE â€” opening cash required */}
+        {/* SHIFT GATE — opening cash required */}
         {posOpen && !pinLocked && !shiftReady && !showCashClose && (
           <PosShiftGate onShiftReady={markShiftReady} onClose={closePos} cashierName={activeCashier?.name} />
         )}
@@ -4178,7 +4569,7 @@ ${rows}
               <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" data-pos-on-accent="" style={{background:"var(--pos-accent-grad)"}}><Lock className="h-8 w-8 text-white"/></div>
               <h2 className="font-bold text-2xl" style={{color:"var(--pos-text)"}}>Switch cashier</h2>
               <p className="text-sm text-center max-w-xs" style={{color:"var(--pos-muted)"}}>
-                Enter your 4-digit PIN â€” bills will be assigned to you (no re-login)
+                Enter your 4-digit PIN — bills will be assigned to you (no re-login)
               </p>
             </div>
             <div className="flex gap-4 mb-2">
@@ -4262,7 +4653,7 @@ ${rows}
               onFocus={()=>{ if (pinLocked) { searchRef.current?.blur(); return; } setActiveNav("products"); }}
               readOnly={pinLocked}
               tabIndex={pinLocked ? -1 : 0}
-              placeholder="Scan barcode Â· search name / SKU / category..."
+              placeholder="Scan barcode · search name / SKU / category..." aria-label="Scan barcode or search name / SKU / category"
               className="pos-input w-full pl-9 pr-16 h-9 text-sm rounded-xl outline-none"
               style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",color:"var(--pos-text)"}}
             />
@@ -4463,7 +4854,14 @@ ${rows}
               <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{color:"var(--pos-sales-muted)"}}>Today Sales</p>
               <p className="font-bold text-lg leading-tight" style={{color:"var(--pos-sales-fg)"}}>LKR {formatNumber(todayStats.sales)}</p>
               <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{color:"var(--pos-sales-fg)"}}/></svg>
-              <p className="text-[10px] mt-1" style={{color:"var(--pos-sales-muted)"}}> {todayStats.orders} Orders  {todayStats.items} Items</p>
+              <div className="mt-1.5 space-y-0.5 text-[10px]" style={{color:"var(--pos-sales-muted)"}}>
+                <p>{todayStats.orders} Total Orders · {todayStats.items} Daily Items</p>
+                {todayStats.byCounter.map((counter) => (
+                  <p key={counter.code}>
+                    {counter.name} · {counter.orders} Orders · LKR {formatNumber(counter.amount)}
+                  </p>
+                ))}
+              </div>
             </div>
             <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:isPosLight?"var(--pos-input)":"rgba(255,255,255,0.05)",color:"var(--pos-muted)"}}>
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
@@ -4644,16 +5042,23 @@ ${rows}
                 <div className="px-4 py-3 space-y-2">
                   <div className="rounded-xl border px-3 py-2.5 space-y-1.5" style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}>
                   <div className="flex justify-between text-sm" style={{color:"var(--pos-text-soft)"}}><span>Items</span><span style={{ color: "var(--pos-text)" }}>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
-                  {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>âˆ’LKR {formatNumber(itemDiscountTotal)}</span></div>}
-                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>âˆ’LKR {formatNumber(cartDiscountAmt)}</span></div>}
-                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>âˆ’LKR {formatNumber(tierDiscountAmt)}</span></div>}
-                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>âˆ’LKR {formatNumber(payState.couponDiscount)}</span></div>}
-                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>âˆ’LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                  {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
+                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
                   {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"var(--pos-success)"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                   <div className="flex justify-between text-sm" style={{color: taxEnabled ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                     <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
+                  {qrSplitFee && qrSplitFee.fee > 0 && (
+                    <div className="space-y-0.5 text-xs tabular-nums" data-testid="qr-fee-split" style={{color:"var(--pos-warn-soft)"}}>
+                      <div className="flex justify-between"><span>QR received (gross)</span><span>LKR {formatNumber(qrSplitFee.amount)}</span></div>
+                      <div className="flex justify-between"><span>QR fee deducted by bank</span><span>−LKR {formatNumber(qrSplitFee.fee)}</span></div>
+                      <div className="flex justify-between font-semibold"><span>QR net received</span><span>LKR {formatNumber(qrSplitFee.netAmount)}</span></div>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"var(--pos-price)"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
 
@@ -4666,7 +5071,7 @@ ${rows}
                       </div>
                       {cartDiscountAmt > 0 && !pendingDiscountApproval && (
                         <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: "var(--pos-success-soft)" }}>
-                          âˆ’LKR {formatNumber(cartDiscountAmt)}
+                          −LKR {formatNumber(cartDiscountAmt)}
                         </span>
                       )}
                     </div>
@@ -4838,7 +5243,7 @@ ${rows}
                 {showLoyalty && customer && (
                   <div className="px-3 py-2 shrink-0">
                     <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1.5" style={{ color: "var(--pos-muted)" }}>
-                      Redeem loyalty points ({customer.loyaltyPoints} available Â· LKR 0.10/pt)
+                      Redeem loyalty points ({customer.loyaltyPoints} available · LKR 0.10/pt)
                     </label>
                     <div className="flex gap-2">
                       <Input
@@ -4928,16 +5333,21 @@ ${rows}
                 {activePayment==="CARD"&&(
                   <div className="mx-3 mt-2 space-y-1">
                     <label className="text-[10px] font-semibold uppercase tracking-wide block" style={{color:"var(--pos-muted)"}}>
-                      Card last 3 digits
+                      Card last 4 digits <span style={{color:"var(--pos-warn-soft)"}}>*</span>
                     </label>
                     <input
-                      ref={cardLast3Ref}
-                      data-pos-field="card-last3"
-                      value={cardLast3}
-                      onChange={(e)=>setCardLast3(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      ref={cardLast4Ref}
+                      data-pos-field="card-last4"
+                      value={cardLast4}
+                      onChange={(e)=>setCardLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
                       inputMode="numeric"
-                      maxLength={3}
-                      placeholder="â€¢â€¢â€¢"
+                      maxLength={4}
+                      required
+                      aria-required="true"
+                      aria-label="Card last 4 digits"
+                      aria-invalid={cardLast4.length > 0 && !isValidCardLast4(cardLast4)}
+                      autoComplete="off"
+                      placeholder="••••"
                       className="w-full h-11 px-3 rounded-xl text-center text-xl text-white outline-none font-mono tracking-[0.35em]"
                       style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       onKeyDown={(e)=>{
@@ -4956,19 +5366,30 @@ ${rows}
                     </label>
                     <select
                       value={payBankAccountId}
-                      onChange={(e)=>setPayBankAccountId(e.target.value)}
+                      onChange={(e)=>{ setPayBankAccountId(e.target.value); setPayQrCodeId(""); }}
+                      aria-label={activePayment === "QR" ? "Bank account that receives the QR payment" : "Bank account that received the transfer"}
                       className="w-full h-11 px-3 rounded-xl text-sm text-white outline-none"
                       style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                     >
                       <option value="">
-                        {bankAccounts.length ? "Select bank accountâ€¦" : "No bank accounts â€” add in Accounting"}
+                        {bankAccounts.length ? "Select bank account…" : "No bank accounts — add in Accounting"}
                       </option>
                       {bankAccounts.map((b)=>(
                         <option key={b.id} value={b.id}>
-                          {b.name}{b.bankName ? ` Â· ${b.bankName}` : ""}{b.code ? ` (${b.code})` : ""}
+                          {b.name}{b.bankName ? ` · ${b.bankName}` : ""}{b.code ? ` (${b.code})` : ""}
                         </option>
                       ))}
                     </select>
+                    {activePayment === "QR" && (
+                      <PosQrPayment
+                        amount={qrBillAmount}
+                        feeSettings={qrFeeSettings}
+                        bankAccountId={payBankAccountId}
+                        qrCodeId={payQrCodeId}
+                        onSelect={({ qrCodeId, bankAccountId }) => { setPayQrCodeId(qrCodeId); setPayBankAccountId(bankAccountId); }}
+                        onDisplayChange={setQrDisplay}
+                      />
+                    )}
                   </div>
                 )}
                 {helpers.length > 0 && (
@@ -4987,31 +5408,19 @@ ${rows}
                     </select>
                   </div>
                 )}
-                {(activePayment==="CASH"||activePayment==="CUSTOMER_CREDIT")&&(
+                {activePayment === "CASH" && (
                   <div ref={cashPanelRef} className="px-4 py-3 flex-1 flex flex-col min-h-0">
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <span className="text-base font-bold" style={{color:"var(--pos-text)"}}>
-                        {activePayment === "CUSTOMER_CREDIT"
-                          ? "Credit amount (LKR)"
-                          : payState.allowPartial && (customer?.creditLimit ?? 0) > 0
-                            ? "Paying now (LKR)"
-                            : "Cash Received (LKR)"}
+                        {payState.allowPartial && (customer?.creditLimit ?? 0) > 0
+                          ? "Paying now (LKR)"
+                          : "Cash Received (LKR)"}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--pos-text-soft)" }}>F9</span>
                         <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded-lg hover:bg-white/10" aria-label="Clear amount"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                       </div>
                     </div>
-                    {activePayment === "CUSTOMER_CREDIT" && customer && (
-                      <div className="flex justify-between text-xs mb-2 px-1">
-                        <span style={{color:"var(--pos-muted)"}}>
-                          {customer.name} Â· available
-                        </span>
-                        <span className="font-bold tabular-nums" style={{color:"var(--pos-success-soft)"}}>
-                          LKR {formatNumber(Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0)))}
-                        </span>
-                      </div>
-                    )}
                     <input
                       type="text"
                       inputMode="decimal"
@@ -5023,11 +5432,11 @@ ${rows}
                         setNumpad(clean);
                         if (activePayment === "CASH" && payState.allowPartial) setPartialPayAmount(clean);
                       }}
-                      placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "Type amount…"}
+                      placeholder="Type amount…"
                       className="h-12 rounded-xl px-4 mb-2 font-bold text-2xl font-mono outline-none w-full"
                       style={{
-                        background: activePayment === "CUSTOMER_CREDIT" ? "rgba(79,110,247,0.12)" : "rgba(16,185,129,0.12)",
-                        color: activePayment === "CUSTOMER_CREDIT" ? "var(--pos-accent-soft)" : "var(--pos-success-soft)",
+                        background: "rgba(16,185,129,0.12)",
+                        color: "var(--pos-success-soft)",
                         border: activePayment === "CASH" && !(parseFloat(numpad) > 0) ? "1px solid rgba(239,68,68,0.55)" : "1px solid var(--pos-border)",
                       }}
                     />
@@ -5036,20 +5445,9 @@ ${rows}
                         Enter cash received before confirming
                       </p>
                     )}
-                    {activePayment === "CUSTOMER_CREDIT" && !numpad && (
-                      <p className="text-[10px] mb-2 px-1" style={{ color: "var(--pos-muted)" }}>
-                        Empty = full bill LKR {formatNumber(totalAmt)} on credit
-                      </p>
-                    )}
                     {activePayment === "CASH" && payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
-                        <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
-                      </div>
-                    )}
-                    {activePayment === "CUSTOMER_CREDIT" && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (
-                      <div className="flex justify-between text-xs mb-2 px-1">
-                        <span style={{color:"var(--pos-muted)"}}>Remaining due</span>
                         <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
@@ -5081,6 +5479,32 @@ ${rows}
                         );
                       }))}
                     </div>
+                  </div>
+                )}
+                {activePayment === "CUSTOMER_CREDIT" && (
+                  <div className="flex-1 px-4 py-6 flex flex-col justify-center gap-3">
+                    <p className="text-sm font-bold text-center" style={{ color: "var(--pos-text)" }}>Customer Credit / Wallet</p>
+                    {customer ? (
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}>
+                        <p className="text-xs font-semibold text-center" style={{ color: "var(--pos-text-soft)" }}>{customer.name}</p>
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: "var(--pos-muted)" }}>Available wallet</span>
+                          <span className="font-bold tabular-nums" style={{ color: "var(--pos-success-soft)" }}>LKR {formatNumber(customer.walletBalance ?? 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: "var(--pos-muted)" }}>Outstanding credit</span>
+                          <span className="font-bold tabular-nums" style={{ color: "var(--pos-warn-soft)" }}>LKR {formatNumber(customer.outstandingBalance ?? 0)}</span>
+                        </div>
+                        <p className="text-[10px] text-center pt-1" style={{ color: "var(--pos-muted)" }}>
+                          Wallet funds are applied first; only the remaining amount uses available customer credit.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-center" style={{ color: "var(--pos-warn-soft)" }}>Select a customer to use Credit / Wallet.</p>
+                    )}
+                    <p className="text-xs text-center" style={{ color: "var(--pos-muted)" }}>
+                      Charge LKR {formatNumber(totalAmt)} to this account
+                    </p>
                   </div>
                 )}
                 {activePayment!=="CASH"&&activePayment!=="CUSTOMER_CREDIT"&&(
@@ -5194,20 +5618,56 @@ ${rows}
 
               <div className="px-5 pb-6 pt-5 text-center">
                 <p className="text-sm font-semibold" style={{ color: "var(--pos-text-soft)" }}>
-                  Give the change to the customer, then press
+                  Give the change to the customer, then start the next sale
                 </p>
-                <div className="mt-3 inline-flex items-center gap-3 rounded-xl border px-5 py-3" style={{
-                  background: "var(--pos-input)",
-                  borderColor: "var(--pos-border)",
-                  color: "var(--pos-text)",
-                }}>
-                  <kbd className="rounded-lg bg-emerald-600 px-4 py-2 font-mono text-lg font-black text-white shadow">
-                    F9
-                  </kbd>
-                  <span className="font-bold">Next Sale</span>
-                </div>
+                <Button
+                  type="button"
+                  variant="success"
+                  size="xl"
+                  data-testid="next-sale"
+                  aria-label="Start next sale (F9)"
+                  title="Start next sale (F9)"
+                  className="mt-3 min-w-56 text-base font-bold"
+                  onClick={dismissSaleComplete}
+                >
+                  Next Sale
+                  <kbd className="ml-2 rounded bg-white/20 px-2 py-0.5 font-mono text-xs">F9</kbd>
+                </Button>
+                {thankYouSale.saleId && (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      data-testid="copy-bill-message"
+                      className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                      style={{ borderColor: "var(--pos-border)", color: "var(--pos-text-soft)" }}
+                      onClick={async () => {
+                        try {
+                          const r = await api.get<{ message: string }>(`/sales/${thankYouSale.saleId}/bill-message`);
+                          if (await copyText(r.data.message)) toast.success("Bill message copied");
+                          else toast.error("Could not copy the bill message");
+                        } catch (e) { toast.error((e as Error).message ?? "Could not build the bill message"); }
+                      }}
+                    >
+                      Copy bill message
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="share-bill-whatsapp"
+                      className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                      style={{ borderColor: "var(--pos-border)", color: "var(--pos-text-soft)" }}
+                      onClick={async () => {
+                        try {
+                          const r = await api.get<{ message: string; phone: string | null }>(`/sales/${thankYouSale.saleId}/bill-message`);
+                          window.open(whatsappShareUrl(r.data.phone, r.data.message), "_blank", "noopener");
+                        } catch (e) { toast.error((e as Error).message ?? "Could not build the bill message"); }
+                      }}
+                    >
+                      Share on WhatsApp
+                    </button>
+                  </div>
+                )}
                 <p className="mt-3 text-xs" style={{ color: "var(--pos-muted)" }}>
-                  This screen closes only with F9
+                  This screen closes only with Next Sale or F9
                 </p>
               </div>
             </div>
@@ -5257,7 +5717,7 @@ ${rows}
               const scannerDetail = formatScannerDetail(lastScanAt, now);
               const scannerColor = scannerActive ? "var(--pos-success)" : "var(--pos-muted)";
               return (
-                <div className="flex items-center gap-1.5 shrink-0 max-w-[200px] lg:max-w-none" style={{ color: scannerColor }} title={`Barcode Scanner Â· ${scannerDetail}`}>
+                <div className="flex items-center gap-1.5 shrink-0 max-w-[200px] lg:max-w-none" style={{ color: scannerColor }} title={`Barcode Scanner · ${scannerDetail}`}>
                   <div className={cn("h-2 w-2 rounded-full shrink-0", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "var(--pos-muted-2)" }} />
                   <Scan className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-xs font-semibold hidden xl:inline whitespace-nowrap">Barcode Scanner</span>
@@ -5266,7 +5726,7 @@ ${rows}
               );
             })()}
             <div className="h-4 w-px shrink-0 hidden md:block" style={{ background: "var(--pos-border)" }} />
-            <div className="flex items-center gap-1.5 shrink-0 max-w-[160px] lg:max-w-none" style={{ color: printerStatus.color }} title={`${printerStatus.label} Â· ${printerStatus.detail}`}>
+            <div className="flex items-center gap-1.5 shrink-0 max-w-[160px] lg:max-w-none" style={{ color: printerStatus.color }} title={`${printerStatus.label} · ${printerStatus.detail}`}>
               <Printer className="h-3.5 w-3.5 shrink-0" />
               <span className="text-xs font-semibold hidden lg:inline whitespace-nowrap">{printerStatus.label}</span>
               <span className="text-[10px] sm:text-xs truncate hidden sm:inline" style={{ color: "var(--pos-muted)" }}>{printerStatus.detail}</span>
@@ -5412,7 +5872,7 @@ ${rows}
                   ))}
                 </div>
 
-                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"var(--pos-text)"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"var(--pos-accent)"},{label:"Net (income âˆ’ expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"var(--pos-success)"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"var(--pos-warn)"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"var(--pos-success)"}].map(r=>(
+                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"var(--pos-text)"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"var(--pos-accent)"},{label:"Net (income − expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"var(--pos-success)"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"var(--pos-warn)"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"var(--pos-success)"}].map(r=>(
                   <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
                     <span className="text-xs" style={{color:"var(--pos-muted)"}}>{r.label}</span>
                     <span className="text-sm font-bold" style={{color:r.color}}>{r.val}</span>
@@ -5459,7 +5919,7 @@ ${rows}
           </motion.div>
         )}</AnimatePresence>
 
-        {/* CUSTOMER SEARCH â€” now inline dropdown in cart panel */}
+        {/* CUSTOMER SEARCH — now inline dropdown in cart panel */}
 
         {/* HELD BILLS MODAL */}
         <AnimatePresence>{showHeldBills&&(
@@ -5498,12 +5958,12 @@ ${rows}
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p>
-                              <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} Â· {billItems.length} item(s)</p>
+                              <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} · {billItems.length} item(s)</p>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn)"}}>Reserved</span>
                           </div>
                           {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(var(--pos-accent-rgb),0.1)"}}><User className="h-3 w-3" style={{color:"var(--pos-accent)"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
-                          <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} Ã—{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more</p>}</div>
+                          <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more</p>}</div>
                           <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}>
                             <span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span>
                             <div className="flex gap-2">
@@ -5793,7 +6253,7 @@ ${rows}
               <div className="flex items-center justify-between mb-4 sticky top-0 z-10 pb-2" style={{background:"var(--pos-panel)"}}>
                 <div className="flex items-center gap-2">
                   <Keyboard className="h-4 w-4" style={{color:"var(--pos-accent)"}}/>
-                  <span className="text-white font-bold text-sm">Keyboard â€” full POS</span>
+                  <span className="text-white font-bold text-sm">Keyboard — full POS</span>
                 </div>
                 <button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
               </div>
@@ -5812,7 +6272,7 @@ ${rows}
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] mt-4 text-center" style={{color:"var(--pos-muted-2)"}}>Tip: Ctrl+Enter = Pay Cash instantly Â· F9 = checkout popup</p>
+              <p className="text-[10px] mt-4 text-center" style={{color:"var(--pos-muted-2)"}}>Tip: Ctrl+Enter = Pay Cash instantly · F9 = checkout popup</p>
             </motion.div>
           </motion.div>
         )}</AnimatePresence>

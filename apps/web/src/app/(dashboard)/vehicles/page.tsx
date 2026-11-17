@@ -418,15 +418,15 @@ export default function VehiclesPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Year</Label>
-                  <Input type="number" placeholder="e.g. 2015" value={searchYear} onChange={(e) => setSearchYear(e.target.value)} />
+                  <Input type="number" aria-label="Vehicle year" placeholder="e.g. 2015" value={searchYear} onChange={(e) => setSearchYear(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">VIN / Chassis</Label>
-                  <Input placeholder="VIN or chassis number" value={searchVin} onChange={(e) => setSearchVin(e.target.value)} />
+                  <Input aria-label="VIN or chassis number" placeholder="VIN or chassis number" value={searchVin} onChange={(e) => setSearchVin(e.target.value)} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">Part name or OEM</Label>
-                  <Input placeholder="Oil filter, brake pad, OEM number..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+                  <Input aria-label="Part name or OEM number" placeholder="Oil filter, brake pad, OEM number..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
                 </div>
               </div>
               <Button onClick={runSearch} disabled={searching} className="gap-1.5">

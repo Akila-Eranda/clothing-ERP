@@ -7,6 +7,8 @@ import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval } from "@/lib/cash-approval";
+import { useSubmitKey } from "@/lib/submit-key";
 import { parseQty } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 
@@ -78,8 +80,11 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
   const [chequeBankName, setChequeBankName] = useState("");
   const [payReference, setPayReference] = useState("");
 
+  const submitKey = useSubmitKey();
+
   useEffect(() => {
     if (po) {
+      submitKey.reset(); // a new receipt
       setRows((po.items ?? []).map((i) => {
         const expected = i.orderedQty + Math.max(0, i.freeQty ?? 0);
         const remaining = Math.max(0, expected - i.receivedQty);
@@ -148,7 +153,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
     setLoading(true);
     try {
-      await api.post(`/purchases/${po.id}/receive`, {
+      await withManagerApproval("Approve supplier cash payment", (headers) => api.post(`/purchases/${po.id}/receive`, {
         items: rows.map((r) => ({
           itemId: r.itemId,
           receivedQty: r.receivedQty,
@@ -178,7 +183,10 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
               },
             }
           : {}),
-      });
+        // same key on retry / approval re-send: the API returns the first GRN, stock is not added twice
+        clientRequestId: submitKey.current(),
+      }, headers ? { headers } : undefined));
+      submitKey.reset();
       toast.success(
         payNow
           ? "Items received & supplier payment recorded"

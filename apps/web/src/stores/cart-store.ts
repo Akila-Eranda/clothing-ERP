@@ -111,6 +111,9 @@ export const useCartStore = create<CartStore>()(
                       allowDecimalSelling: existing.allowDecimalSelling || decimal,
                       productKind: existing.productKind || newItem.productKind,
                       unit: existing.unit ?? newItem.unit,
+                      scaleBarcodes: existing.scaleBarcodes?.length && newItem.scaleBarcodes?.length
+                        ? [...existing.scaleBarcodes, ...newItem.scaleBarcodes]
+                        : undefined,
                       ...(perUnitDisc > 0
                         ? { discountAmount: perUnitDisc * newQty, discountType: "fixed" as const }
                         : {}),
@@ -152,6 +155,7 @@ export const useCartStore = create<CartStore>()(
                   return {
                     ...i,
                     quantity: newQty,
+                    scaleBarcodes: undefined,
                     discountAmount: perUnitDisc > 0 ? perUnitDisc * newQty : i.discountAmount,
                   };
                 }),
@@ -252,6 +256,9 @@ export const useCartStore = create<CartStore>()(
         customer: state.customer,
         discount: state.discount,
         discountType: state.discountType,
+        couponCode: state.couponCode,
+        loyaltyPointsToRedeem: state.loyaltyPointsToRedeem,
+        notes: state.notes,
         activeHeldBillId: state.activeHeldBillId,
       }),
     }

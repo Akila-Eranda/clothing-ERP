@@ -1,9 +1,11 @@
+import { textSearch } from '@/shared/search.helper';
 import { Module, NotFoundException } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { expenseRefusal, MAX_EXPENSE_AMOUNT } from './expense-limits.helper';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsBoolean, ValidateNested, IsArray, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsBoolean, IsNotEmpty, ValidateNested, IsArray, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -22,6 +24,7 @@ import {
   NumberSeriesResetPolicy,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { NoCardNumber } from '@/shared/security/card-number.validator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions, RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
@@ -41,6 +44,8 @@ import { FixedAssetsService } from './fixed-assets.service';
 import { PayrollService } from './payroll.service';
 import { FinancialReportsService } from './financial-reports.service';
 import { AccountingSettingsService } from './accounting-settings.service';
+import { ReconciliationController } from './reconciliation.controller';
+import { ReconciliationService } from './reconciliation.service';
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from './expense-categories';
 import { chequeSourceNotes } from './finance.helper';
 import { AuditLogModule } from '@/modules/audit-log/audit-log.module';
@@ -48,7 +53,9 @@ import { CustomersModule } from '@/modules/customers/customers.module';
 import { SuppliersModule } from '@/modules/suppliers/suppliers.module';
 import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
 import { recordExpenseCashOutflow } from '@/shared/cash-register.helper';
+import { CashAuth, managerApprovalRequired, resolveCashActor } from '@/shared/security/cash-actor';
 import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 import type { Response } from 'express';
 import {
   assertCodeInTypeRange,
@@ -115,26 +122,26 @@ export class CloseFiscalYearDto {
 }
 
 export class CreateExpenseDto {
-  @ApiProperty() @IsNumber() amount: number;
-  @ApiProperty() @IsString() description: string;
+  @ApiProperty() @IsNumber() @Min(0.01) @Max(MAX_EXPENSE_AMOUNT) amount: number;
+  @ApiProperty() @IsString() @MaxLength(1000) @NoCardNumber() description: string;
   @ApiProperty() @IsDateString() date: string;
   @ApiPropertyOptional({ enum: EXPENSE_CATEGORIES }) @IsOptional() @IsString() categoryId?: string;
   @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
   @ApiPropertyOptional({ description: 'Required when paymentMethod is CHEQUE' })
-  @IsOptional() @IsString() chequeNumber?: string;
+  @IsOptional() @IsString() @MaxLength(32) @NoCardNumber() chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
 }
 
 export class UpdateExpenseDto {
-  @ApiPropertyOptional() @IsOptional() @IsNumber() amount?: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0.01) @Max(MAX_EXPENSE_AMOUNT) amount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) @NoCardNumber() description?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() date?: string;
   @ApiPropertyOptional({ enum: EXPENSE_CATEGORIES }) @IsOptional() @IsString() categoryId?: string;
   @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
 }
 
 export class JournalLineDto {
@@ -182,8 +189,14 @@ export class CreateBankAccountDto {
   @ApiProperty() @IsString() code: string;
   @ApiProperty() @IsString() name: string;
   @ApiPropertyOptional({ enum: BankAccountType }) @IsOptional() @IsEnum(BankAccountType) type?: BankAccountType;
-  @ApiPropertyOptional() @IsOptional() @IsString() bankName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() accountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) accountNumber?: string;
+  @ApiPropertyOptional({ description: 'Name the account is held under (required for current / savings accounts)' })
+  @IsOptional() @IsString() @MaxLength(200) accountHolderName?: string;
+  @ApiPropertyOptional({ description: 'Branch name (required for current / savings accounts)' })
+  @IsOptional() @IsString() @MaxLength(200) branchName?: string;
+  @ApiPropertyOptional({ description: 'Branch code (required for current / savings accounts)' })
+  @IsOptional() @IsString() @MaxLength(50) branchCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() openingBalance?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() currency?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
@@ -191,12 +204,17 @@ export class CreateBankAccountDto {
 }
 
 export class UpdateBankAccountDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() bankName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() accountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) accountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) accountHolderName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) branchName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) branchCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() glAccountId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({ description: 'updatedAt the editor loaded; a different value on the server rejects the save (409)' })
+  @IsOptional() @IsDateString() expectedUpdatedAt?: string;
 }
 
 export class CreateBankTxnDto {
@@ -214,6 +232,8 @@ export class BankTransferDto {
   @ApiProperty() @IsString() fromAccountId: string;
   @ApiProperty() @IsString() toAccountId: string;
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ description: 'Stable idempotency key for this transfer attempt' })
+  @IsString() @IsNotEmpty() @MaxLength(128) clientRequestId: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() txnDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
@@ -526,6 +546,13 @@ export class UpdateEmployeeStatutoryDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() basicSalary?: number;
 }
 
+export class JournalEntryQueryDto extends PaginationDto {
+  @ApiPropertyOptional({ enum: JournalEntryStatus }) @IsOptional() @IsEnum(JournalEntryStatus) status?: JournalEntryStatus;
+  @ApiPropertyOptional({ description: 'Search entry number, description or reference' }) @IsOptional() @IsString() q?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() endDate?: string;
+}
+
 export class TaxPreviewDto {
   @ApiProperty() @IsNumber() amount: number;
   @ApiProperty() @IsNumber() rate: number;
@@ -831,7 +858,17 @@ export class AccountingService {
     return { created, updated, total: parsed.length };
   }
 
-  async createExpense(tenantId: string, branchId: string, userId: string, dto: CreateExpenseDto) {
+  async createExpense(tenantId: string, branchId: string, auth: CashAuth, dto: CreateExpenseDto) {
+    // The person really acting (PIN cashier — never the terminal login's roles) and an explicit approver.
+    const actor = await resolveCashActor(this.prisma, { tenantId, ...auth });
+    const userId = actor.actorId;
+    // F-04: amount must be positive; cashiers are capped (LKR 5,000 default, per-shop setting) unless a
+    // manager acts or approves with their PIN.
+    const tenantSettings = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    const refusal = expenseRefusal(dto.amount, actor.actorRoles, tenantSettings?.settings);
+    if (refusal && !(refusal.status === 403 && actor.authorizerId)) {
+      throw refusal.status === 403 ? managerApprovalRequired(refusal.message) : new BadRequestException(refusal.message);
+    }
     const method = dto.paymentMethod ?? PaymentMethod.CASH;
     const chequeNumber = (dto.chequeNumber || dto.reference || '').trim();
     if (method === PaymentMethod.CHEQUE && !chequeNumber) {
@@ -880,6 +917,7 @@ export class AccountingService {
           expenseId: expense.id,
           amount: dto.amount,
           description: `Expense — ${dto.description}`,
+          authorizedById: actor.authorizerId,
         });
       }
 
@@ -898,6 +936,7 @@ export class AccountingService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
+      ...textSearch(query.search, ['description', 'reference']),
       ...(query.startDate && query.endDate && {
         date: {
           gte: dayjs(query.startDate).startOf('day').toDate(),
@@ -1398,9 +1437,14 @@ export class AccountingController {
     @CurrentUser() user: IAuthUser,
     @Body() dto: CreateExpenseDto,
     @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-cash-approval-token') approvalToken?: string,
   ) {
-    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
-    return this.accountingService.createExpense(user.tenantId, user.branchId ?? '', cashierId, dto);
+    return this.accountingService.createExpense(
+      user.tenantId,
+      user.branchId ?? '',
+      { user: { id: user.id, roles: user.roles ?? [] }, unlockToken, approvalToken },
+      dto,
+    );
   }
 
   @Get('expenses')
@@ -1464,19 +1508,10 @@ export class AccountingController {
   @ApiOperation({ summary: 'List journal entries' })
   getJournalEntries(
     @CurrentUser() user: IAuthUser,
-    @Query() query: PaginationDto,
-    @Query('status') status?: JournalEntryStatus,
-    @Query('q') q?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    // Declared in a DTO: with forbidNonWhitelisted, separate @Query('q') params were rejected (400) (search audit).
+    @Query() query: JournalEntryQueryDto,
   ) {
-    return this.accountingService.getJournalEntries(user.tenantId, {
-      ...query,
-      status,
-      q,
-      startDate,
-      endDate,
-    });
+    return this.accountingService.getJournalEntries(user.tenantId, query);
   }
 
   @Get('journal-entries/:id')
@@ -1597,7 +1632,7 @@ export class AccountingController {
   ) {
     return this.financeService.getCashBook(
       user.tenantId,
-      branchId ?? user.branchId ?? '',
+      resolveBranchScope(user, branchId) ?? '',
       start ?? dayjs().startOf('month').format('YYYY-MM-DD'),
       end ?? dayjs().format('YYYY-MM-DD'),
     );
@@ -1617,17 +1652,17 @@ export class AccountingController {
     @CurrentUser() user: IAuthUser,
     @Query('includeInactive') includeInactive?: string,
   ) {
-    return this.financeService.listBankAccounts(
-      user.tenantId,
-      includeInactive === 'true' || includeInactive === '1',
-    );
+    // Disabled accounts are listed only for users who can manage bank accounts; everyone else sees active ones.
+    const wantsInactive = includeInactive === 'true' || includeInactive === '1';
+    const canManage = (user.permissions ?? []).includes('accounting:update');
+    return this.financeService.listBankAccounts(user.tenantId, wantsInactive && canManage);
   }
 
   @Post('bank-accounts')
   @RequirePermissions('accounting:create')
   @ApiOperation({ summary: 'Create bank account' })
   createBankAccount(@CurrentUser() user: IAuthUser, @Body() dto: CreateBankAccountDto) {
-    return this.financeService.createBankAccount(user.tenantId, user.branchId ?? '', dto);
+    return this.financeService.createBankAccount(user.tenantId, user.branchId ?? '', dto, user.id);
   }
 
   @Put('bank-accounts/:id')
@@ -1638,7 +1673,7 @@ export class AccountingController {
     @Param('id') id: string,
     @Body() dto: UpdateBankAccountDto,
   ) {
-    return this.financeService.updateBankAccount(user.tenantId, id, dto);
+    return this.financeService.updateBankAccount(user.tenantId, id, dto, user.id);
   }
 
   @Get('bank-accounts/:id/book')
@@ -1833,7 +1868,7 @@ export class AccountingController {
       user.tenantId,
       start ?? dayjs().startOf('month').format('YYYY-MM-DD'),
       end ?? dayjs().format('YYYY-MM-DD'),
-      branchId,
+      resolveBranchScope(user, branchId),
     );
   }
 
@@ -1857,7 +1892,7 @@ export class AccountingController {
   createVatReturn(@CurrentUser() user: IAuthUser, @Body() dto: CreateVatReturnDto) {
     return this.taxService.createVatReturn(user.tenantId, user.id, {
       ...dto,
-      branchId: dto.branchId ?? user.branchId ?? undefined,
+      branchId: resolveBranchScope(user, dto.branchId),
     });
   }
 
@@ -2122,7 +2157,7 @@ export class AccountingController {
     @Query('status') status?: FixedAssetStatus,
     @Query('branchId') branchId?: string,
   ) {
-    return this.fixedAssetsService.listAssets(user.tenantId, status, branchId);
+    return this.fixedAssetsService.listAssets(user.tenantId, status, resolveBranchScope(user, branchId));
   }
 
   @Post('fixed-assets')
@@ -2353,7 +2388,7 @@ export class AccountingController {
       accountId,
       customerId,
       supplierId,
-      branchId,
+      branchId: resolveBranchScope(user, branchId),
     });
   }
 
@@ -2379,7 +2414,7 @@ export class AccountingController {
       accountId,
       customerId,
       supplierId,
-      branchId,
+      branchId: resolveBranchScope(user, branchId),
     });
     res.set({
       'Content-Type': out.contentType,
@@ -2524,7 +2559,7 @@ export class AccountingController {
 
 @Module({
   imports: [AuditLogModule, CustomersModule, SuppliersModule, DocumentNumberingModule],
-  controllers: [AccountingController, AdvancedAccountingController],
+  controllers: [AccountingController, AdvancedAccountingController, ReconciliationController],
   providers: [
     AccountingService,
     FinanceService,
@@ -2541,6 +2576,7 @@ export class AccountingController {
     AccountingOutboxService,
     AccountingAutomationListener,
     AdvancedAccountingService,
+    ReconciliationService,
   ],
   exports: [
     AccountingService,
@@ -2557,6 +2593,7 @@ export class AccountingController {
     AccountingPostingService,
     AccountingOutboxService,
     AdvancedAccountingService,
+    ReconciliationService,
   ],
 })
 export class AccountingModule {}

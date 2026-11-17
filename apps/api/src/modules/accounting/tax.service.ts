@@ -146,25 +146,25 @@ export class TaxService {
     });
 
     const seed = defaultTaxSeed();
-    const created = [];
-    for (const row of seed) {
-      created.push(
-        await this.prisma.taxRate.create({
-          data: {
-            tenantId,
-            code: row.code,
-            name: row.name,
-            rate: row.rate,
-            direction: row.direction as TaxDirection,
-            isDefault: !!row.isDefault,
-            description: row.description,
-            outputGlAccountId: vatPayable?.id,
-            inputGlAccountId: vatInput?.id,
-          },
-        }),
-      );
-    }
-    return { created: created.length, rates: created };
+    const result = await this.prisma.taxRate.createMany({
+      data: seed.map((row) => ({
+        tenantId,
+        code: row.code,
+        name: row.name,
+        rate: row.rate,
+        direction: row.direction as TaxDirection,
+        isDefault: !!row.isDefault,
+        description: row.description,
+        outputGlAccountId: vatPayable?.id,
+        inputGlAccountId: vatInput?.id,
+      })),
+      skipDuplicates: true,
+    });
+    const rates = await this.prisma.taxRate.findMany({
+      where: { tenantId, code: { in: seed.map((row) => row.code) } },
+      orderBy: { code: 'asc' },
+    });
+    return { created: result.count, rates };
   }
 
   calculatePreview(amount: number, rate: number, inclusive = false) {

@@ -37,6 +37,8 @@ import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { ChequesHub } from "@/components/accounting/cheques-hub";
 import { parseApiList } from "@/lib/parse-api-list";
+import { BankDetailsFields } from "@/components/accounting/bank-details-fields";
+import { bankFieldsForSave, EMPTY_BANK_DETAILS, type BankDetailsInput } from "@/lib/bank-account";
 
 type AgingBuckets = Record<string, { count: number; amount: number }>;
 
@@ -141,8 +143,9 @@ type FinanceHubContextValue = {
   setBaCode: (v: string) => void;
   baName: string;
   setBaName: (v: string) => void;
-  baBank: string;
-  setBaBank: (v: string) => void;
+  baDetails: BankDetailsInput;
+  setBaDetails: (v: BankDetailsInput) => void;
+  baTried: boolean;
   baOpen: string;
   setBaOpen: (v: string) => void;
   baBusy: boolean;
@@ -202,7 +205,8 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
 
   const [baCode, setBaCode] = useState("");
   const [baName, setBaName] = useState("");
-  const [baBank, setBaBank] = useState("");
+  const [baDetails, setBaDetails] = useState<BankDetailsInput>(EMPTY_BANK_DETAILS);
+  const [baTried, setBaTried] = useState(false);
   const [baOpen, setBaOpen] = useState("0");
   const [baBusy, setBaBusy] = useState(false);
 
@@ -253,18 +257,27 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
       toast.error("Code and name required");
       return;
     }
+    // a new bank account is a current account: the bank, account number, holder, branch and branch code are required
+    const bk = bankFieldsForSave("CURRENT", baDetails);
+    if (bk.firstProblem) {
+      setBaTried(true);
+      toast.error(bk.firstProblem);
+      return;
+    }
     setBaBusy(true);
     try {
       await api.post("/accounting/bank-accounts", {
         code: baCode,
         name: baName,
-        bankName: baBank || undefined,
+        type: "CURRENT",
+        ...bk.fields,
         openingBalance: parseFloat(baOpen) || 0,
       });
       toast.success("Bank account created");
       setBaCode("");
       setBaName("");
-      setBaBank("");
+      setBaDetails(EMPTY_BANK_DETAILS);
+      setBaTried(false);
       setBaOpen("0");
       load();
     } catch (e: unknown) {
@@ -635,8 +648,9 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
     setBaCode,
     baName,
     setBaName,
-    baBank,
-    setBaBank,
+    baDetails,
+    setBaDetails,
+    baTried,
     baOpen,
     setBaOpen,
     baBusy,
@@ -911,7 +925,7 @@ export function CashBookSection() {
 
 export function BanksSection() {
   const {
-    baCode, setBaCode, baName, setBaName, baBank, setBaBank, baOpen, setBaOpen,
+    baCode, setBaCode, baName, setBaName, baDetails, setBaDetails, baTried, baOpen, setBaOpen,
     baBusy, createBank, banks, bankColumns,
   } = useFinanceHub();
 
@@ -934,15 +948,13 @@ export function BanksSection() {
               <label className="text-xs font-semibold">Name</label>
               <Input value={baName} onChange={(e) => setBaName(e.target.value)} className="h-9" placeholder="Operating" />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Bank name</label>
-              <Input value={baBank} onChange={(e) => setBaBank(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <label className="text-xs font-semibold">Opening balance</label>
               <Input type="number" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} className="h-9" />
             </div>
           </div>
+          <BankDetailsFields compact idPrefix="finance-bank" required value={baDetails} onChange={setBaDetails} disabled={baBusy}
+            errors={baTried ? bankFieldsForSave("CURRENT", baDetails).problems : {}} />
           <Button size="sm" onClick={createBank} disabled={baBusy} className="gap-1.5">
             {baBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             Create

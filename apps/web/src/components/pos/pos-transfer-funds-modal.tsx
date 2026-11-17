@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowLeftRight, Loader2, RefreshCw, X, Landmark, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { formatNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,20 +135,21 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
 
     setBusy(true);
     try {
-      const res = await api.post<{ message?: string }>("/cash/transfer", {
-        toRegisterId,
-        amount: amt,
-        from,
-        fromRegisterId: from === "REGISTER" ? fromRegisterId : undefined,
-        reason: reason.trim() || undefined,
-      });
+      const res = await withManagerApproval(`Approve transfer of LKR ${formatNumber(amt)}`, (headers) =>
+        api.post<{ message?: string }>("/cash/transfer", {
+          toRegisterId,
+          amount: amt,
+          from,
+          fromRegisterId: from === "REGISTER" ? fromRegisterId : undefined,
+          reason: reason.trim() || undefined,
+        }, headers ? { headers } : undefined));
       toast.success(res.data?.message || `Transferred LKR ${formatNumber(amt)}`);
       setAmount("");
       setReason("");
       onTransferred?.();
       await load();
     } catch (e: unknown) {
-      toast.error((e as Error).message || "Transfer failed");
+      toast.error(e instanceof ManagerApprovalCancelled ? "Transfer not approved — nothing was moved" : (e as Error).message || "Transfer failed");
     } finally {
       setBusy(false);
     }

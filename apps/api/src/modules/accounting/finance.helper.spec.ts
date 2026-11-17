@@ -8,6 +8,7 @@ import {
   bankBookRunningBalance,
   bankTxnBalanceDelta,
   assertDistinctTransferAccounts,
+  bankTransferRequestFingerprint,
   round2,
 } from './finance.helper';
 
@@ -98,6 +99,29 @@ describe('Phase 5 Finance — report accuracy', () => {
       expect(bankTxnBalanceDelta('DEPOSIT', 100)).toBe(100);
       expect(bankTxnBalanceDelta('WITHDRAWAL', 40)).toBe(-40);
       expect(() => assertDistinctTransferAccounts('a', 'a')).toThrow(/same account/);
+    });
+
+    it('fingerprints the effective transfer request consistently and distinguishes changed payloads', () => {
+      const request = {
+        tenantId: 'tenant-a',
+        branchId: 'branch-a',
+        userId: 'user-a',
+        fromAccountId: 'bank-a',
+        toAccountId: 'bank-b',
+        amount: 125.5,
+        txnDate: '2026-11-14T10:00:00.000Z',
+        postToGl: true,
+      };
+
+      expect(bankTransferRequestFingerprint(request)).toBe(
+        bankTransferRequestFingerprint({ ...request, txnDate: '2026-11-14T10:00:00Z' }),
+      );
+      expect(bankTransferRequestFingerprint(request)).not.toBe(
+        bankTransferRequestFingerprint({ ...request, amount: 126 }),
+      );
+      expect(bankTransferRequestFingerprint(request)).not.toBe(
+        bankTransferRequestFingerprint({ ...request, tenantId: 'tenant-b' }),
+      );
     });
   });
 });

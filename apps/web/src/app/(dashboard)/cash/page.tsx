@@ -5,12 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Banknote, PlayCircle, StopCircle, History, AlertTriangle,
   RefreshCw, Loader2, CheckCircle2, ArrowDownCircle, ArrowUpCircle,
-  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye, Monitor, Wallet,
+  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye, Monitor, Wallet, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { downloadDayEndPdf, printDayEndReport } from "@/lib/day-end-print";
 import { formatNumber, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +135,31 @@ export default function CashManagementPage() {
   const [closing, setClosing] = React.useState(false);
   const [history, setHistory] = React.useState<CashRegister[]>([]);
   const [dateRange, setDateRange] = React.useState({ from: TODAY, to: TODAY });
+  const { settings: receiptSettings } = useReceiptSettings();
+  const [printingDayEnd, setPrintingDayEnd] = React.useState(false);
+  const [downloadingDayEnd, setDownloadingDayEnd] = React.useState(false);
+  /** Branch day-end report for the selected end date, on the POS thermal printer. */
+  const printBranchDayEnd = async () => {
+    setPrintingDayEnd(true);
+    try {
+      await printDayEndReport({ date: dateRange.to }, receiptSettings);
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Could not print the day-end report");
+    } finally {
+      setPrintingDayEnd(false);
+    }
+  };
+  const downloadBranchDayEndPdf = async () => {
+    setDownloadingDayEnd(true);
+    try {
+      await downloadDayEndPdf({ date: dateRange.to });
+      toast.success("A4 day-end PDF downloaded");
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Could not download the day-end PDF");
+    } finally {
+      setDownloadingDayEnd(false);
+    }
+  };
   const [varianceDays, setVarianceDays] = React.useState("30");
   const [varianceReport, setVarianceReport] = React.useState<{
     totalShifts: number;
@@ -288,8 +316,9 @@ export default function CashManagementPage() {
     setOpening(true);
     try {
       if (counterId) writePosCounterId(counterId);
-      await api.post("/cash/open", { openingCash: amount, counterId: counterId || undefined, notes: openingNotes || undefined });
-      toast.success("Shift started");
+      const res = await api.post<{ openingCash?: number; handover?: { countedCash: number } }>("/cash/open", { openingCash: amount, counterId: counterId || undefined, notes: openingNotes || undefined });
+      // A counter with another cashier's cash is handed over: the shift starts from that balance.
+      toast.success(res.data?.handover ? `Counter taken over with LKR ${res.data.handover.countedCash.toLocaleString()} (previous cashier's balance)` : "Shift started");
       setOpeningCash("");
       setOpeningNotes("");
       await refresh();
@@ -344,18 +373,19 @@ export default function CashManagementPage() {
     }
     setMoving(true);
     try {
-      await api.post(`/cash/${active.id}/movements`, {
-        type: movementType,
-        amount,
-        description: movementDesc || undefined,
-      });
+      await withManagerApproval(`Approve cash ${movementType === "DEPOSIT" ? "in" : "out"} of LKR ${amount.toLocaleString("en-LK")}`, (headers) =>
+        api.post(`/cash/${active.id}/movements`, {
+          type: movementType,
+          amount,
+          description: movementDesc || undefined,
+        }, headers ? { headers } : undefined));
       toast.success(movementType === "DEPOSIT" ? "Cash in recorded" : "Cash out recorded");
       setMovementAmount("");
       setMovementDesc("");
       await loadActive();
       await loadToday();
     } catch (e: unknown) {
-      toast.error((e as Error).message || "Failed to record movement");
+      toast.error(e instanceof ManagerApprovalCancelled ? "Not approved — nothing was recorded" : (e as Error).message || "Failed to record movement");
     } finally {
       setMoving(false);
     }
@@ -546,6 +576,12 @@ export default function CashManagementPage() {
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               <Button variant="outline" onClick={() => void refresh()} className="gap-1.5">
                 <RefreshCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} /> Refresh
+              </Button>
+              <Button variant="outline" onClick={() => void printBranchDayEnd()} disabled={printingDayEnd} className="gap-1.5" title={`Day-end report for ${dateRange.to} (thermal printer)`}>
+                {printingDayEnd ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Printer className="h-[18px] w-[18px]" />} Print day-end
+              </Button>
+              <Button variant="outline" onClick={() => void downloadBranchDayEndPdf()} disabled={downloadingDayEnd} className="gap-1.5" title="Download the read-only A4 PDF">
+                {downloadingDayEnd ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Printer className="h-[18px] w-[18px]" />} A4 PDF
               </Button>
               <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
               {!shiftOpen && !shiftPending && (

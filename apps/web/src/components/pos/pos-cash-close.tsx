@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Banknote, Loader2, StopCircle, X, AlertTriangle } from "lucide-react";
+import { Banknote, Loader2, StopCircle, X, AlertTriangle, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_DENOMINATIONS } from "@/components/cash/denomination-input";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printDayEndReport } from "@/lib/day-end-print";
 
 const VARIANCE_THRESHOLD = 500;
 
@@ -30,6 +32,21 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
   const [active, setActive] = React.useState<ActiveShift | null>(null);
   const [denominations, setDenominations] = React.useState<Record<string, number>>({});
   const [notes, setNotes] = React.useState("");
+  const [printAfterClose, setPrintAfterClose] = React.useState(true);
+  const [printing, setPrinting] = React.useState(false);
+  const { settings: receiptSettings } = useReceiptSettings();
+
+  /** Day-end report for this shift on the thermal printer (58 / 80 mm, same printer as receipts). */
+  const printReport = React.useCallback(async (registerId: string) => {
+    setPrinting(true);
+    try {
+      await printDayEndReport({ registerId }, receiptSettings);
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Could not print the day-end report");
+    } finally {
+      setPrinting(false);
+    }
+  }, [receiptSettings]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -78,13 +95,14 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
       } else {
         toast.success("Cash shift closed successfully");
       }
+      if (printAfterClose) await printReport(active.id);
       onClosed({ needsApproval: needs, variance: v });
     } catch (e: unknown) {
       toast.error((e as Error).message || "Failed to close shift");
     } finally {
       setClosing(false);
     }
-  }, [active, actualTotal, denominations, notes, variance, onClosed]);
+  }, [active, actualTotal, denominations, notes, variance, onClosed, printAfterClose, printReport]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -220,6 +238,20 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
         </div>
 
         <div className="p-5 pt-0 shrink-0 space-y-2">
+          <label className="flex items-center gap-2 text-xs text-white/80">
+            <input type="checkbox" checked={printAfterClose} onChange={(e) => setPrintAfterClose(e.target.checked)} />
+            Print day-end report after closing ({receiptSettings.paperWidth === "58mm" ? "58" : "80"} mm thermal)
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void printReport(active.id)}
+            disabled={printing || closing}
+            className="w-full h-9 gap-2 text-xs"
+          >
+            {printing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+            Print current totals (shift stays open)
+          </Button>
           <Button
             onClick={() => void handleClose()}
             disabled={closing || actualTotal <= 0}

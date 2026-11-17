@@ -12,8 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { parseApiList } from "@/lib/parse-api-list";
+import { applyAdvanceProblem, defaultAdvanceToApply, paymentSplit } from "@/lib/supplier-advance";
+import { useSubmitKey } from "@/lib/submit-key";
+import { SupplierSearchSelect } from "@/components/purchases/supplier-search-select";
+import { parseSupplierPage, supplierBrowsePath, SUPPLIER_PRELOAD_LIMIT } from "@/lib/supplier-search";
 
-type Supplier = { id: string; code?: string; name: string; balance?: number; outstandingBalance?: number };
+type Supplier = { id: string; code?: string | null; phone?: string | null; name: string; balance?: number; outstandingBalance?: number; advanceBalance?: number };
+type AdvanceEntry = { id: string; type: "ADVANCE_IN" | "APPLIED"; amount: number; balanceAfter: number; createdAt: string; notes?: string | null };
 type UnpaidPo = { id: string; poNumber: string; dueAmount: number; dueDate: string };
 type Payment = {
   id: string;
@@ -55,6 +60,8 @@ const monthStart = () => {
 
 export default function SupplierPaymentsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierTotal, setSupplierTotal] = useState<number | null>(null);
+  const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unpaidPos, setUnpaidPos] = useState<UnpaidPo[]>([]);
   const [banks, setBanks] = useState<BankAccount[]>([]);
@@ -64,6 +71,11 @@ export default function SupplierPaymentsPage() {
   const [open, setOpen] = useState(false);
   const [range, setRange] = useState({ start: monthStart(), end: today() });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Overpayment: keep the excess as the supplier's advance (off unless the user asks).
+  const [keepAdvance, setKeepAdvance] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [applying, setApplying] = useState(false);
+  const applyKey = useSubmitKey();
   const [form, setForm] = useState({
     supplierId: "",
     amount: "",
@@ -87,14 +99,18 @@ export default function SupplierPaymentsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [supplierRes, paymentRes, bankRes] = await Promise.all([
-        api.get<{ data: Supplier[] }>("/suppliers?limit=500"),
+      const [supplierRes, paymentRes, dashboardRes, bankRes] = await Promise.all([
+        api.get<unknown>(supplierBrowsePath(SUPPLIER_PRELOAD_LIMIT)),
         api.get<{ payments: Payment[] }>(
           `/suppliers/ap/payments?startDate=${range.start}&endDate=${range.end}&limit=500`,
         ),
+        api.get<{ kpis?: { totalOutstanding?: number } }>("/suppliers/ap/dashboard"),
         api.get<BankAccount[] | { data: BankAccount[] }>("/accounting/bank-accounts").catch(() => ({ data: [] })),
       ]);
-      setSuppliers(parseApiList<Supplier>(supplierRes.data));
+      const supplierPage = parseSupplierPage<Supplier>(supplierRes);
+      setSuppliers(supplierPage.rows.length ? supplierPage.rows : parseApiList<Supplier>(supplierRes));
+      setSupplierTotal(supplierPage.total);
+      setTotalOutstanding(dashboardRes.data?.kpis?.totalOutstanding ?? 0);
       setPayments(paymentRes.data?.payments ?? []);
       const bankList = parseApiList<BankAccount>(bankRes.data);
       setBanks(bankList);
@@ -158,18 +174,63 @@ export default function SupplierPaymentsPage() {
     setForm((f) => ({ ...f, amount: selectedDue > 0 ? selectedDue.toFixed(2) : "" }));
   }, [selectedDue, open]);
 
+  // Payable and advance side by side + the advance history (reloaded whenever the supplier list reloads,
+  // i.e. after every payment and every advance application).
+  const [advanceInfo, setAdvanceInfo] = useState<{ outstanding: number; advanceBalance?: number; entries: AdvanceEntry[] } | null>(null);
+  useEffect(() => {
+    if (!form.supplierId) { setAdvanceInfo(null); return; }
+    let alive = true;
+    api.get<{ outstanding: number; advanceBalance?: number; entries: AdvanceEntry[] }>(`/suppliers/${form.supplierId}/ap/advance`)
+      .then((r) => { if (alive) setAdvanceInfo({ outstanding: r.data?.outstanding ?? 0, advanceBalance: r.data?.advanceBalance, entries: r.data?.entries ?? [] }); })
+      .catch(() => { if (alive) setAdvanceInfo(null); });
+    return () => { alive = false; };
+  }, [form.supplierId, suppliers]);
+
+  const advanceOfSupplier = advanceInfo?.advanceBalance
+    ?? suppliers.find((x) => x.id === form.supplierId)?.advanceBalance
+    ?? 0;
+  const split = paymentSplit(Number(form.amount), selectedDue);
+
+  // Offer the whole usable advance whenever the supplier or the selection changes.
+  useEffect(() => {
+    setAdvanceAmount(defaultAdvanceToApply(advanceOfSupplier, selectedDue) > 0 ? defaultAdvanceToApply(advanceOfSupplier, selectedDue).toFixed(2) : "");
+  }, [advanceOfSupplier, selectedDue, form.supplierId]);
+
+  const applyAdvance = async () => {
+    const amount = Number(advanceAmount);
+    const problem = applyAdvanceProblem(amount, advanceOfSupplier, selectedDue, selected.size);
+    if (problem) { toast.error(problem); return; }
+    setApplying(true);
+    try {
+      // The same key on a retry (double click / lost response) applies nothing twice.
+      const r = await api.post<{ applied: number; advanceBalance: number; outstanding: number; replayed?: boolean }>(
+        `/suppliers/${form.supplierId}/ap/advance/apply`,
+        { amount, purchaseIds: [...selected], clientRequestId: applyKey.current() },
+      );
+      applyKey.reset();
+      toast.success(`Advance applied: LKR ${formatNumber(r.data.applied)} · advance left LKR ${formatNumber(r.data.advanceBalance)} · balance due LKR ${formatNumber(r.data.outstanding)}`);
+      await load();
+      await loadUnpaid(form.supplierId);
+    } catch (error) {
+      toast.error((error as Error).message || "Could not apply the advance");
+    } finally {
+      setApplying(false);
+    }
+  };
+
   const submit = async () => {
     const amount = Number(form.amount);
     if (!form.supplierId || !Number.isFinite(amount) || amount <= 0 || !form.paidAt) {
       toast.error("Supplier, amount and payment date are required");
       return;
     }
-    if (selected.size === 0) {
+    // Nothing to select (no unpaid PO) is fine only when the whole payment is kept as supplier advance.
+    if (selected.size === 0 && !(keepAdvance && unpaidPos.length === 0)) {
       toast.error("Select at least one unpaid purchase order");
       return;
     }
-    if (amount > selectedDue + 0.01) {
-      toast.error(`Amount exceeds selected balance due (LKR ${formatNumber(selectedDue)})`);
+    if (amount > selectedDue + 0.01 && !keepAdvance) {
+      toast.error(`Amount exceeds selected balance due (LKR ${formatNumber(selectedDue)}). Tick "Keep the excess as supplier advance" to overpay.`);
       return;
     }
     if (form.method === "CHEQUE" && !form.reference.trim()) {
@@ -186,7 +247,7 @@ export default function SupplierPaymentsPage() {
     }
     setSaving(true);
     try {
-      const result = await api.post<{ supplierBalance: number; poSummary?: string }>(
+      const result = await api.post<{ supplierBalance: number; poSummary?: string; advanceAmount?: number; advanceBalance?: number | null }>(
         `/suppliers/${form.supplierId}/ap/payment`,
         {
           amount,
@@ -194,7 +255,8 @@ export default function SupplierPaymentsPage() {
           paidAt: form.paidAt,
           reference: form.reference || undefined,
           notes: form.notes || undefined,
-          purchaseIds: [...selected],
+          ...(keepAdvance ? { allowAdvance: true } : {}),
+          ...(selected.size > 0 ? { purchaseIds: [...selected] } : {}),
           ...(form.method === "CHEQUE" || form.method === "BANK_TRANSFER"
             ? {
                 bankAccountId: form.bankAccountId,
@@ -211,8 +273,11 @@ export default function SupplierPaymentsPage() {
         },
       );
       toast.success(
-        `Payment recorded${result.data.poSummary ? ` · ${result.data.poSummary}` : ""}. Balance due: LKR ${formatNumber(result.data.supplierBalance ?? 0)}`,
+        `Payment recorded${result.data.poSummary ? ` · ${result.data.poSummary}` : ""}. Balance due: LKR ${formatNumber(result.data.supplierBalance ?? 0)}${
+          (result.data.advanceAmount ?? 0) > 0 ? ` · Advance kept: LKR ${formatNumber(result.data.advanceAmount ?? 0)} (available LKR ${formatNumber(result.data.advanceBalance ?? 0)})` : ""
+        }`,
       );
+      setKeepAdvance(false);
       setOpen(false);
       setForm((f) => ({
         supplierId: "",
@@ -267,7 +332,7 @@ export default function SupplierPaymentsPage() {
           { label: "Payment Count", value: payments.length, icon: Wallet, count: true },
           {
             label: "Open Supplier Balance",
-            value: suppliers.reduce((s, x) => s + (x.outstandingBalance ?? x.balance ?? 0), 0),
+            value: totalOutstanding,
             icon: Banknote,
           },
         ].map((item) => (
@@ -343,22 +408,16 @@ export default function SupplierPaymentsPage() {
             <div className="p-6 space-y-4 overflow-y-auto">
               <div className="space-y-1.5">
                 <Label>Supplier *</Label>
-                <Select
+                <SupplierSearchSelect
+                  suppliers={suppliers}
                   value={form.supplierId}
-                  onValueChange={(supplierId) => {
+                  totalSuppliers={supplierTotal}
+                  loading={loading}
+                  onChange={(supplierId) => {
                     setForm((f) => ({ ...f, supplierId, amount: "" }));
                     void loadUnpaid(supplierId);
                   }}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name} — Due LKR {formatNumber(s.outstandingBalance ?? s.balance ?? 0)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
 
               <div className="space-y-2">
@@ -404,8 +463,50 @@ export default function SupplierPaymentsPage() {
 
               <div className="rounded-xl bg-muted/50 p-3 flex justify-between text-sm">
                 <span>Balance Due (selected)</span>
-                <strong>LKR {formatNumber(selectedDue)}</strong>
+                <strong data-testid="selected-due">LKR {formatNumber(selectedDue)}</strong>
               </div>
+              {form.supplierId && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2 text-sm" data-testid="supplier-advance-panel">
+                  {advanceInfo && (
+                    <div className="flex justify-between">
+                      <span>Total payable (all bills)</span>
+                      <strong data-testid="payable-outstanding">LKR {formatNumber(advanceInfo.outstanding)}</strong>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Supplier advance available</span>
+                    <strong data-testid="advance-available">LKR {formatNumber(advanceOfSupplier)}</strong>
+                  </div>
+                  {advanceOfSupplier > 0.009 && selected.size > 0 && (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Use advance on the selected bills (LKR)</Label>
+                        <Input
+                          type="number" min="0.01" step="0.01" className="w-44" aria-label="Advance to apply"
+                          value={advanceAmount}
+                          onChange={(e) => setAdvanceAmount(e.target.value)}
+                        />
+                      </div>
+                      <Button type="button" size="sm" variant="outline" disabled={applying || saving} onClick={() => void applyAdvance()} data-testid="apply-advance">
+                        {applying && <Loader2 className="h-4 w-4 animate-spin" />} Apply advance
+                      </Button>
+                    </div>
+                  )}
+                  {advanceInfo && advanceInfo.entries.length > 0 && (
+                    <details className="text-xs" data-testid="advance-history">
+                      <summary className="cursor-pointer text-muted-foreground">Advance history ({advanceInfo.entries.length})</summary>
+                      <div className="mt-1 max-h-40 overflow-y-auto divide-y divide-border">
+                        {advanceInfo.entries.map((e) => (
+                          <div key={e.id} className="flex justify-between gap-2 py-1 tabular-nums" data-testid="advance-history-row">
+                            <span>{new Date(e.createdAt).toLocaleString()} · {e.type === "ADVANCE_IN" ? "Kept from payment" : "Applied to bill"}</span>
+                            <span>{e.amount >= 0 ? "+" : "−"}LKR {formatNumber(Math.abs(e.amount))} → LKR {formatNumber(e.balanceAfter)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -427,6 +528,25 @@ export default function SupplierPaymentsPage() {
                   />
                 </div>
               </div>
+
+              {split.excess > 0.009 && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2" data-testid="overpayment-box">
+                  <p>
+                    This is <strong>LKR {formatNumber(split.excess)}</strong> more than the selected bills owe
+                    (LKR {formatNumber(split.toBills)} pays the bills).
+                  </p>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={keepAdvance} onChange={(e) => setKeepAdvance(e.target.checked)} data-testid="keep-advance" />
+                    <span>Keep the excess as supplier advance (use it on a future bill)</span>
+                  </label>
+                </div>
+              )}
+              {unpaidPos.length === 0 && form.supplierId && !loadingPos && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={keepAdvance} onChange={(e) => setKeepAdvance(e.target.checked)} data-testid="keep-advance-only" />
+                  <span>Nothing is payable: keep this whole payment as supplier advance</span>
+                </label>
+              )}
 
               <div className="space-y-1.5">
                 <Label>Payment Method</Label>

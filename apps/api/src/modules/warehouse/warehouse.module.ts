@@ -12,6 +12,7 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, CreateTransferDto } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { summarizeWarehouseStock } from './warehouse.helper';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 
 export class CreateWarehouseDto {
   @ApiProperty() @IsString() branchId: string;
@@ -84,9 +85,9 @@ export class WarehouseService {
   async resolveWarehouseId(tenantId: string, branchId: string, warehouseId?: string | null) {
     if (warehouseId) {
       const wh = await this.prisma.warehouse.findFirst({
-        where: { id: warehouseId, tenantId, isActive: true },
+        where: { id: warehouseId, tenantId, branchId, isActive: true },
       });
-      if (!wh) throw new NotFoundException('Warehouse not found');
+      if (!wh) throw new NotFoundException('Warehouse not found for this branch');
       return wh.id;
     }
     const def = await this.ensureDefaultWarehouse(tenantId, branchId);
@@ -376,14 +377,14 @@ export class WarehouseController {
   @RequirePermissions('inventory:read')
   @ApiOperation({ summary: 'Warehouse dashboard KPIs' })
   dashboard(@CurrentUser() user: IAuthUser, @Query('branchId') branchId?: string) {
-    return this.warehouses.getDashboard(user.tenantId, branchId || user.branchId || undefined);
+    return this.warehouses.getDashboard(user.tenantId, resolveBranchScope(user, branchId));
   }
 
   @Get()
   @RequirePermissions('inventory:read')
   @ApiOperation({ summary: 'List warehouses (multi-warehouse)' })
   list(@CurrentUser() user: IAuthUser, @Query('branchId') branchId?: string) {
-    return this.warehouses.list(user.tenantId, branchId || user.branchId || undefined);
+    return this.warehouses.list(user.tenantId, resolveBranchScope(user, branchId));
   }
 
   @Post()
@@ -404,7 +405,7 @@ export class WarehouseController {
     return this.warehouses.listTransfers(
       user.tenantId,
       warehouseId,
-      branchId || user.branchId || undefined,
+      resolveBranchScope(user, branchId),
     );
   }
 

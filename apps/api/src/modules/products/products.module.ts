@@ -1,9 +1,14 @@
 import { Module } from '@nestjs/common';
 import {
   Controller, Get, Post, Put, Patch, Delete,
-  Body, Param, Query, HttpCode, HttpStatus,
+  Body, Param, Query, HttpCode, HttpStatus, Header, StreamableFile, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { AuditLogModule } from '@/modules/audit-log/audit-log.module';
+import { CommitImportDto, ProductImportService } from './product-import.service';
+import { IMPORT_MAX_BYTES } from './product-import.helper';
 import { ProductStatus } from '@prisma/client';
 import {
   ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto,
@@ -13,18 +18,59 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
+import { ForbiddenException } from '@nestjs/common';
 
 @ApiTags('Products')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly importService: ProductImportService,
+  ) {}
 
   @Post()
   @RequirePermissions('products:create')
   @ApiOperation({ summary: 'Create product' })
   create(@CurrentUser() user: IAuthUser, @Body() dto: CreateProductDto) {
-    return this.productsService.create(user.tenantId, dto);
+    const canManageAllBranches = user.roles.some((role) =>
+      role === 'TENANT_ADMIN' || role === 'SUPER_ADMIN',
+    );
+    if (!canManageAllBranches && !user.branchId) {
+      throw new ForbiddenException('Your account must be assigned to a branch to create products.');
+    }
+    return this.productsService.create(
+      user.tenantId,
+      canManageAllBranches
+        ? dto
+        : { ...dto, branchScope: 'SINGLE', branchId: user.branchId },
+    );
+  }
+
+  // ── Bulk import (Excel / CSV). Needs create + update, so the default Cashier role cannot bulk-import.
+  @Get('import/template.xlsx')
+  @RequirePermissions('products:create', 'products:update')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="product-import-template.xlsx"')
+  @ApiOperation({ summary: 'Excel import template (with instructions and your categories / brands)' })
+  async importTemplate(@CurrentUser() user: IAuthUser) {
+    return new StreamableFile(await this.importService.buildTemplateXlsx(user.tenantId));
+  }
+
+  @Post('import/preview')
+  @RequirePermissions('products:create', 'products:update')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: IMPORT_MAX_BYTES, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Validate an .xlsx / .csv product file (nothing is saved)' })
+  importPreview(@CurrentUser() user: IAuthUser, @UploadedFile() file: Express.Multer.File) {
+    return this.importService.preview(user.tenantId, file);
+  }
+
+  @Post('import/commit')
+  @RequirePermissions('products:create', 'products:update')
+  @ApiOperation({ summary: 'Import validated rows (max 200 per request; re-validated, duplicates skipped)' })
+  importCommit(@CurrentUser() user: IAuthUser, @Body() dto: CommitImportDto) {
+    return this.importService.commit(user.tenantId, { id: user.id, branchId: user.branchId }, dto);
   }
 
   @Get()
@@ -150,9 +196,9 @@ export class BrandsController {
 }
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, AuditLogModule],
   controllers: [ProductsController, CategoriesController, BrandsController],
-  providers: [ProductsService],
+  providers: [ProductsService, ProductImportService],
   exports: [ProductsService],
 })
 export class ProductsModule {}

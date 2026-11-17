@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -97,14 +98,17 @@ export function AuditTrailHub() {
   const [endDate, setEndDate] = useState("");
   const [detail, setDetail] = useState<AuditRow | null>(null);
   const limit = 50;
+  // Search audit: typed filters are debounced (each keystroke used to fire 2 API requests).
+  const searchQ = useDebouncedValue(search.trim(), 300);
+  const resourceQ = useDebouncedValue(resource.trim(), 300);
 
   const load = useCallback(async (p = 1) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(p), limit: String(limit) });
       if (action !== "ALL") params.set("action", action);
-      if (resource.trim()) params.set("resource", resource.trim());
-      if (search.trim()) params.set("search", search.trim());
+      if (resourceQ) params.set("resource", resourceQ);
+      if (searchQ) params.set("search", searchQ);
       if (startDate && endDate) {
         params.set("startDate", startDate);
         params.set("endDate", endDate);
@@ -123,7 +127,7 @@ export function AuditTrailHub() {
     } finally {
       setLoading(false);
     }
-  }, [action, resource, search, startDate, endDate]);
+  }, [action, resourceQ, searchQ, startDate, endDate]);
 
   useEffect(() => { void load(1); }, [load]);
 
@@ -282,6 +286,7 @@ export function AuditTrailHub() {
               <Input
                 className="h-9"
                 placeholder="e.g. products, Auth"
+                aria-label="Filter audit trail by resource"
                 value={resource}
                 onChange={(e) => setResource(e.target.value)}
               />
@@ -290,7 +295,8 @@ export function AuditTrailHub() {
               <Label className="text-xs">Search</Label>
               <Input
                 className="h-9"
-                placeholder="IP, id, action…"
+                placeholder="IP, id, action, user…"
+                aria-label="Search audit trail (IP, id, action, user)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -316,11 +322,7 @@ export function AuditTrailHub() {
             data={rows}
             columns={columns}
             pageCount={1}
-            searchableColumns={[
-              { id: "action", title: "Action" },
-              { id: "resource", title: "Resource" },
-              { id: "user", title: "User" },
-            ]}
+            // No table-level search: it only filtered the current page of 50. The server search above covers all entries.
             filterableColumns={[]}
             isShowExportButtons={{ isShow: true, fileName: "audit-trail" }}
           />

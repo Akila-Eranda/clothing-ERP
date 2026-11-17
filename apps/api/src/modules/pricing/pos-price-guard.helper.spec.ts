@@ -71,8 +71,14 @@ describe('POS price guard', () => {
     ).toBeNull();
   });
 
-  it('skips weighed goods (scale price-embedded barcodes)', () => {
-    expect(findPosPriceViolation({ unitPrice: 750, quantity: 1 }, ctx({ isWeighted: true }))).toBeNull();
+  it('applies catalog price and cost limits to weighed goods', () => {
+    const weighted = ctx({ isWeighted: true });
+    expect(findPosPriceViolation({ unitPrice: 100, quantity: 0.25 }, weighted)).toBeNull();
+    expect(findPosPriceViolation({ unitPrice: 750, quantity: 1 }, weighted)?.kind).toBe('ABOVE_MAX_PRICE');
+    expect(findPosPriceViolation({ unitPrice: 50, quantity: 0.25 }, weighted)?.kind).toBe('BELOW_COST');
+    expect(
+      findPosPriceViolation({ unitPrice: 50, quantity: 0.25 }, ctx({ isWeighted: true, costPrice: 0 }))?.kind,
+    ).toBe('BELOW_COST');
   });
 
   it('tolerates rounding noise', () => {

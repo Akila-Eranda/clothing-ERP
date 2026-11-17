@@ -1,10 +1,19 @@
+import { textSearch } from '@/shared/search.helper';
 import { Module } from '@nestjs/common';
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, Headers } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Type } from 'class-transformer';
+import { CashAuth, managerApprovalRequired, resolveCashActor } from '@/shared/security/cash-actor';
+import { resolveOpenDrawerForCashier } from '@/shared/cash-register.helper';
+import { CARD_LAST4_REQUIRED_MESSAGE, maskCardLast4, parseCardLast4 } from '@/shared/card-payment.helper';
+import { NoCardNumber } from '@/shared/security/card-number.validator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min, IsInt, IsBoolean, Max, MaxLength, IsIn, NotEquals } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min, IsInt, IsBoolean, Max, MaxLength, IsIn, NotEquals, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { CustomerTier, Gender, NotificationChannel, CreditReminderStatus, PaymentMethod } from '@prisma/client';
+import { CustomerTier, Gender, NotificationChannel, CreditReminderStatus, PaymentMethod, RoleType, Prisma } from '@prisma/client';
+import { validateCustomerBank } from '@/shared/customer-bank.helper';
+import { Roles } from '@/common/decorators/roles.decorator';
 import {
   assertFinancialAuthority,
   MAX_MANUAL_LOYALTY_ADJUST,
@@ -19,6 +28,7 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { CustomerCreditService } from './customer-credit.service';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
+import { withWhatsappConsent } from '@/modules/whatsapp/customer-payment-notification.helper';
 
 export class CreateCustomerDto {
   @ApiProperty() @IsString() firstName: string;
@@ -34,6 +44,8 @@ export class CreateCustomerDto {
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) creditLimit?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(3650) creditDays?: number;
+  @ApiPropertyOptional({ description: 'True only when the customer explicitly opted in to WhatsApp payment notifications' })
+  @IsOptional() @IsBoolean() whatsappConsent?: boolean;
 }
 
 /** Profile edits only. Balances (wallet, loyalty, credit, totals), tier and tenant are never writable here. */
@@ -50,9 +62,21 @@ export class CustomerCreditNoteDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) referenceId?: string;
 }
 
+/** FUNDED: the customer paid money into the wallet. GOODWILL: a non-cash credit given by the shop. */
+export const WALLET_TOPUP_KINDS = ['FUNDED', 'GOODWILL'] as const;
+export const WALLET_TOPUP_METHODS: string[] = [PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.QR, PaymentMethod.BANK_TRANSFER];
+
 export class WalletTopUpDto {
   @ApiProperty() @IsNumber() @Min(0.01) @Max(MAX_MANUAL_WALLET_TOPUP) amount: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) @NoCardNumber() description?: string;
+  /** FUNDED (default) needs the real payment method; GOODWILL is never cash received. */
+  @ApiPropertyOptional({ enum: WALLET_TOPUP_KINDS }) @IsOptional() @IsIn([...WALLET_TOPUP_KINDS]) kind?: 'FUNDED' | 'GOODWILL';
+  @ApiPropertyOptional({ enum: WALLET_TOPUP_METHODS }) @IsOptional() @IsIn(WALLET_TOPUP_METHODS) paymentMethod?: PaymentMethod;
+  /** CARD: exactly the last 4 digits (only those are kept). */
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(4) cardLast4?: string;
+  /** QR / BANK_TRANSFER: the shop bank account the money went into. */
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) bankAccountId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
 }
 
 export class LoyaltyAdjustDto {
@@ -72,17 +96,31 @@ export const CREDIT_PAYMENT_METHODS = [
 
 export class CreditPaymentDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ description: 'Stable idempotency key reused when retrying the same payment' })
+  @IsString() @Matches(/^[A-Za-z0-9_-]{8,64}$/) clientRequestId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
-  @ApiPropertyOptional({ enum: CREDIT_PAYMENT_METHODS })
-  @IsOptional() @IsIn(CREDIT_PAYMENT_METHODS) paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional({ enum: [...CREDIT_PAYMENT_METHODS, PaymentMethod.WALLET] })
+  @IsOptional() @IsIn([...CREDIT_PAYMENT_METHODS, PaymentMethod.WALLET]) paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) @NoCardNumber() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() applyFromWallet?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  /** CARD settlements: exactly the last 4 digits (never the full card number or CVV). */
+  @ApiPropertyOptional({ example: '1234' }) @IsOptional() @IsString() @MaxLength(4) cardLast4?: string;
 }
 
 export class CreditLimitDto {
   @ApiProperty() @IsNumber() @Min(0) @Max(1_000_000_000) creditLimit: number;
+}
+
+export class CustomerHistoryQueryDto {
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 50 })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 50;
+  @ApiPropertyOptional({ maxLength: 256 })
+  @IsOptional() @IsString() @MaxLength(256) cursor?: string;
+  @ApiPropertyOptional({ enum: ['true'] })
+  @IsOptional() @IsIn(['true']) recent?: 'true';
 }
 
 export class CreditDaysDto {
@@ -109,12 +147,57 @@ export class CreateCreditReminderDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() sendNow?: boolean;
 }
 
+export class CustomerBankDetailsDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) accountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) accountHolderName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) branchName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) branchCode?: string;
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credit: CustomerCreditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  private async assertCustomer(id: string, tenantId: string) {
+    const c = await this.prisma.customer.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!c) throw new NotFoundException('Customer not found');
+  }
+
+  /** Bank details of a customer (null when none were entered). Admin screens only. */
+  async getBankDetails(id: string, tenantId: string) {
+    await this.assertCustomer(id, tenantId);
+    const row = await this.prisma.customerBankDetail.findFirst({ where: { customerId: id, tenantId } });
+    return row
+      ? { bankName: row.bankName, accountNumber: row.accountNumber, accountHolderName: row.accountHolderName, branchName: row.branchName, branchCode: row.branchCode, updatedAt: row.updatedAt }
+      : null;
+  }
+
+  /**
+   * Saves (or, when every field is empty, removes) the customer's bank details. The audit interceptor logs the
+   * request with the account number redacted (accountNumber is a sensitive audit key).
+   */
+  async saveBankDetails(id: string, tenantId: string, userId: string, dto: CustomerBankDetailsDto) {
+    await this.assertCustomer(id, tenantId);
+    const empty = [dto.bankName, dto.accountNumber, dto.accountHolderName, dto.branchName, dto.branchCode].every((v) => !(v ?? '').trim());
+    if (empty) {
+      await this.prisma.customerBankDetail.deleteMany({ where: { customerId: id, tenantId } });
+      return null;
+    }
+    const checked = validateCustomerBank(dto);
+    if (!checked.ok) throw new BadRequestException(checked.error);
+    const v = checked.value;
+    const row = await this.prisma.customerBankDetail.upsert({
+      where: { customerId: id },
+      create: { tenantId, customerId: id, ...v, updatedById: userId },
+      update: { ...v, updatedById: userId },
+    });
+    return { bankName: row.bankName, accountNumber: row.accountNumber, accountHolderName: row.accountHolderName, branchName: row.branchName, branchCode: row.branchCode, updatedAt: row.updatedAt };
+  }
 
   async create(tenantId: string, dto: CreateCustomerDto, actorRoles: string[] = []) {
     // Opening a customer with credit is the same decision as raising a limit later.
@@ -137,6 +220,9 @@ export class CustomersService {
         notes: dto.notes, tags: dto.tags ?? [],
         creditLimit: dto.creditLimit ?? 0,
         creditDays: dto.creditDays ?? 30,
+        ...(dto.whatsappConsent !== undefined
+          ? { metadata: withWhatsappConsent({}, dto.whatsappConsent) }
+          : {}),
       },
     });
   }
@@ -146,14 +232,7 @@ export class CustomersService {
     const where = {
       tenantId,
       ...(query.tier && { tier: query.tier }),
-      ...(query.search && {
-        OR: [
-          { firstName: { contains: query.search, mode: 'insensitive' as const } },
-          { lastName: { contains: query.search, mode: 'insensitive' as const } },
-          { phone: { contains: query.search } },
-          { email: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['firstName', 'lastName', 'phone', 'email', 'code']),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -174,7 +253,6 @@ export class CustomersService {
         sales: {
           where: { isReturn: false },
           orderBy: { invoiceDate: 'desc' },
-          take: 20,
           select: {
             id: true,
             invoiceNumber: true,
@@ -183,6 +261,7 @@ export class CustomersService {
             amountPaid: true,
             paymentStatus: true,
             status: true,
+            payments: { select: { method: true, amount: true } },
             _count: { select: { items: true } },
             items: {
               select: {
@@ -248,6 +327,9 @@ export class CustomersService {
     }
     if (dto.dateOfBirth !== undefined) data.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
     if (dto.anniversary !== undefined) data.anniversary = dto.anniversary ? new Date(dto.anniversary) : null;
+    if (dto.whatsappConsent !== undefined) {
+      data.metadata = withWhatsappConsent(customer.metadata, dto.whatsappConsent);
+    }
     if (dto.creditLimit !== undefined && Math.abs(dto.creditLimit - customer.creditLimit) > 0.001) {
       assertFinancialAuthority(actorRoles, 'Changing a credit limit');
       if (dto.creditLimit < customer.creditBalance) {
@@ -267,10 +349,13 @@ export class CustomersService {
       paymentMethod?: string;
       branchId?: string;
       userId?: string;
+      clientRequestId?: string;
+      reference?: string;
       applyFromWallet?: boolean;
       chequeNumber?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      cardLast4?: string;
     },
   ) {
     return this.credit.receiveCreditPayment(id, tenantId, amount, description, opts);
@@ -294,15 +379,105 @@ export class CustomersService {
     });
   }
 
-  async topUpWallet(id: string, tenantId: string, amount: number, description: string) {
+  /**
+   * Manual wallet top-up, always with manager authority (a manager acting, or a manager PIN approval):
+   * - FUNDED: the customer paid. The real payment method is recorded; cash goes into the acting cashier's
+   *   open drawer (or main cash when none is open), and the ledger posts Dr tender / Cr 2400.
+   * - GOODWILL: a non-cash credit from the shop. Posted Dr Customer Goodwill Credits / Cr 2400 — never as
+   *   cash received, never into a drawer.
+   */
+  async topUpWallet(
+    id: string,
+    tenantId: string,
+    dto: WalletTopUpDto,
+    auth: CashAuth,
+    opts: { branchId?: string | null; counterId?: string | null } = {},
+  ) {
     const customer = await this.findOne(id, tenantId);
-    await this.prisma.$transaction([
-      this.prisma.customer.update({ where: { id }, data: { walletBalance: { increment: amount } } }),
-      this.prisma.walletTransaction.create({
-        data: { customerId: id, tenantId, amount, type: 'TOPUP', description },
-      }),
-    ]);
-    return { walletBalance: customer.walletBalance + amount };
+    const actor = await resolveCashActor(this.prisma, { tenantId, ...auth });
+    const kind = dto.kind ?? 'FUNDED';
+    const amount = Math.round(dto.amount * 100) / 100;
+    if (!actor.authorizerId) {
+      throw managerApprovalRequired(
+        kind === 'GOODWILL' ? 'A goodwill wallet credit needs a manager PIN approval' : 'A manual wallet top-up needs a manager PIN approval',
+      );
+    }
+    let method: PaymentMethod | null = null;
+    let cardNote = '';
+    let bankAccountId: string | null = null;
+    if (kind === 'FUNDED') {
+      if (!dto.paymentMethod) throw new BadRequestException('Select how the customer paid (cash, card, QR or bank transfer)');
+      method = dto.paymentMethod;
+      if (method === PaymentMethod.CARD) {
+        const last4 = parseCardLast4(dto.cardLast4);
+        if (!last4) throw new BadRequestException(CARD_LAST4_REQUIRED_MESSAGE);
+        cardNote = ` · Card ${maskCardLast4(last4)}`;
+      }
+      if (method === PaymentMethod.QR || method === PaymentMethod.BANK_TRANSFER) {
+        const bank = dto.bankAccountId
+          ? await this.prisma.bankAccount.findFirst({ where: { id: dto.bankAccountId, tenantId, isActive: true }, select: { id: true } })
+          : null;
+        if (!bank) throw new BadRequestException('Select the bank account the money was paid into');
+        bankAccountId = bank.id;
+      }
+    } else if (dto.paymentMethod || dto.cardLast4 || dto.bankAccountId) {
+      throw new BadRequestException('A goodwill credit is not a payment: do not enter a payment method');
+    }
+
+    const label = kind === 'GOODWILL' ? 'Goodwill wallet credit' : `Wallet top-up · ${method}${cardNote}`;
+    const description = [label, dto.description?.trim(), dto.reference?.trim() ? `Ref ${dto.reference.trim()}` : '']
+      .filter(Boolean)
+      .join(' · ');
+
+    const txn = await this.prisma.$transaction(async (tx) => {
+      await tx.customer.update({ where: { id }, data: { walletBalance: { increment: amount } } });
+      const created = await tx.walletTransaction.create({
+        data: {
+          customerId: id,
+          tenantId,
+          amount,
+          type: kind === 'GOODWILL' ? 'GOODWILL_CREDIT' : 'TOPUP',
+          paymentMethod: method,
+          authorizedById: actor.authorizerId,
+          // QR / bank top-ups keep the shop bank account here (for the ledger); nothing else is stored
+          referenceId: bankAccountId,
+          description,
+        },
+      });
+      // Cash physically received at the till goes into that cashier's open drawer (like a cash sale).
+      if (method === PaymentMethod.CASH && opts.branchId) {
+        const drawer = await resolveOpenDrawerForCashier(tx, tenantId, opts.branchId, actor.actorId);
+        if (drawer) {
+          await tx.cashMovement.create({
+            data: {
+              tenantId,
+              registerId: drawer.id,
+              type: 'SALE',
+              amount,
+              reference: created.id,
+              description: `Wallet top-up · ${customer.firstName}`,
+              createdById: actor.actorId,
+              authorizedById: actor.authorizerId,
+            },
+          });
+        }
+      }
+      return created;
+    });
+
+    this.eventEmitter.emit('accounting.wallet.topup', {
+      tenantId,
+      walletTxnId: txn.id,
+      branchId: opts.branchId ?? undefined,
+      userId: actor.actorId,
+    });
+    return {
+      walletBalance: Math.round((customer.walletBalance + amount) * 100) / 100,
+      transactionId: txn.id,
+      kind,
+      paymentMethod: method,
+      authorizedById: actor.authorizerId,
+    };
   }
 
   async addLoyaltyPoints(id: string, tenantId: string, points: number, description: string) {
@@ -519,6 +694,24 @@ export class CustomersController {
     return this.creditService.getCustomerLedger(id, user.tenantId, startDate, endDate);
   }
 
+  @Get(':id/transaction-history')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'Paginated customer transaction history' })
+  customerTransactionHistory(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query() query: CustomerHistoryQueryDto,
+  ) {
+    return this.creditService.getCustomerTransactionHistory(
+      id,
+      user.tenantId,
+      user.branchId,
+      query.limit,
+      query.cursor,
+      query.recent === 'true',
+    );
+  }
+
   @Get(':id/credit/statement')
   @RequirePermissions('customers:read')
   @ApiOperation({ summary: 'Customer statement (printable AR statement)' })
@@ -560,6 +753,22 @@ export class CustomersController {
     return this.creditService.createCreditNote(id, user.tenantId, body);
   }
 
+  @Get(':id/bank-details')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'Customer bank account details (admins only)' })
+  getBankDetails(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.customersService.getBankDetails(id, user.tenantId);
+  }
+
+  @Put(':id/bank-details')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Save customer bank account details (admins only; all fields empty removes them)' })
+  saveBankDetails(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: CustomerBankDetailsDto) {
+    return this.customersService.saveBankDetails(id, user.tenantId, user.id, dto);
+  }
+
   @Get(':id')
   @RequirePermissions('customers:read')
   findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
@@ -574,13 +783,21 @@ export class CustomersController {
 
   @Post(':id/wallet/topup')
   @RequirePermissions('customers:update')
-  topUpWallet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: WalletTopUpDto) {
-    assertFinancialAuthority(user.roles, 'Manual wallet top-up');
+  topUpWallet(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() body: WalletTopUpDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-cash-approval-token') approvalToken?: string,
+    @Headers('x-pos-counter-id') counterId?: string,
+  ) {
+    // Manager authority comes from the person acting or a manager PIN approval, never the terminal login.
     return this.customersService.topUpWallet(
       id,
       user.tenantId,
-      body.amount,
-      `${body.description ?? 'Manual top-up'} (by ${user.email})`,
+      body,
+      { user: { id: user.id, roles: user.roles ?? [] }, unlockToken, approvalToken },
+      { branchId: user.branchId, counterId },
     );
   }
 
@@ -612,10 +829,13 @@ export class CustomersController {
       {
         paymentMethod: body.paymentMethod,
         applyFromWallet: body.applyFromWallet,
+        clientRequestId: body.clientRequestId,
+        reference: body.reference,
         branchId: user.branchId,
         userId: user.id,
         chequeNumber: body.chequeNumber,
         chequeBankName: body.chequeBankName,
+        cardLast4: body.cardLast4,
         chequeDueDate: body.chequeDueDate,
       },
     );

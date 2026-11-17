@@ -388,8 +388,15 @@ export async function addToLot(
   if (quantity <= 0) return null;
 
   if (lotId) {
+    // The lot must belong to the caller's tenant AND be a lot of this variant at this branch (S-F8):
+    // a foreign or mismatched lot id is refused, never incremented.
+    const owned = await client.inventoryLot.findFirst({
+      where: { id: lotId, tenantId, branchId, variantId },
+      select: { id: true },
+    });
+    if (!owned) throw new BadRequestException('Lot not found for this product at this branch');
     return client.inventoryLot.update({
-      where: { id: lotId },
+      where: { id: owned.id },
       data: {
         quantity: { increment: quantity },
         isActive: true,
@@ -448,6 +455,7 @@ export async function addToLot(
       expiryDate: expiryDate ?? null,
       manufactureDate: manufactureDate ?? null,
       quantity,
+      reservedQty: 0,
       unitCost: unitCost ?? 0,
       referenceType,
       referenceId,

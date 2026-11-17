@@ -273,7 +273,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                   <Input
                     ref={searchRef}
                     className="pl-8 h-9 text-sm"
-                    placeholder="Search name or SKU..."
+                    placeholder="Search name or SKU..." aria-label="Search name or SKU"
                     value={pickerSearch}
                     onChange={(e) => setPickerSearch(e.target.value)}
                   />

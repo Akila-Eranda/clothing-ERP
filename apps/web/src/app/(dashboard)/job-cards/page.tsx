@@ -478,6 +478,7 @@ export default function JobCardsPage() {
             columns={columns}
             searchableColumns={[
               { id: "jobNumber", title: "Job #" },
+              { id: "customerSearch", title: "customer / phone / vehicle", getValue: (r: JobCard) => `${r.customer ? `${r.customer.firstName} ${r.customer.lastName ?? ""} ${r.customer.phone}` : ""} ${r.customerVehicle ? `${r.customerVehicle.registrationNo ?? ""} ${r.customerVehicle.make ?? ""} ${r.customerVehicle.model ?? ""}` : ""}` },
             ]}
             filterableColumns={[
               {

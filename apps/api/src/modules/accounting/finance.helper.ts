@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 /** Pure finance helpers — unit-tested for report accuracy. */
 
@@ -188,6 +189,34 @@ export function assertDistinctTransferAccounts(fromAccountId: string, toAccountI
   if (fromAccountId === toAccountId) {
     throw new BadRequestException('Cannot transfer to the same account');
   }
+}
+
+export function bankTransferRequestFingerprint(input: {
+  tenantId: string;
+  branchId: string;
+  userId: string;
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  txnDate?: string;
+  reference?: string;
+  description?: string;
+  postToGl?: boolean;
+}): string {
+  const txnDate = input.txnDate ? new Date(input.txnDate).toISOString() : null;
+  const canonical = [
+    input.tenantId,
+    input.branchId,
+    input.userId,
+    input.fromAccountId,
+    input.toAccountId,
+    input.amount,
+    txnDate,
+    input.reference || null,
+    input.description || null,
+    input.postToGl !== false,
+  ];
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
 export function isBankInflowType(type: string): boolean {

@@ -123,6 +123,20 @@ export class FilesService {
     try { await fs.unlink(filepath); } catch {}
     return this.prisma.fileUpload.delete({ where: { id } });
   }
+
+  async readByUrl(tenantId: string, url: string): Promise<{ data: Buffer; mimeType: string } | null> {
+    const file = await this.prisma.fileUpload.findFirst({
+      where: { tenantId, url },
+      select: { filename: true, folder: true, mimeType: true },
+    });
+    if (!file) return null;
+    const filepath = path.join(this.uploadDir, tenantId, file.folder ?? '', file.filename);
+    try {
+      return { data: await fs.readFile(filepath), mimeType: file.mimeType };
+    } catch {
+      return null;
+    }
+  }
 }
 
 @ApiTags('Files')

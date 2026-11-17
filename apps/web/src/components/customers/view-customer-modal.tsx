@@ -6,15 +6,22 @@ import {
   X, Phone, Mail, MapPin, Star, Gift, Wallet, Calendar,
   Tag, Loader2, Plus, UserCheck, Car, User, Hash, Wrench, MessageCircle,
   ShoppingBag, CreditCard, FileText,
+  History as HistoryIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
+import { isValidCardLast4, sanitizeCardLast4Input } from "@/lib/card-last4";
+import { checkoutRequestKey, clearCheckoutRequestKey } from "@/lib/pos-checkout-key";
 import { cn, formatNumber } from "@/lib/utils";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { hasShopModule } from "@/lib/shop-vertical";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { CustomerBankDetails } from "./customer-bank-details";
 import type { Customer } from "./add-customer-modal";
 
 interface SaleLine {
@@ -39,6 +46,26 @@ interface SaleItem {
 interface LoyaltyTxn { id: string; points: number; type: string; description?: string | null; createdAt: string }
 interface WalletTxn { id: string; amount: number; type: string; description?: string | null; createdAt: string }
 interface CreditTxn { id: string; amount: number; type: string; description?: string | null; createdAt: string; dueDate?: string | null; status?: string; paidAmount?: number }
+interface CustomerHistoryEntry {
+  id: string;
+  category: string;
+  createdAt: string;
+  amount: number;
+  paymentMethod?: string | null;
+  paymentAmounts?: { method: string; amount: number }[];
+  reference?: string | null;
+  description: string;
+  creditBalanceAfter?: number | null;
+  walletBalanceAfter?: number | null;
+  status?: string | null;
+}
+interface HistoryTotals { sales: number; wallet: number; credit: number; creditLimit: number }
+interface HistoryPageInfo { hasMore: boolean; nextCursor: string | null }
+interface HistoryBranchScope {
+  branchFilterApplied: boolean;
+  walletAndCreditEntriesOmitted: boolean;
+  balancesAreAllBranches: boolean;
+}
 
 interface CustomerVehicleRow {
   id: string; registrationNo?: string | null; make?: string | null; model?: string | null;
@@ -75,7 +102,7 @@ interface FullCustomer extends Customer {
 
 interface Props { customerId: string | null; onClose: () => void; onEdit: (c: Customer) => void; }
 
-type Tab = "overview" | "hire" | "loyalty" | "wallet" | "credit" | "vehicles";
+type Tab = "overview" | "history" | "hire" | "loyalty" | "account" | "vehicles" | "bank";
 
 function fmtDate(d?: string | null) {
   if (!d) return "—";
@@ -104,6 +131,33 @@ function saleItemsSummary(sale: SaleItem) {
   if (!first) return `${count} item${count === 1 ? "" : "s"}`;
   const extra = count > 1 ? ` +${count - 1} more` : "";
   return `${first.productName}${first.variantName ? ` (${first.variantName})` : ""}${extra}`;
+}
+
+const HISTORY_CATEGORY_STYLES: Record<string, { label: string; className: string }> = {
+  SALE: { label: "Sale / invoice", className: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
+  POS_CREDIT_WALLET_PURCHASE: { label: "POS Credit / Wallet purchase", className: "bg-indigo-500/10 text-indigo-700 border-indigo-500/20" },
+  CREDIT: { label: "Credit charge", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  CREDIT_SETTLEMENT: { label: "Credit settlement", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  CREDIT_SETTLEMENT_FROM_WALLET: { label: "Wallet credit settlement", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  CUSTOMER_OVERPAYMENT: { label: "Customer payment / overpayment", className: "bg-teal-500/10 text-teal-700 border-teal-500/20" },
+  CUSTOMER_ADVANCE: { label: "Customer advance", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
+  WALLET_TOP_UP: { label: "Wallet top-up", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
+  AUTHORIZED_ADJUSTMENT: { label: "Authorized adjustment", className: "bg-slate-500/10 text-slate-700 border-slate-500/20" },
+  REVERSAL: { label: "Reversal", className: "bg-red-500/10 text-red-700 border-red-500/20" },
+  WALLET: { label: "Wallet top-up / advance", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
+  WALLET_PAYMENT: { label: "Wallet payment", className: "bg-indigo-500/10 text-indigo-700 border-indigo-500/20" },
+  REFUND_CREDIT: { label: "Refund / credit", className: "bg-rose-500/10 text-rose-700 border-rose-500/20" },
+  EXCHANGE: { label: "Exchange", className: "bg-cyan-500/10 text-cyan-700 border-cyan-500/20" },
+  RETURN_REFUND: { label: "Return / refund", className: "bg-red-500/10 text-red-700 border-red-500/20" },
+  CREDIT_ADJUSTMENT: { label: "Credit adjustment", className: "bg-slate-500/10 text-slate-700 border-slate-500/20" },
+};
+
+function historyAmount(entry: CustomerHistoryEntry) {
+  return entry.category === "CREDIT_SETTLEMENT"
+    || entry.category === "CREDIT_SETTLEMENT_FROM_WALLET"
+    || entry.category === "WALLET_PAYMENT"
+    ? -Math.abs(entry.amount)
+    : entry.amount;
 }
 
 function InfoRow({ icon: Icon, label, value, valueClass }: {
@@ -137,9 +191,20 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const profile = useShopProfile();
   const showLoyalty = hasShopModule(profile, "loyalty");
   const showVehicles = hasShopModule(profile, "vehicles");
+  // Bank details: shop admins only (the API enforces the same rule).
+  const authUser = useAuthStore((st) => st.user);
+  const isShopAdmin = bypassesWorkflowApproval(authUser?.role);
   const showWorkshop = hasShopModule(profile, "workshop");
 
   const [customer, setCustomer] = useState<FullCustomer | null>(null);
+  const [history, setHistory] = useState<CustomerHistoryEntry[]>([]);
+  const [historyTotals, setHistoryTotals] = useState<HistoryTotals | null>(null);
+  const [historyPageInfo, setHistoryPageInfo] = useState<HistoryPageInfo | null>(null);
+  const [historyBranchScope, setHistoryBranchScope] = useState<HistoryBranchScope | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  const [historyMoreLoading, setHistoryMoreLoading] = useState(false);
+  const [historyMoreError, setHistoryMoreError] = useState(false);
   const [vehicles, setVehicles] = useState<CustomerVehicleRow[]>([]);
   const [schedules, setSchedules] = useState<CreditSchedule[]>([]);
   const [repairs, setRepairs] = useState<RepairJob[]>([]);
@@ -148,6 +213,12 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const [loading, setLoading] = useState(false);
   const [pointsInput, setPointsInput] = useState("");
   const [walletInput, setWalletInput] = useState("");
+  // Manual top-up: FUNDED (customer paid — the real method is recorded) or GOODWILL (non-cash shop credit)
+  const [topupKind, setTopupKind] = useState<"FUNDED" | "GOODWILL">("FUNDED");
+  const [topupMethod, setTopupMethod] = useState<"CASH" | "CARD" | "QR" | "BANK_TRANSFER">("CASH");
+  const [topupLast4, setTopupLast4] = useState("");
+  const [topupBankId, setTopupBankId] = useState("");
+  const [topupBanks, setTopupBanks] = useState<{ id: string; name: string; bankName?: string | null }[]>([]);
   const [creditPayInput, setCreditPayInput] = useState("");
   const [creditLimitInput, setCreditLimitInput] = useState("");
   const [creditDaysInput, setCreditDaysInput] = useState("7");
@@ -170,13 +241,58 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     return r.data;
   };
 
+  const loadHistory = async (id: string, cursor?: string, append = false) => {
+    if (append) {
+      setHistoryMoreLoading(true);
+      setHistoryMoreError(false);
+    } else {
+      setHistoryLoading(true);
+      setHistoryError(false);
+    }
+    try {
+      const params = new URLSearchParams({ limit: "50" });
+      if (cursor) params.set("cursor", cursor);
+      const res = await api.get<{
+        entries: CustomerHistoryEntry[];
+        totals: HistoryTotals;
+        pageInfo: HistoryPageInfo;
+        branchScope: HistoryBranchScope;
+      }>(`/customers/${id}/transaction-history?${params.toString()}`);
+      setHistory((previous) => append ? [...previous, ...(res.data?.entries ?? [])] : (res.data?.entries ?? []));
+      setHistoryTotals(res.data?.totals ?? null);
+      setHistoryPageInfo(res.data?.pageInfo ?? null);
+      setHistoryBranchScope(res.data?.branchScope ?? null);
+    } catch (error: unknown) {
+      if (append) {
+        setHistoryMoreError(true);
+      } else {
+        setHistory([]);
+        setHistoryTotals(null);
+        setHistoryPageInfo(null);
+        setHistoryBranchScope(null);
+        setHistoryError(true);
+      }
+      toast.error(error instanceof Error ? error.message : "Failed to load customer transaction history");
+    } finally {
+      if (append) setHistoryMoreLoading(false);
+      else setHistoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!customerId) { setCustomer(null); return; }
     setLoading(true);
     setTab("overview");
+    setHistory([]);
+    setHistoryTotals(null);
+    setHistoryPageInfo(null);
+    setHistoryBranchScope(null);
+    setHistoryError(false);
+    setHistoryMoreError(false);
     loadCustomer(customerId)
       .then(async (c) => {
         const tasks: Promise<void>[] = [
+          loadHistory(c.id),
           api.get<CreditSchedule[]>(`/customers/credit/schedules?customerId=${c.id}`)
             .then((res) => setSchedules(Array.isArray(res.data) ? res.data : []))
             .catch(() => setSchedules([])),
@@ -227,7 +343,8 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
 
   const reloadCustomer = async () => {
     if (!customerId) return;
-    await loadCustomer(customerId);
+    const updated = await loadCustomer(customerId);
+    await loadHistory(updated.id);
   };
 
   const addVehicle = async () => {
@@ -263,16 +380,82 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     finally { setActionLoading(false); }
   };
 
+  useEffect(() => {
+    if (topupKind !== "FUNDED" || (topupMethod !== "QR" && topupMethod !== "BANK_TRANSFER") || topupBanks.length) return;
+    api.get<{ id: string; name: string; bankName?: string | null; isActive?: boolean }[] | { data: { id: string; name: string; bankName?: string | null; isActive?: boolean }[] }>("/accounting/bank-accounts")
+      .then((r) => {
+        const d = r.data as unknown;
+        const list = Array.isArray(d) ? d : ((d as { data?: unknown[] })?.data ?? []);
+        setTopupBanks((list as { id: string; name: string; bankName?: string | null; isActive?: boolean }[]).filter((b) => b.isActive !== false));
+      })
+      .catch(() => setTopupBanks([]));
+  }, [topupKind, topupMethod, topupBanks.length]);
+
   const topupWallet = async () => {
     const amt = parseFloat(walletInput);
     if (!customer || isNaN(amt) || amt <= 0) return;
+    if (topupKind === "FUNDED" && topupMethod === "CARD" && !isValidCardLast4(topupLast4)) { toast.error("Enter the last 4 digits of the card"); return; }
+    if (topupKind === "FUNDED" && (topupMethod === "QR" || topupMethod === "BANK_TRANSFER") && !topupBankId) { toast.error("Select the bank account the money was paid into"); return; }
+    const body = topupKind === "GOODWILL"
+      ? { amount: amt, kind: "GOODWILL" as const }
+      : {
+          amount: amt,
+          kind: "FUNDED" as const,
+          paymentMethod: topupMethod,
+          ...(topupMethod === "CARD" ? { cardLast4: topupLast4 } : {}),
+          ...(topupMethod === "QR" || topupMethod === "BANK_TRANSFER" ? { bankAccountId: topupBankId } : {}),
+        };
     setActionLoading(true);
     try {
-      await api.post(`/customers/${customer.id}/wallet/topup`, { amount: amt, description: "Manual top-up" });
-      toast.success(`LKR ${amt} added to wallet`);
+      // Always needs a manager: acting, or approving with their own PIN (never the terminal login).
+      const topupResult = await withManagerApproval(
+        topupKind === "GOODWILL" ? `Approve goodwill credit of LKR ${formatNumber(amt)}` : `Approve wallet top-up of LKR ${formatNumber(amt)} (${topupMethod})`,
+        (headers) => api.post<{ transactionId: string }>(`/customers/${customer.id}/wallet/topup`, body, headers ? { headers } : undefined),
+      );
+      let settledToCredit = 0;
+      if (topupKind === "FUNDED" && customer.creditBalance > 0) {
+        const settleAmount = Math.min(amt, customer.creditBalance);
+        try {
+          const request = {
+            amount: settleAmount,
+            description: `Automatically settled from wallet top-up ${topupResult.data.transactionId}`,
+            paymentMethod: "WALLET",
+            applyFromWallet: true,
+          };
+          const requestSlot = `customer-payment:${customer.id}` as const;
+          const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
+          const settlement = await api.post<{ appliedToCredit?: number; creditBalance?: number; walletBalance?: number }>(
+            `/customers/${customer.id}/credit/payment`,
+            { ...request, clientRequestId },
+          );
+          clearCheckoutRequestKey(requestSlot);
+          settledToCredit = settlement.data?.appliedToCredit ?? settleAmount;
+          setCustomer((c) => c
+            ? {
+                ...c,
+                creditBalance: settlement.data?.creditBalance ?? Math.max(0, c.creditBalance - settledToCredit),
+                walletBalance: settlement.data?.walletBalance ?? Math.max(0, c.walletBalance + amt - settledToCredit),
+              }
+            : c);
+        } catch (settleError: unknown) {
+          toast.error(`Wallet topped up, but automatic credit settlement failed: ${(settleError as Error).message ?? "try Apply wallet advance to credit"}`);
+        }
+      }
+      toast.success(
+        topupKind === "GOODWILL"
+          ? `Goodwill credit of LKR ${formatNumber(amt)} added`
+          : settledToCredit > 0
+            ? `Wallet +LKR ${formatNumber(amt)} · Credit settled LKR ${formatNumber(settledToCredit)}`
+            : `LKR ${formatNumber(amt)} added to wallet (${topupMethod})`,
+      );
       setWalletInput("");
-      setCustomer((c) => c ? { ...c, walletBalance: c.walletBalance + amt } : c);
-    } catch { toast.error("Failed to top up wallet"); }
+      setTopupLast4("");
+      if (settledToCredit === 0) {
+        setCustomer((c) => c ? { ...c, walletBalance: c.walletBalance + amt } : c);
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof ManagerApprovalCancelled ? "Top-up not approved — nothing was added" : (e as Error).message || "Failed to top up wallet");
+    }
     finally { setActionLoading(false); }
   };
 
@@ -281,11 +464,18 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     if (!customer || isNaN(amt) || amt <= 0) return;
     setActionLoading(true);
     try {
-      const res = await api.post<{ appliedToCredit?: number; advanceToWallet?: number }>(`/customers/${customer.id}/credit/payment`, {
+      const request = {
         amount: amt,
         description: "Credit payment received",
         paymentMethod: "CASH",
+      };
+      const requestSlot = `customer-payment:${customer.id}` as const;
+      const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
+      const res = await api.post<{ appliedToCredit?: number; advanceToWallet?: number }>(`/customers/${customer.id}/credit/payment`, {
+        ...request,
+        clientRequestId,
       });
+      clearCheckoutRequestKey(requestSlot);
       const applied = res.data?.appliedToCredit ?? Math.min(amt, customer.creditBalance);
       const advance = res.data?.advanceToWallet ?? 0;
       toast.success(advance > 0 ? `Settled LKR ${applied} · Advance LKR ${advance} → wallet` : `LKR ${applied} credit payment received`);
@@ -300,11 +490,18 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     const amt = Math.min(customer.creditBalance, customer.walletBalance);
     setActionLoading(true);
     try {
-      await api.post(`/customers/${customer.id}/credit/payment`, {
+      const request = {
         amount: amt,
         description: "Credit settled from wallet advance",
         applyFromWallet: true,
+      };
+      const requestSlot = `customer-payment:${customer.id}` as const;
+      const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
+      await api.post(`/customers/${customer.id}/credit/payment`, {
+        ...request,
+        clientRequestId,
       });
+      clearCheckoutRequestKey(requestSlot);
       toast.success(`Applied LKR ${amt} from wallet to credit`);
       await reloadCustomer();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to apply wallet"); }
@@ -363,13 +560,14 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
 
   const MAIN_TABS: { id: Tab; label: string }[] = [
     { id: "overview", label: "Overview" },
+    { id: "history", label: "Transaction history" },
     { id: "hire", label: `Hire Purchase (${customerSchedules.length})` },
   ];
 
   const EXTRA_TABS: { id: Tab; label: string }[] = [
     ...(showLoyalty ? [{ id: "loyalty" as Tab, label: "Loyalty" }] : []),
-    { id: "wallet", label: "Wallet" },
-    { id: "credit", label: "Credit" },
+    { id: "account", label: "Credit / Wallet" },
+    ...(isShopAdmin ? [{ id: "bank" as Tab, label: "Bank details" }] : []),
     ...(showVehicles ? [{ id: "vehicles" as Tab, label: `Vehicles (${vehicles.length})` }] : []),
   ];
 
@@ -600,6 +798,107 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
             </div>
           )}
 
+          {customer && tab === "history" && (
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="font-semibold flex items-center gap-2"><HistoryIcon className="h-4 w-4 text-primary" /> Customer history (derived view)</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      One chronological view of customer activity. Wallet and credit balances remain separate audited sub-ledgers; this view does not combine or change their accounting balances.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Historical opening balances are shown only when an opening transaction exists; no synthetic opening entry is inferred.
+                    </p>
+                    {historyBranchScope?.walletAndCreditEntriesOmitted && (
+                      <p className="text-xs text-amber-700 mt-2">
+                        This branch-filtered history omits wallet and credit transactions because those records do not store branch attribution. The displayed wallet and credit balances are current all-branch balances.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <div><p className="text-[10px] text-muted-foreground uppercase">Wallet</p><p className="font-bold text-violet-700">{fmtMoney(historyTotals?.wallet ?? customer.walletBalance)}</p></div>
+                    <div><p className="text-[10px] text-muted-foreground uppercase">Outstanding credit</p><p className="font-bold text-amber-700">{fmtMoney(historyTotals?.credit ?? customer.creditBalance)}</p></div>
+                    <div><p className="text-[10px] text-muted-foreground uppercase">Available credit</p><p className="font-bold text-emerald-700">{fmtMoney(Math.max(0, (historyTotals?.creditLimit ?? customer.creditLimit) - (historyTotals?.credit ?? customer.creditBalance)))}</p></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Category legend</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(HISTORY_CATEGORY_STYLES).map(([key, style]) => (
+                    <span key={key} className={cn("rounded-full border px-2.5 py-1 text-[10px] font-semibold", style.className)}>{style.label}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border overflow-hidden bg-card">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[760px]">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {["Date & time", "Category", "Description", "Payment", "Reference", "Amount", "Balance"].map((heading, index) => (
+                          <th key={heading} className={cn("px-3 py-2.5 font-semibold", index >= 5 ? "text-right" : "text-left")}>{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {historyLoading ? (
+                        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">Loading customer transactions…</td></tr>
+                      ) : historyError ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center">
+                            <p className="text-sm text-destructive mb-3">Customer transaction history could not be loaded.</p>
+                            <Button variant="outline" size="sm" onClick={() => void loadHistory(customer.id)}>Retry</Button>
+                          </td>
+                        </tr>
+                      ) : history.length === 0 ? (
+                        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No customer transactions yet</td></tr>
+                      ) : history.map((entry) => {
+                        const style = HISTORY_CATEGORY_STYLES[entry.category] ?? HISTORY_CATEGORY_STYLES.CREDIT_ADJUSTMENT;
+                        const amount = historyAmount(entry);
+                        return (
+                          <tr key={entry.id} className="hover:bg-muted/20">
+                            <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(entry.createdAt).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}</td>
+                            <td className="px-3 py-3"><span className={cn("rounded-full border px-2 py-1 text-[10px] font-semibold whitespace-nowrap", style.className)}>{style.label}</span></td>
+                            <td className="px-3 py-3 text-xs max-w-[220px]">{entry.description}</td>
+                            <td className="px-3 py-3 text-xs">{entry.paymentAmounts?.length
+                              ? entry.paymentAmounts.map((payment) => `${payment.method}: ${fmtMoney(payment.amount)}`).join(", ")
+                              : entry.paymentMethod ?? "—"}</td>
+                            <td className="px-3 py-3 font-mono text-[11px] max-w-[160px] truncate" title={entry.reference ?? undefined}>{entry.reference ?? "—"}</td>
+                            <td className={cn("px-3 py-3 text-right font-bold tabular-nums whitespace-nowrap", amount < 0 ? "text-emerald-600" : "text-foreground")}>{amount > 0 ? "+" : ""}{fmtMoney(amount)}</td>
+                            <td className="px-3 py-3 text-right text-xs tabular-nums whitespace-nowrap">
+                              {[
+                                entry.creditBalanceAfter !== null && entry.creditBalanceAfter !== undefined ? `Credit ${fmtMoney(entry.creditBalanceAfter)}` : null,
+                                entry.walletBalanceAfter !== null && entry.walletBalanceAfter !== undefined ? `Wallet ${fmtMoney(entry.walletBalanceAfter)}` : null,
+                              ].filter(Boolean).join(" · ") || "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {historyMoreError && (
+                <p className="text-sm text-destructive text-center">More customer transactions could not be loaded.</p>
+              )}
+              {historyPageInfo?.hasMore && historyPageInfo.nextCursor && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => void loadHistory(customer.id, historyPageInfo.nextCursor ?? undefined, true)}
+                    disabled={historyMoreLoading}
+                  >
+                    {historyMoreLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {historyMoreError ? "Retry loading more" : "Load more transactions"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {customer && tab === "hire" && (
             <div className="p-5 sm:p-6 space-y-4">
               {customerSchedules.length === 0 ? (
@@ -666,14 +965,58 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
             </div>
           )}
 
-          {customer && tab === "wallet" && (
+          {customer && tab === "account" && (
             <div className="p-5 sm:p-6 space-y-4">
-              <div className="rounded-xl border bg-emerald-500/5 p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Wallet Balance</p>
-                  <p className="text-3xl font-black text-emerald-500">{fmtMoney(customer.walletBalance)}</p>
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-sm font-semibold">Customer Credit / Wallet</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Available wallet balance</p>
+                    <p className="text-2xl font-black text-emerald-600">{fmtMoney(customer.walletBalance)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Outstanding credit (customer debt)</p>
+                    <p className="text-2xl font-black text-amber-600">{fmtMoney(customer.creditBalance)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Credit limit {fmtMoney(customer.creditLimit)} · Available {fmtMoney(Math.max(0, customer.creditLimit - customer.creditBalance))}
+                    </p>
+                  </div>
                 </div>
-                <Wallet className="h-10 w-10 text-emerald-500/30" />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex gap-1.5" role="radiogroup" aria-label="Top-up type">
+                  {(["FUNDED", "GOODWILL"] as const).map((k) => (
+                    <Button key={k} type="button" size="sm" role="radio" aria-checked={topupKind === k}
+                      variant={topupKind === k ? "success" : "chip"} onClick={() => setTopupKind(k)}>
+                      {k === "FUNDED" ? "Customer paid" : "Goodwill credit"}
+                    </Button>
+                  ))}
+                </div>
+                {topupKind === "FUNDED" ? (
+                  <div className="flex gap-1.5">
+                    <select aria-label="Payment method" value={topupMethod}
+                      onChange={(e) => setTopupMethod(e.target.value as typeof topupMethod)}
+                      className="h-9 rounded-lg border border-input bg-card px-2 text-sm">
+                      <option value="CASH">Cash</option>
+                      <option value="CARD">Card</option>
+                      <option value="QR">QR</option>
+                      <option value="BANK_TRANSFER">Bank transfer</option>
+                    </select>
+                    {topupMethod === "CARD" && (
+                      <Input aria-label="Card last 4 digits" inputMode="numeric" maxLength={4} placeholder="Last 4" className="w-24"
+                        value={topupLast4} onChange={(e) => setTopupLast4(sanitizeCardLast4Input(e.target.value))} />
+                    )}
+                    {(topupMethod === "QR" || topupMethod === "BANK_TRANSFER") && (
+                      <select aria-label="Bank account" value={topupBankId} onChange={(e) => setTopupBankId(e.target.value)}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-card px-2 text-sm">
+                        <option value="">{topupBanks.length ? "Paid into…" : "No bank accounts"}</option>
+                        {topupBanks.map((b) => <option key={b.id} value={b.id}>{b.name}{b.bankName ? ` · ${b.bankName}` : ""}</option>)}
+                      </select>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground self-center">A shop credit, not money received. Recorded as a goodwill cost.</p>
+                )}
               </div>
               <div className="flex gap-2">
                 <Input type="number" min={1} step={0.01} placeholder="Top-up amount (LKR)…" value={walletInput}
@@ -699,17 +1042,15 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
             </div>
           )}
 
-          {customer && tab === "credit" && (
+          {customer && tab === "bank" && isShopAdmin && <CustomerBankDetails customerId={customer.id} />}
+
+          {customer && tab === "account" && (
             <div className="p-5 sm:p-6 space-y-4">
-              <div className="rounded-xl border bg-amber-500/5 p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Outstanding Credit</p>
-                  <p className="text-3xl font-black text-amber-500">{fmtMoney(customer.creditBalance)}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    Limit: {fmtMoney(customer.creditLimit)} · Available: {fmtMoney(Math.max(0, customer.creditLimit - customer.creditBalance))}
-                  </p>
-                </div>
-                <UserCheck className="h-10 w-10 text-amber-500/30" />
+              <div className="border-t pt-4">
+                <p className="text-sm font-semibold">Credit payments and allocation</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Payments settle outstanding credit first; any excess is added to the same available wallet balance.
+                </p>
               </div>
               <div className="rounded-xl border p-3 space-y-2">
                 <p className="text-xs font-semibold">Credit Limit</p>
@@ -824,7 +1165,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
               <Button
                 variant="outline"
                 className="gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10"
-                onClick={() => { setTab("credit"); setCreditPayInput(String(customer.creditBalance)); }}
+                onClick={() => { setTab("account"); setCreditPayInput(String(customer.creditBalance)); }}
               >
                 <Wallet className="h-3.5 w-3.5" /> Pay Outstanding
               </Button>

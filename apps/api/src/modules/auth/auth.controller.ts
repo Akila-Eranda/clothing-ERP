@@ -45,7 +45,7 @@ class KcLoginDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'Admin@123456' })
+  @ApiProperty({ example: 'your-password' })
   @IsString()
   password: string;
 }

@@ -10,7 +10,7 @@ A tenant's `shopType` (Prisma enum `ShopType` on `Tenant`) selects a `ShopProfil
 ## The profile is defined in THREE places — keep them identical
 1. `apps/api/src/shared/shop-profiles.ts` — source of truth (backend).
 2. `apps/web/src/lib/shop-profiles.ts` — frontend mirror (same content, different header comment).
-3. `apps/api/prisma/src/shared/shop-profiles.js` — compiled copy used by the seed bundle.
+3. (The seed bundle inlines `src/shared/shop-profiles.ts`; there is no separate compiled copy.)
 After editing, diff 1 vs 2: `diff apps/api/src/shared/shop-profiles.ts apps/web/src/lib/shop-profiles.ts` — only the header comment should differ.
 
 ## Adding a module flag

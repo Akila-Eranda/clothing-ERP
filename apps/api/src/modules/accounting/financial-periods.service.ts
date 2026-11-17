@@ -84,23 +84,26 @@ export class FinancialPeriodsService {
       throw new BadRequestException('End date must be on or after start date');
     }
 
-    const existing = await this.prisma.fiscalYear.findMany({
-      where: { tenantId },
-      select: { id: true, name: true, startDate: true, endDate: true },
-    });
-    if (existing.some((e) => e.name === name)) {
-      throw new BadRequestException(`Fiscal year "${name}" already exists`);
-    }
-    for (const e of existing) {
-      if (datesOverlap(startDate, endDate, e.startDate, e.endDate)) {
-        throw new BadRequestException(`Date range overlaps existing fiscal year "${e.name}"`);
-      }
-    }
-
     const periodDrafts = generateMonthlyPeriods(startDate, endDate);
-    const setCurrent = dto.setCurrent !== false || existing.length === 0;
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtext(${tenantId}), hashtext('fiscal-year-create'))::text
+      `;
+      const existing = await tx.fiscalYear.findMany({
+        where: { tenantId },
+        select: { id: true, name: true, startDate: true, endDate: true },
+      });
+      if (existing.some((e) => e.name === name)) {
+        throw new BadRequestException(`Fiscal year "${name}" already exists`);
+      }
+      for (const e of existing) {
+        if (datesOverlap(startDate, endDate, e.startDate, e.endDate)) {
+          throw new BadRequestException(`Date range overlaps existing fiscal year "${e.name}"`);
+        }
+      }
+      const setCurrent = dto.setCurrent !== false || existing.length === 0;
+
       if (setCurrent) {
         await tx.fiscalYear.updateMany({
           where: { tenantId, isCurrent: true },

@@ -83,3 +83,18 @@ describe('POS idempotency helpers', () => {
     });
   });
 });
+
+describe('saleRequestFingerprint — card last 4 / QR code (Nov 2026)', () => {
+  const base = { items: [{ variantId: 'v1', quantity: 1, unitPrice: 100 }], payments: [{ method: 'CARD', amount: 100, reference: '1234' }] };
+  it('is unchanged for requests without the new fields (older clients / stored fingerprints)', () => {
+    expect(saleRequestFingerprint(base)).toBe(saleRequestFingerprint({ ...base, payments: [{ method: 'CARD', amount: 100, reference: '1234', cardLast4: null, qrCodeId: '' }] }));
+  });
+  it('a different card or QR code is a different request', () => {
+    const a = saleRequestFingerprint({ ...base, payments: [{ method: 'CARD', amount: 100, cardLast4: '1234' }] });
+    const b = saleRequestFingerprint({ ...base, payments: [{ method: 'CARD', amount: 100, cardLast4: '9999' }] });
+    expect(a).not.toBe(b);
+    const q1 = saleRequestFingerprint({ ...base, payments: [{ method: 'QR', amount: 100, qrCodeId: 'qr1' }] });
+    const q2 = saleRequestFingerprint({ ...base, payments: [{ method: 'QR', amount: 100, qrCodeId: 'qr2' }] });
+    expect(q1).not.toBe(q2);
+  });
+});

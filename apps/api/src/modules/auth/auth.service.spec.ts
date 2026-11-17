@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -80,10 +80,30 @@ describe('AuthService', () => {
   describe('login', () => {
     const loginDto = { email: 'test@example.com', password: 'Test@123' };
     const tenantId = 'tenant-1';
+    const shop = 'demo-shop';
+
+    beforeEach(() => {
+      mockPrisma.tenant.findFirst.mockResolvedValue({ id: tenantId });
+    });
+
+    it('rejects a login that is not bound to a shop, before looking up any user', async () => {
+      mockPrisma.user.findFirst.mockClear();
+      await expect(service.login(loginDto, '127.0.0.1', 'test-agent')).rejects.toThrow(BadRequestException);
+      await expect(service.login(loginDto, '127.0.0.1', 'test-agent', '   ')).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.user.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('looks the user up only inside the resolved shop', async () => {
+      mockPrisma.user.findFirst.mockClear().mockResolvedValue(null);
+      await expect(service.login(loginDto, '127.0.0.1', 'test-agent', shop)).rejects.toThrow(UnauthorizedException);
+      expect(mockPrisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ email: loginDto.email, tenantId }),
+      }));
+    });
 
     it('should throw UnauthorizedException if user not found', async () => {
       mockPrisma.user.findFirst.mockResolvedValue(null);
-      await expect(service.login(loginDto, '127.0.0.1', 'test-agent')).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto, '127.0.0.1', 'test-agent', shop)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException if password is wrong', async () => {
@@ -98,7 +118,7 @@ describe('AuthService', () => {
         twoFactorEnabled: false,
         roles: [{ role: { name: 'Admin', type: 'TENANT_ADMIN', permissions: [] } }],
       });
-      await expect(service.login(loginDto, '127.0.0.1', 'test-agent')).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto, '127.0.0.1', 'test-agent', shop)).rejects.toThrow(UnauthorizedException);
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'auth.login.failed',
         expect.objectContaining({ reason: 'invalid_password' }),
@@ -136,7 +156,7 @@ describe('AuthService', () => {
         };
       });
 
-      const result = await service.login(loginDto, '127.0.0.1', 'test-agent');
+      const result = await service.login(loginDto, '127.0.0.1', 'test-agent', shop);
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
@@ -166,8 +186,8 @@ describe('AuthService', () => {
       mockJwtService.signAsync.mockClear();
       mockPrisma.session.create.mockClear();
 
-      await service.login(loginDto, '127.0.0.1', 'tab-1');
-      await service.login(loginDto, '127.0.0.1', 'tab-2');
+      await service.login(loginDto, '127.0.0.1', 'tab-1', shop);
+      await service.login(loginDto, '127.0.0.1', 'tab-2', shop);
 
       const jtis = mockJwtService.signAsync.mock.calls.map((c) => (c[1] as { jwtid?: string }).jwtid);
       expect(jtis).toHaveLength(4); // 2 logins × (access + refresh)

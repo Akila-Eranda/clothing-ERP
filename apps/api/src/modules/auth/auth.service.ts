@@ -54,7 +54,14 @@ export class AuthService {
       throw new ServiceUnavailableException(maintenance.message);
     }
 
-    // Resolve tenantId from slug when provided (multi-tenant isolation)
+    // A shop login is always bound to ONE shop. Without a workspace the lookup below would search
+    // users by email across every shop and could sign into the wrong shop's account. Platform admins
+    // use /auth/platform-login; the web resolves the workspace (x-tenant-id) before calling this.
+    if (!tenantSlug?.trim()) {
+      throw new BadRequestException('Choose your shop workspace to sign in.');
+    }
+
+    // Resolve tenantId from slug (multi-tenant isolation)
     let tenantId: string | undefined;
     if (tenantSlug) {
       const tenant = await this.prisma.tenant.findFirst({

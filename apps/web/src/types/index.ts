@@ -281,6 +281,7 @@ export interface CartItem {
   productKind?: string;
   unit?: string | null;
   allowDecimalSelling?: boolean;
+  scaleBarcodes?: string[];
 }
 
 export interface Payment {

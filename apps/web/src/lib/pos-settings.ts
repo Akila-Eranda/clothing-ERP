@@ -195,6 +195,15 @@ export type PosTenantSettings = {
   roundOff: boolean;
   loyalty: boolean;
   reloadEnabled?: boolean;
+  saveChangeToWalletEnabled?: boolean;
+  saveChangeMin?: number;
+  saveChangeMax?: number | null;
   /** Tenant default POS screen layout — admin selects in Settings → POS */
   posLayout?: PosLayoutId;
+  /** QR payments ABOVE this amount (LKR) have the QR fee deducted by the bank (Settings → POS). */
+  qrFeeThreshold?: number;
+  /** QR fee percentage of the whole QR amount, deducted from what the shop receives (not added to the bill). */
+  qrFeePercent?: number;
+  /** How the shop's label scale encodes digits 8-12 of its EAN-13 labels (Settings -> POS). Unset = AUTO. */
+  scaleBarcodeMode?: "AUTO" | "PRICE" | "WEIGHT";
 };

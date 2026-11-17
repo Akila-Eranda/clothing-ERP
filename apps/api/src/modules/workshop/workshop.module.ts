@@ -20,6 +20,7 @@ import { assertShopModule } from '@/shared/shop-module.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { NotificationsService, NotificationsModule } from '@/modules/notifications/notifications.module';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 
 // ── DTOs ─────────────────────────────────────────────────────
 
@@ -400,10 +401,10 @@ export class WorkshopService {
 
   // ── Tyre serials ────────────────────────────────────────────
 
-  async listTyreSerials(tenantId: string, variantId?: string, status?: TyreSerialStatus) {
+  async listTyreSerials(tenantId: string, variantId?: string, status?: TyreSerialStatus, branchId?: string) {
     await assertShopModule(this.prisma, tenantId, 'workshop');
     return this.prisma.tyreSerial.findMany({
-      where: { tenantId, ...(variantId && { variantId }), ...(status && { status }) },
+      where: { tenantId, ...(branchId && { branchId }), ...(variantId && { variantId }), ...(status && { status }) },
       include: { variant: { include: { product: { include: { brand: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -570,13 +571,16 @@ export class WorkshopController {
   @Get('tyre-serials')
   @RequirePermissions('products:read')
   listSerials(@CurrentUser() user: IAuthUser, @Query('variantId') variantId?: string, @Query('status') status?: TyreSerialStatus) {
-    return this.service.listTyreSerials(user.tenantId, variantId, status);
+    return this.service.listTyreSerials(user.tenantId, variantId, status, resolveBranchScope(user));
   }
 
   @Post('tyre-serials')
   @RequirePermissions('products:create')
   createSerial(@CurrentUser() user: IAuthUser, @Body() dto: CreateTyreSerialDto) {
-    return this.service.createTyreSerial(user.tenantId, dto);
+    return this.service.createTyreSerial(user.tenantId, {
+      ...dto,
+      branchId: resolveBranchScope(user, dto.branchId),
+    });
   }
 
   @Get('reminders')

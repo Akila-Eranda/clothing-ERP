@@ -58,6 +58,14 @@ describe('ensureSystemRoles (new tenants) — default Cashier', () => {
     expect(bm).not.toContain('accounting:update');
   });
 
+  it('lets a Branch Manager ring sales (Step 1B) without granting delete or accounting rights', async () => {
+    const bm = (await grantedByRole()).get('Branch Manager')!;
+    expect(bm).toEqual(expect.arrayContaining(['sales:create', 'sales:read']));
+    for (const denied of ['sales:delete', 'accounting:create', 'accounting:update', 'users:update', 'roles:update']) {
+      expect(bm).not.toContain(denied);
+    }
+  });
+
   it('only grants permissions that exist in the database', () => {
     const defs = systemRoleDefinitions(['sales:create', 'sales:read']);
     for (const d of defs) for (const k of d.permissions) expect(['sales:create', 'sales:read']).toContain(k);

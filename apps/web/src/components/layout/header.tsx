@@ -5,10 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
-  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor, Home, Download,
-} from "lucide-react";
+  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor, Home, Download, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Input } from "@/components/ui/input";
+import { GlobalSearch, type GlobalSearchHandle } from "@/components/layout/global-search";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
@@ -132,7 +131,13 @@ export function Header() {
   const { user, logoutApi } = useAuthStore();
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
-  const searchRef = React.useRef<HTMLInputElement>(null);
+  const searchRef = React.useRef<GlobalSearchHandle>(null);
+  const [searchPanelOpen, setSearchPanelOpen] = React.useState(false);
+  // The inline search box only shows from 1536px (retail-theme.css); below that the icon opens a panel.
+  const openSearch = React.useCallback(() => {
+    if (window.matchMedia("(min-width: 1536px)").matches) searchRef.current?.focus();
+    else setSearchPanelOpen(true);
+  }, []);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
   const [showDesktopDownload, setShowDesktopDownload] = React.useState(true);
@@ -167,7 +172,7 @@ export function Header() {
 
       if (isModKey(e) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        searchRef.current?.focus();
+        openSearch();
         return;
       }
       if (isModKey(e) && e.shiftKey && e.key.toLowerCase() === "p") {
@@ -193,7 +198,7 @@ export function Header() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goProfile, goSettings, handleLogout]);
+  }, [goProfile, goSettings, handleLogout, openSearch]);
 
   const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
@@ -201,9 +206,11 @@ export function Header() {
   const crumbLabel = (index: number) => {
     const fullPath = "/" + breadcrumbs.slice(0, index + 1).join("/");
     const crumb = breadcrumbs[index];
+    // A record id (cuid / uuid) is not a page name: show "Details" instead of "Cmw4lu2qy00t…".
+    const looksLikeId = /^(c[a-z0-9]{20,}|[0-9a-f]{8}-[0-9a-f-]{27,}|[a-z0-9]{24,})$/i.test(crumb) && /\d/.test(crumb);
     return routeLabels[fullPath]
       || routeLabels["/" + crumb]
-      || crumb.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      || (looksLikeId ? "Details" : crumb.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
   };
 
   const currentTitle = breadcrumbs.length > 0
@@ -266,15 +273,7 @@ export function Header() {
 
         {/* ── Center: search ── */}
         <div className="hex-header__search-wrap">
-          <div className="hex-header__search">
-            <Search className="hex-header__search-icon" />
-            <Input
-              ref={searchRef}
-              placeholder="Search products, customers, orders..."
-              className="hex-header__search-input"
-            />
-            <kbd className="hex-header__search-kbd">⌘K</kbd>
-          </div>
+          <GlobalSearch ref={searchRef} />
         </div>
 
         {/* ── Right: actions ── */}
@@ -317,8 +316,8 @@ export function Header() {
           <div className="hex-header__toolbar">
             <button
               type="button"
-              className="hex-header__icon-btn md:hidden"
-              onClick={() => searchRef.current?.focus()}
+              className="hex-header__icon-btn hex-header__search-btn"
+              onClick={openSearch}
               aria-label="Search"
             >
               <Search className="h-[18px] w-[18px]" />
@@ -404,7 +403,7 @@ export function Header() {
                     {getInitials(user?.name || "U")}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hex-header__profile-meta hidden lg:block">
+                <span className="hex-header__profile-meta hidden lg:flex">
                   <span className="hex-header__profile-name">{user?.name || "Admin"}</span>
                   <span className="hex-header__profile-role">{user?.role?.replace(/_/g, " ") || "User"}</span>
                 </span>
@@ -461,6 +460,22 @@ export function Header() {
           </DropdownMenu>
         </div>
       </div>
+
+      {searchPanelOpen && (
+        <div
+          className="absolute inset-x-0 top-full z-50 border-b bg-background shadow-lg"
+          onKeyDown={(e) => { if (e.key === "Escape") setSearchPanelOpen(false); }}
+        >
+          <div className="flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <GlobalSearch variant="panel" autoFocus onNavigate={() => setSearchPanelOpen(false)} />
+            </div>
+            <button type="button" aria-label="Close search" className="hex-header__icon-btn m-3" onClick={() => setSearchPanelOpen(false)}>
+              <X className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />

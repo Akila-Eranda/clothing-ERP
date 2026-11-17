@@ -16,6 +16,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import { parseApiList } from "@/lib/parse-api-list";
@@ -65,11 +66,14 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
         await api.put(`/accounting/expenses/${edit.id}`, body);
         toast.success("Expense updated");
       } else {
-        await api.post("/accounting/expenses", body);
+        await withManagerApproval(`Approve expense of LKR ${body.amount.toLocaleString("en-LK")}`, (headers) =>
+          api.post("/accounting/expenses", body, headers ? { headers } : undefined));
         toast.success("Expense recorded");
       }
       onSaved(); onClose();
-    } catch { toast.error(edit ? "Failed to update" : "Failed to record expense"); }
+    } catch (e: unknown) {
+      toast.error(e instanceof ManagerApprovalCancelled ? "Expense not approved — nothing was recorded" : (e as Error).message || (edit ? "Failed to update" : "Failed to record expense"));
+    }
     finally { setSaving(false); }
   };
 

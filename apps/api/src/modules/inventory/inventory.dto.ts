@@ -1,5 +1,5 @@
 import {
-  IsString, IsOptional, IsNumber, IsEnum, Min, IsArray, ValidateNested,
+  IsString, IsOptional, IsNumber, IsEnum, Min, IsArray, ValidateNested, Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -18,6 +18,8 @@ export class AdjustStockDto {
   @ApiPropertyOptional() @IsOptional() @IsString() lotId?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() unitCost?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() warehouseId?: string;
+  /** Idempotency key (8-64 chars): a retry with the same key returns the first result and adjusts nothing. */
+  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(/^[A-Za-z0-9_-]{8,64}$/) clientRequestId?: string;
 }
 
 export class TransferStatusDto {

@@ -48,7 +48,9 @@ export function systemRoleDefinitions(existingKeys: readonly string[]): SystemRo
       name: 'Branch Manager', type: RoleType.BRANCH_MANAGER, permissions: pick(
         'inventory:read', 'inventory:update',
         'purchases:read', 'purchases:create', 'purchases:update',
-        'sales:read', 'reports:read', 'products:read',
+        // sales:create (Step 1B decision): a Branch Manager can ring sales. This does NOT grant discounts: manual
+        // discounts stay Tenant/Super Admin only until a discount approval policy is configured.
+        'sales:create', 'sales:read', 'reports:read', 'products:read',
         'customers:read', 'customers:create', 'customers:update',
         'cash:read', 'cash:update',
       ),

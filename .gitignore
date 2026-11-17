@@ -71,3 +71,7 @@ test-results/
 apps/desktop/release/
 # Large installer binary — publish with: pnpm desktop:publish then SCP to server
 apps/web/public/downloads/*.exe
+
+# Seed bundle is built (pnpm seed:build / Dockerfile) from prisma/seed.ts, never tracked
+apps/api/prisma/seed.js
+apps/api/prisma/seed.js.map

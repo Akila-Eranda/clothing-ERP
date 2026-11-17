@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { textSearch } from '@/shared/search.helper';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus, ProductKind } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -7,6 +8,11 @@ import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { WorkflowService } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { randomUUID } from 'crypto';
+import { adjustRequestFingerprint, decideAdjustReplay } from './inventory-idempotency.helper';
+import { assertVariantsInTenant } from './tenant-ownership.helper';
+import { assertTransferClaimed } from './transfer-claim.helper';
+import { assertTransferBranchAccess } from './transfer-branch-scope.helper';
+import { isClientRequestIdConflict, normalizeClientRequestId } from '@/modules/pos/pos-idempotency.helper';
 import {
   addToLot,
   applyOutboundLots,
@@ -130,12 +136,7 @@ export class InventoryService {
         where: { id: warehouseId, tenantId, branchId, isActive: true },
       });
       if (!wh) {
-        // Allow cross-check by id alone when branch already validated via transfer
-        const any = await this.prisma.warehouse.findFirst({
-          where: { id: warehouseId, tenantId, isActive: true },
-        });
-        if (!any) throw new NotFoundException('Warehouse not found');
-        return any.id;
+        throw new NotFoundException('Warehouse not found for this branch');
       }
       return wh.id;
     }
@@ -148,18 +149,13 @@ export class InventoryService {
     const where = {
       tenantId,
       ...(branchId && { branchId }),
-      ...(query.search && {
-        variant: {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' as const } },
-            { sku: { contains: query.search, mode: 'insensitive' as const } },
-          ],
-        },
-      }),
+      ...textSearch(query.search, ['variant.name', 'variant.sku', 'variant.barcode', 'variant.product.name', 'variant.product.sku', 'variant.product.barcode', 'variant.product.category.name']),
     };
 
     // Low stock: quantity <= reorderPoint (fallback threshold 5 when reorderPoint unset)
-    if (query.lowStock === true) {
+    // F-21: query strings arrive as text, so `lowStock=true` is the string "true" (was never applied).
+    const lowStock = query.lowStock === true || String(query.lowStock).toLowerCase() === 'true';
+    if (lowStock) {
       const all = await this.prisma.inventory.findMany({
         where,
         include: {
@@ -472,7 +468,21 @@ export class InventoryService {
     const { strategy, blockExpired: tenantBlockExpired, allowNegativeStock } = await this.resolveTenantLotSettings(tenantId);
     const warehouseId = await this.resolveWarehouseId(tenantId, effectiveBranch, dto.warehouseId);
 
+    const clientRequestId = normalizeClientRequestId(dto.clientRequestId);
+    const fingerprint = adjustRequestFingerprint({ ...dto, warehouseId });
+
     const execute = async (client: Prisma.TransactionClient) => {
+      // The variant must be a product of this tenant before any stock, lot or cost row is written (S-F8).
+      await assertVariantsInTenant(client, tenantId, [dto.variantId]);
+      await client.$queryRaw<{ locked: number }[]>`
+        WITH lock_acquired AS MATERIALIZED (
+          SELECT pg_advisory_xact_lock(
+            hashtext(${`inventory-adjust:${tenantId}:${warehouseId}:${dto.variantId}`})
+          )
+        )
+        SELECT 1::int AS locked FROM lock_acquired
+      `;
+      // The advisory lock also serializes first writes, when no inventory row exists to lock yet.
       // Row lock to reduce concurrent oversell under multi-cashier load
       const locked = await client.$queryRaw<{ id: string }[]>`
         SELECT id FROM inventory
@@ -486,6 +496,16 @@ export class InventoryService {
         : await client.inventory.findFirst({
             where: { tenantId, warehouseId, variantId: dto.variantId },
           });
+
+      // Check after both locks so a retry sees the winning request's log row.
+      if (clientRequestId && inventory) {
+        const prior = await client.inventoryLog.findFirst({ where: { tenantId, clientRequestId } });
+        if (prior) {
+          const decision = decideAdjustReplay(prior, { variantId: dto.variantId, branchId: effectiveBranch, fingerprint });
+          if (decision.kind === 'CONFLICT') throw new ConflictException(decision.reason);
+          return Object.assign(inventory, { _lotAllocations: [] as never[], _lotId: prior.lotId ?? null, _replayed: true as const });
+        }
+      }
 
       const currentQty = inventory?.quantity ?? 0;
       const currentReserved = inventory?.reservedQty ?? 0;
@@ -628,8 +648,8 @@ export class InventoryService {
         && dto.unitCost != null
         && dto.unitCost > 0
       ) {
-        await client.productVariant.update({
-          where: { id: dto.variantId },
+        await client.productVariant.updateMany({
+          where: { id: dto.variantId, product: { tenantId } },
           data: { costPrice: dto.unitCost },
         });
       }
@@ -658,6 +678,8 @@ export class InventoryService {
           unitCost: dto.unitCost,
           performedBy: userId,
           correlationId: dto.referenceId ?? undefined,
+          clientRequestId: clientRequestId ?? undefined,
+          requestFingerprint: clientRequestId ? fingerprint : undefined,
         },
       });
 
@@ -688,10 +710,22 @@ export class InventoryService {
         });
       }
 
-      return Object.assign(updated, { _lotAllocations: outboundAllocations });
+      return Object.assign(updated, { _lotAllocations: outboundAllocations, _lotId: primaryLotId ?? null, _replayed: false as const });
     };
 
-    const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
+    let result: Awaited<ReturnType<typeof execute>>;
+    if (tx) {
+      result = await execute(tx);
+    } else {
+      try {
+        result = await this.prisma.$transaction(execute);
+      } catch (e) {
+        if (!(clientRequestId && isClientRequestIdConflict(e))) throw e;
+        // Lost a race against the same key: the winner committed, so replay its result.
+        result = await this.prisma.$transaction(execute);
+      }
+    }
+    if (result._replayed) return result;
 
     if (result.quantity <= (result.reorderPoint > 0 ? result.reorderPoint : result.minStockLevel > 0 ? result.minStockLevel : 5)) {
       this.eventEmitter.emit('inventory.low-stock', {
@@ -1053,6 +1087,11 @@ export class InventoryService {
 
   async createTransfer(tenantId: string, fromBranchId: string, userId: string, dto: CreateTransferDto, userRoles: string[] = []) {
     if (!dto.items?.length) throw new BadRequestException('At least one item is required');
+    // Body ids must be this tenant's (S-F8): variants, and a source branch named in the body.
+    await assertVariantsInTenant(this.prisma, tenantId, dto.items.map((i) => i.variantId));
+    if (dto.fromBranchId && !(await this.prisma.branch.findFirst({ where: { id: dto.fromBranchId, tenantId }, select: { id: true } }))) {
+      throw new NotFoundException('Source branch not found');
+    }
 
     const effectiveFrom = await this.resolveBranchId(tenantId, dto.fromBranchId || fromBranchId);
     if (!effectiveFrom) throw new BadRequestException('Source branch is required');
@@ -1066,6 +1105,9 @@ export class InventoryService {
         where: { id: toWarehouseId, tenantId, isActive: true },
       });
       if (!toWh) throw new NotFoundException('Destination warehouse not found');
+      if (toBranchId && toWh.branchId !== toBranchId) {
+        throw new BadRequestException('Destination warehouse does not belong to the destination branch');
+      }
       toBranchId = toWh.branchId;
       toWarehouseId = toWh.id;
     } else {
@@ -1145,24 +1187,50 @@ export class InventoryService {
     return this.enrichTransfers(transfers);
   }
 
-  async updateTransferStatus(id: string, tenantId: string, status: TransferStatus, userId: string, userRoles: string[] = []) {
+  async updateTransferStatus(
+    id: string,
+    tenantId: string,
+    status: TransferStatus,
+    userId: string,
+    userRoles: string[] = [],
+    actorBranchId?: string,
+  ) {
     const transfer = await this.prisma.stockTransfer.findFirst({
       where: { id, tenantId },
       include: { items: { include: { variant: true } } },
     });
     if (!transfer) throw new NotFoundException('Transfer not found');
+    const canManageAllBranches = bypassesWorkflowApproval(userRoles);
+    assertTransferBranchAccess({
+      status,
+      fromBranchId: transfer.fromBranchId,
+      toBranchId: transfer.toBranchId,
+      actorBranchId,
+      canManageAllBranches,
+    });
+    const branchClaim = canManageAllBranches
+      ? {}
+      : status === TransferStatus.RECEIVED
+        ? { toBranchId: actorBranchId! }
+        : { fromBranchId: actorBranchId! };
 
     if (status === TransferStatus.CANCELLED) {
       if (transfer.status !== TransferStatus.PENDING) {
         throw new BadRequestException('Only pending transfers can be cancelled');
       }
-      return this.prisma.stockTransfer.update({
-        where: { id },
-        data: { status },
-        include: {
-          items: { include: { variant: { include: { product: true } } } },
-          fromBranch: { select: { id: true, name: true, code: true } },
-        },
+      // Conditional claim: a transfer dispatched in the meantime is never cancelled (S-F10).
+      return this.prisma.$transaction(async (tx) => {
+        assertTransferClaimed(await tx.stockTransfer.updateMany({
+          where: { id, tenantId, status: TransferStatus.PENDING, ...branchClaim },
+          data: { status },
+        }), 'cancel');
+        return tx.stockTransfer.findFirstOrThrow({
+          where: { id, tenantId },
+          include: {
+            items: { include: { variant: { include: { product: true } } } },
+            fromBranch: { select: { id: true, name: true, code: true } },
+          },
+        });
       }).then(async (updated) => {
         const [enriched] = await this.enrichTransfers([updated]);
         return enriched;
@@ -1214,6 +1282,11 @@ export class InventoryService {
       }
 
       const updated = await this.prisma.$transaction(async (tx) => {
+        // Claim PENDING -> IN_TRANSIT first: of two simultaneous dispatches only one moves stock (S-F10).
+        assertTransferClaimed(await tx.stockTransfer.updateMany({
+          where: { id, tenantId, status: TransferStatus.PENDING, ...branchClaim },
+          data: { status, dispatchedAt: new Date() },
+        }), 'dispatch');
         for (const item of transfer.items) {
           const result = await this.adjustStock(transfer.tenantId, transfer.fromBranchId, userId, {
             variantId: item.variantId,
@@ -1245,9 +1318,8 @@ export class InventoryService {
           }
         }
 
-        return tx.stockTransfer.update({
-          where: { id },
-          data: { status, dispatchedAt: new Date() },
+        return tx.stockTransfer.findFirstOrThrow({
+          where: { id, tenantId },
           include: {
             items: { include: { variant: { include: { product: true } } } },
             fromBranch: { select: { id: true, name: true, code: true } },
@@ -1267,6 +1339,11 @@ export class InventoryService {
         ?? await this.resolveWarehouseId(transfer.tenantId, transfer.toBranchId);
 
       const updated = await this.prisma.$transaction(async (tx) => {
+        // Claim IN_TRANSIT -> RECEIVED first: of two simultaneous receives only one adds stock (S-F10).
+        assertTransferClaimed(await tx.stockTransfer.updateMany({
+          where: { id, tenantId, status: TransferStatus.IN_TRANSIT, ...branchClaim },
+          data: { status, receivedAt: new Date(), approvedBy: userId },
+        }), 'receive');
         for (const item of transfer.items) {
           const qty = item.sentQty || item.requestedQty;
           const lotRows = await tx.stockTransferLot.findMany({
@@ -1275,6 +1352,20 @@ export class InventoryService {
 
           if (lotRows.length) {
             for (const lr of lotRows) {
+              const sourceLot = lr.fromLotId
+                ? await tx.inventoryLot.findFirst({
+                    where: {
+                      id: lr.fromLotId,
+                      tenantId: transfer.tenantId,
+                      branchId: transfer.fromBranchId,
+                      variantId: item.variantId,
+                    },
+                    select: { unitCost: true },
+                  })
+                : null;
+              if (lr.fromLotId && !sourceLot) {
+                throw new BadRequestException('Source transfer lot is no longer available');
+              }
               await this.adjustStock(transfer.tenantId, transfer.toBranchId, userId, {
                 variantId: item.variantId,
                 quantity: lr.quantity,
@@ -1285,6 +1376,7 @@ export class InventoryService {
                 notes: `Transfer received from warehouse ${transfer.fromWarehouseId ?? transfer.fromBranchId}`,
                 batchNumber: lr.batchNumber ?? undefined,
                 expiryDate: lr.expiryDate?.toISOString(),
+                unitCost: sourceLot?.unitCost ?? undefined,
               }, tx);
               const toLot = await tx.inventoryLot.findFirst({
                 where: {
@@ -1312,6 +1404,15 @@ export class InventoryService {
               }
             }
           } else {
+            const sourceInventory = await tx.inventory.findFirst({
+              where: {
+                tenantId: transfer.tenantId,
+                branchId: transfer.fromBranchId,
+                warehouseId: transfer.fromWarehouseId ?? undefined,
+                variantId: item.variantId,
+              },
+              select: { avgCost: true },
+            });
             await this.adjustStock(transfer.tenantId, transfer.toBranchId, userId, {
               variantId: item.variantId,
               quantity: qty,
@@ -1320,6 +1421,7 @@ export class InventoryService {
               referenceType: 'StockTransfer',
               warehouseId: toWarehouseId,
               notes: `Transfer received from warehouse ${transfer.fromWarehouseId ?? transfer.fromBranchId}`,
+              unitCost: sourceInventory?.avgCost ?? undefined,
             }, tx);
           }
 
@@ -1329,9 +1431,8 @@ export class InventoryService {
           });
         }
 
-        return tx.stockTransfer.update({
-          where: { id },
-          data: { status, receivedAt: new Date(), approvedBy: userId },
+        return tx.stockTransfer.findFirstOrThrow({
+          where: { id, tenantId },
           include: {
             items: { include: { variant: { include: { product: true } } } },
             fromBranch: { select: { id: true, name: true, code: true } },
@@ -1733,9 +1834,13 @@ export class InventoryService {
    * Inventory Engine — create/update opening inventory rows for new variants.
    * Prefer this over direct prisma.inventory writes from Products.
    */
-  async seedOpeningStock(rows: OpeningStockSeed[]): Promise<{ created: number }> {
+  async seedOpeningStock(
+    rows: OpeningStockSeed[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ created: number }> {
     if (!rows.length) return { created: 0 };
-    await this.prisma.inventory.createMany({
+    const client = tx ?? this.prisma;
+    await client.inventory.createMany({
       data: rows.map((r) => ({
         tenantId: r.tenantId,
         branchId: r.branchId,
@@ -1761,6 +1866,7 @@ export class InventoryService {
       minStockLevel?: number;
       maxStockLevel?: number;
     },
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     if (!variantIds.length || !branchIds.length) return;
     const data: Record<string, number> = {};
@@ -1769,7 +1875,8 @@ export class InventoryService {
     if (prefs.minStockLevel != null) data.minStockLevel = prefs.minStockLevel;
     if (prefs.maxStockLevel != null) data.maxStockLevel = prefs.maxStockLevel;
     if (!Object.keys(data).length) return;
-    await this.prisma.inventory.updateMany({
+    const client = tx ?? this.prisma;
+    await client.inventory.updateMany({
       where: { tenantId, variantId: { in: variantIds }, branchId: { in: branchIds } },
       data,
     });

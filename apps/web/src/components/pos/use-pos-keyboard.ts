@@ -4,6 +4,9 @@ import * as React from "react";
 import { toast } from "sonner";
 import type { HeldBillData } from "@/stores/cart-store";
 import { POS_PAY_METHODS, PRODUCT_GRID_COLS } from "./pos-shortcuts";
+import { shouldBlockBrowserDefault } from "@/lib/browser-key-guard";
+import { isPosKeyOwnedByWidget } from "@/lib/pos-key-owner";
+import { captureSaleCompleteScanKey } from "@/lib/pos-sale-complete-scan";
 
 export type PosProductItem = {
   variantId: string;
@@ -234,12 +237,41 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
     const onKey = (e: KeyboardEvent) => {
       const ctx = ctxRef.current;
 
+      // Function keys are POS shortcuts. Never let them reach the browser, whichever panel is open
+      // (Edge: F9 = Reading mode, F7 = caret browsing; F5 reload, F1 help, F3 find).
+      if (shouldBlockBrowserDefault(e.key, true)) e.preventDefault();
+
       // The cashier must acknowledge the customer's change before starting
       // another sale. Swallow every other shortcut while this screen is open.
       if (ctx.saleCompleteOpen) {
         e.preventDefault();
         e.stopPropagation();
-        if (e.key === "F9") ctx.dismissSaleComplete();
+        if (e.key === "F9") {
+          ctx.barcodeBuffer.current = "";
+          clearTimeout(ctx.barcodeTimer.current);
+          ctx.dismissSaleComplete();
+          return;
+        }
+        const now = Date.now();
+        const delta = now - ctx.lastKeyTime.current;
+        ctx.lastKeyTime.current = now;
+        const scan = captureSaleCompleteScanKey(
+          ctx.barcodeBuffer.current,
+          e.key,
+          delta,
+          e.ctrlKey || e.altKey || e.metaKey,
+        );
+        ctx.barcodeBuffer.current = scan.buffer;
+        clearTimeout(ctx.barcodeTimer.current);
+        if (e.key === "Enter") {
+          if (scan.shouldNotify) {
+            toast.info("Barcode scan ignored while payment confirmation is open");
+          }
+        } else {
+          ctx.barcodeTimer.current = setTimeout(() => {
+            ctx.barcodeBuffer.current = "";
+          }, 120);
+        }
         return;
       }
 
@@ -258,6 +290,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (e.key === "Escape") { ctx.closePos(); return; }
         return;
       }
+
+      // An open widget that needs Escape / Enter / arrows itself (e.g. the Quick GRN supplier list) marks its
+      // container with data-pos-own-keys="true"; leave exactly those keys to it (Escape must not close the POS).
+      if (isPosKeyOwnedByWidget(e.target, e.key)) return;
 
       // Cash close owns its own keys; only Esc is handled here as fallback
       if (ctx.showCashClose) {

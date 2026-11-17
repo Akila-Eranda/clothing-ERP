@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Banknote, CalendarDays, FileText, Package, PackageCheck, Plus, Save, Search, ScanLine, Scale, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw, BarChart3 } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarDays, FileText, List, Package, PackageCheck, Plus, Save, Search, ScanLine, Scale, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn, parseQty } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
+import { exactStock, withExactStock } from "@/lib/exact-stock";
+import { useSubmitKey } from "@/lib/submit-key";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { PoProductSalesModal } from "@/components/purchases/po-product-sales-modal";
 import { PoStockBalanceModal, type PoStockBalanceTarget } from "@/components/purchases/po-stock-balance-modal";
@@ -211,6 +213,7 @@ export default function CreatePOPage() {
   const [suppliers,    setSuppliers]    = useState<Supplier[]>([]);
   const [allVariants,  setAllVariants]  = useState<VariantOpt[]>([]);
   const [supplierId,   setSupplierId]   = useState("");
+  const submitKey = useSubmitKey();
   const [supplier,     setSupplier]     = useState<Supplier | null>(null);
   const [expectedDate, setExpectedDate] = useState("");
   const [paymentDueDate, setPaymentDueDate] = useState("");
@@ -240,6 +243,9 @@ export default function CreatePOPage() {
 
   const [productSearchQ, setProductSearchQ] = useState("");
   const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productListEnabled, setProductListEnabled] = useState(true);
+  const [supplierCatalogVisible, setSupplierCatalogVisible] = useState(true);
+  const [supplierCatalogIds, setSupplierCatalogIds] = useState<Set<string>>(new Set());
   const [searchHighlight, setSearchHighlight] = useState(0);
   const [selectedRowIdx, setSelectedRowIdx] = useState<number | null>(null);
   const [supplierCollapsed, setSupplierCollapsed] = useState(false);
@@ -266,7 +272,7 @@ export default function CreatePOPage() {
       productName: item.productName,
       variantName: item.variantName,
       barcode: item.barcode || v?.barcode || null,
-      systemStock: Number(v?.stock ?? 0),
+      systemStock: Number(v?.currentStock ?? v?.stock ?? 0),
     });
   }, []);
 
@@ -274,7 +280,8 @@ export default function CreatePOPage() {
     setAllVariants((prev) => prev.map((v) => {
       if (v.variantId !== variantId) return v;
       const reserved = Number(v.reservedStock ?? 0);
-      return { ...v, stock: newQty, currentStock: newQty, availableStock: Math.max(0, newQty - reserved), status: null };
+      const exact = Math.round((newQty - reserved) * 1000) / 1000;
+      return { ...v, stock: exact, currentStock: newQty, availableStock: exact, status: null };
     }));
   }, []);
 
@@ -299,10 +306,11 @@ export default function CreatePOPage() {
       ]);
       if (reqId !== catalogReqRef.current) return { rows: [], linkedRows: [], fallback: false };
 
+      // PO shows exact stock (negative included), not the POS "available to sell" figure clamped at 0
       const linkedRows = parsePosProducts<VariantOpt>(supplierRes)
         .filter((v) => !v.supplierId || v.supplierId === sid)
-        .map((v) => ({ ...v, supplierId: sid }));
-      const allRows = parsePosProducts<VariantOpt>(allRes);
+        .map((v) => withExactStock({ ...v, supplierId: sid }));
+      const allRows = parsePosProducts<VariantOpt>(allRes).map(withExactStock);
 
       // Prefer linked pricing/meta; keep every other product so Add Products can include unassigned
       const byId = new Map<string, VariantOpt>();
@@ -419,12 +427,15 @@ export default function CreatePOPage() {
     setSearchHighlight(0);
     setSearchOpen(null);
     setSelectedRowIdx(null);
+    setSupplierCatalogVisible(true);
+    setSupplierCatalogIds(new Set());
     if (!fromGrnId) {
       setItems([]);
       setSearchQ([]);
     }
     if (id) {
       const { linkedRows, fallback } = await loadSupplierCatalog(id);
+      setSupplierCatalogIds(new Set(linkedRows.map((v) => v.variantId)));
       // Load all supplier products into Order Lines — user ticks which ones to include on PO
       if (!fromGrnId && !fallback && linkedRows.length > 0) {
         const lines = variantsToOrderLines(linkedRows, false);
@@ -440,6 +451,7 @@ export default function CreatePOPage() {
       catalogReqRef.current += 1;
       setAllVariants([]);
       setCatalogFallback(false);
+      setSupplierCatalogIds(new Set());
       setLoadingProducts(false);
       supplierDetailReqRef.current += 1;
       setLoadingSupplierDetail(false);
@@ -703,7 +715,7 @@ export default function CreatePOPage() {
         sku: d.sku,
         barcode: d.barcode,
         costPrice: d.costPrice,
-        stock: d.stock,
+        stock: exactStock(d),
         size: d.size,
         color: d.color,
         imageUrl: d.imageUrl ?? undefined,
@@ -712,7 +724,7 @@ export default function CreatePOPage() {
         sellingPrice: d.sellingPrice ?? undefined,
         mrp: d.mrp ?? undefined,
         currentStock: d.currentStock ?? undefined,
-        availableStock: d.availableStock ?? undefined,
+        availableStock: exactStock(d),
         reservedStock: d.reservedStock ?? undefined,
         leadTimeDays: d.leadTimeDays ?? undefined,
         lastPurchaseDate: d.lastPurchaseDate ?? undefined,
@@ -762,7 +774,22 @@ export default function CreatePOPage() {
       return;
     }
 
-    // Same product can appear on multiple lines (different buying / selling / MRP / expiry)
+    const existingIdx = items.findIndex((item) => item.variantId === v.variantId);
+    if (existingIdx >= 0) {
+      setItems((p) => p.map((item, index) =>
+        index === existingIdx ? { ...item, includeInPo: true } : item,
+      ));
+      setSelectedRowIdx(existingIdx);
+      setProductSearchOpen(false);
+      setProductSearchQ("");
+      setSearchHighlight(0);
+      productSearchRef.current?.blur();
+      scrollToItems();
+      toast.info(`${v.productName} is already in Order Lines — selected`);
+      return;
+    }
+
+    // Same product can appear on multiple lines only when it is added as a separate line intentionally.
     const newIdx = items.length;
     setItems((p) => [
       ...p,
@@ -824,7 +851,7 @@ export default function CreatePOPage() {
     const matches = filteredVariants(productSearchQ);
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (productSearchQ.trim()) {
+      if (productListEnabled && productSearchQ.trim()) {
         setProductSearchOpen(true);
         setSearchHighlight((h) => Math.min(h + 1, Math.max(matches.length - 1, 0)));
       }
@@ -847,6 +874,17 @@ export default function CreatePOPage() {
 
     const q = (productSearchQ ?? "").trim();
     if (!q) return;
+
+    const exactCode = q.toLowerCase();
+    const exactMatch = allVariants.find((v) =>
+      v.sku.toLowerCase() === exactCode
+      || v.barcode?.toLowerCase() === exactCode
+      || v.supplierProductCode?.toLowerCase() === exactCode,
+    );
+    if (exactMatch) {
+      addVariantToItems(exactMatch);
+      return;
+    }
 
     if (matches.length) {
       const pick = matches[Math.min(searchHighlight, matches.length - 1)] ?? matches[0];
@@ -925,6 +963,8 @@ export default function CreatePOPage() {
         notes: notes || undefined, reference: reference || undefined, paymentTerms,
         fromGrnId: fromGrnId || undefined,
         createAndReceive: createAndReceive || undefined,
+        // same key on retry: the API returns the first PO (and its GRN); nothing is created or received twice
+        clientRequestId: submitKey.current(),
         items: selected.map((i) => ({
           variantId: i.variantId, productName: i.productName, variantName: i.variantName,
           sku: i.sku, orderedQty: i.orderedQty, freeQty: i.freeQty || 0,
@@ -957,6 +997,7 @@ export default function CreatePOPage() {
         grn?: { grnNumber?: string };
         paymentError?: string;
       }>("/purchases", payload);
+      submitKey.reset();
       if (fromGrnId) {
         toast.success(
           fromGrnNumber
@@ -1199,17 +1240,17 @@ export default function CreatePOPage() {
                     disabled={!supplierId || loadingProducts}
                     onChange={(e) => {
                       setProductSearchQ(e.target.value);
-                      setProductSearchOpen(e.target.value.trim().length > 0);
+                      setProductSearchOpen(productListEnabled && e.target.value.trim().length > 0);
                       setSearchHighlight(0);
                     }}
                     onFocus={() => {
-                      if (productSearchQ.trim()) setProductSearchOpen(true);
+                     if (productListEnabled && productSearchQ.trim()) setProductSearchOpen(true);
                     }}
                     onKeyDown={handleBigSearchKeyDown}
                     placeholder={supplierId ? "Search by product name, SKU or scan barcode…" : "Select supplier above first"}
                     className={cn(PO_FIELD, "h-12 pl-10")}
                   />
-                {productSearchOpen && supplierId && productSearchQ.trim().length > 0 && (
+                {productListEnabled && productSearchOpen && supplierId && productSearchQ.trim().length > 0 && (
                   <div className={cn(FORM_DROPDOWN, "z-[100]")}>
                     <div className="max-h-80 overflow-y-auto">
                       {bigMatches.length === 0 ? (
@@ -1260,11 +1301,30 @@ export default function CreatePOPage() {
                   type="button"
                   variant="outline"
                   disabled={!supplierId || loadingProducts}
-                  onClick={() => productSearchRef.current?.focus()}
+                  onClick={() => {
+                    productSearchRef.current?.focus();
+                    if (productListEnabled && productSearchQ.trim()) setProductSearchOpen(true);
+                  }}
                   className={cn("h-12 shrink-0 gap-2", FORM_SCAN_BTN, FORM_OUTLINE_BTN)}
                 >
                   <ScanLine className="h-4 w-4" />
                   Scan Barcode
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!supplierId || loadingProducts}
+                  onClick={() => {
+                    const next = !supplierCatalogVisible;
+                    setSupplierCatalogVisible(next);
+                    setProductListEnabled(next);
+                    setProductSearchOpen(next && productSearchQ.trim().length > 0);
+                  }}
+                  className="h-12 shrink-0 gap-2"
+                  title={supplierCatalogVisible ? "Hide supplier product list" : "Show supplier product list"}
+                >
+                  <List className="h-4 w-4" />
+                  {supplierCatalogVisible ? "Hide List" : "Show List"}
                 </Button>
                 <Button
                   type="button"
@@ -1352,6 +1412,7 @@ export default function CreatePOPage() {
                   </div>
                 ) : (
                   items.map((item, idx) => {
+                    if (!supplierCatalogVisible && supplierCatalogIds.has(item.variantId) && !item.includeInPo) return null;
                     const v = item.variantId ? variantById.get(item.variantId) : undefined;
                     const { total } = calcItem(item);
                     const q = searchQ[idx] ?? "";
@@ -1398,13 +1459,20 @@ export default function CreatePOPage() {
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); openStockBalance(item, v); }}
-                                    className={cn("inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 font-semibold", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
-                                    title="Balance stock"
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 font-semibold",
+                                      FORM_ACCENT_TEXT,
+                                      stock !== null && stock < 0 && "text-rose-600 dark:text-rose-400",
+                                      "hover:bg-primary/10",
+                                    )}
+                                    title="Change stock balance"
                                   >
-                                    <Scale className="h-3 w-3" /> Stock {stock ?? "—"}
+                                    <Scale className="h-3 w-3" /> Stock preview {stock ?? "—"}
                                   </button>
                                 ) : (
-                                  <span>Stock {stock ?? "—"}</span>
+                                  <span className={cn(stock !== null && stock < 0 && "font-semibold text-rose-600 dark:text-rose-400")}>
+                                    Stock preview {stock ?? "—"}
+                                  </span>
                                 )}
                                 {item.size ? ` · ${item.size}` : ""}
                                 {item.color ? ` · ${item.color}` : ""}
@@ -1439,7 +1507,7 @@ export default function CreatePOPage() {
                               onChange={(e) => setSearchQ((p) => p.map((x, i) => (i === idx ? e.target.value : x)))}
                               onFocus={() => setSearchOpen(idx)}
                               onKeyDown={(e) => handleItemSearchKeyDown(idx, e)}
-                              placeholder="Search or scan…"
+                              placeholder="Search or scan…" aria-label="Search or scan"
                               className="h-10 w-full rounded-lg border bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                             {searchOpen === idx && (
@@ -1588,8 +1656,8 @@ export default function CreatePOPage() {
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
                       <th className="px-4 py-3 text-left font-semibold min-w-[280px] max-w-[360px]">Product</th>
                       <th className="px-3 py-3 text-left font-semibold w-36">Barcode</th>
-                      <th className="px-3 py-3 text-right font-semibold w-16">
-                        <span className="inline-flex items-center gap-1 justify-end">Stock <Info className="h-3 w-3" /></span>
+                      <th className="px-3 py-3 text-right font-semibold w-20">
+                        <span className="inline-flex items-center gap-1 justify-end">Stock preview <Info className="h-3 w-3" /></span>
                       </th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Order Qty</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Free Qty</th>
@@ -1604,6 +1672,7 @@ export default function CreatePOPage() {
                   </thead>
                   <tbody className={FORM_TABLE_BODY}>
                     {items.map((item, idx) => {
+                      if (!supplierCatalogVisible && supplierCatalogIds.has(item.variantId) && !item.includeInPo) return null;
                       const v = item.variantId ? variantById.get(item.variantId) : undefined;
                       const { total } = calcItem(item);
                       const q = searchQ[idx] ?? "";
@@ -1678,7 +1747,7 @@ export default function CreatePOPage() {
                                   onChange={(e) => setSearchQ((p) => p.map((x, i) => (i === idx ? e.target.value : x)))}
                                   onFocus={() => setSearchOpen(idx)}
                                   onKeyDown={(e) => handleItemSearchKeyDown(idx, e)}
-                                  placeholder="Search name, SKU, or scan…"
+                                  placeholder="Search name, SKU, or scan…" aria-label="Search name, SKU, or scan"
                                   className="h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                                 {searchOpen === idx && (
@@ -1725,13 +1794,21 @@ export default function CreatePOPage() {
                           <td className="px-3 py-3 font-mono text-xs text-muted-foreground">
                             {item.barcode || v?.barcode || "—"}
                           </td>
-                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground" onClick={(e) => { if (canBalanceStock) e.stopPropagation(); }}>
+                          <td className={cn(
+                            "px-3 py-3 text-right font-semibold tabular-nums",
+                            stock !== null && stock < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground",
+                          )} onClick={(e) => { if (canBalanceStock) e.stopPropagation(); }}>
                             {canBalanceStock && item.variantId ? (
                               <button
                                 type="button"
                                 onClick={() => openStockBalance(item, v)}
-                                className={cn("inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 tabular-nums", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
-                                title="Balance stock (physical count)"
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 tabular-nums",
+                                  FORM_ACCENT_TEXT,
+                                  stock !== null && stock < 0 && "text-rose-600 dark:text-rose-400",
+                                  "hover:bg-primary/10",
+                                )}
+                                title="Change stock balance"
                               >
                                 <Scale className="h-3 w-3" />
                                 {stock ?? "—"}
@@ -2206,7 +2283,7 @@ function SelectedProductPanel({
     ["Brand", dash(variant?.brand)],
     ["Category", dash(variant?.category)],
     ["Barcode", variant?.barcode ?? item.barcode ?? "—"],
-    ["Current Stock", variant?.stock ?? "—"],
+    ["Stock Preview", variant?.stock ?? "—"],
     ["Reserved Stock", variant?.reservedStock ?? "—"],
     ["Available Stock", variant?.availableStock ?? (variant?.stock != null ? variant.stock : "—")],
     ["Last Purchase Date", fmtDate(variant?.lastPurchaseDate)],

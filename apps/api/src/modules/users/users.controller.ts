@@ -1,3 +1,5 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 import {
   Controller, Get, Post, Put, Patch, Delete,
   Body, Param, Query, HttpCode, HttpStatus,
@@ -11,6 +13,11 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { RoleType, UserStatus } from '@prisma/client';
 import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles';
+
+export class PlatformUsersQueryDto extends PaginationDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantId?: string;
+  @ApiPropertyOptional({ description: 'Tenant id or subdomain' }) @IsOptional() @IsString() tenant?: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
@@ -29,11 +36,11 @@ export class UsersController {
   @Roles(...PLATFORM_ADMIN_ROLES)
   @ApiOperation({ summary: 'List all users across tenants (Platform Admin)' })
   findAllPlatform(
-    @Query() query: PaginationDto,
-    @Query('tenantId') tenantId?: string,
-    @Query('tenant') tenant?: string,
+    // Declared in a DTO: separate @Query('tenantId') params were rejected with 400 (forbidNonWhitelisted).
+    @Query() query: PlatformUsersQueryDto,
   ) {
-    return this.usersService.findAllPlatform(query, tenantId || tenant);
+    const { tenantId, tenant, ...page } = query;
+    return this.usersService.findAllPlatform(page, tenantId || tenant);
   }
 
   @Get()

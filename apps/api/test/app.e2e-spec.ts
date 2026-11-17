@@ -1,96 +1,81 @@
-/// <reference path="../node_modules/.pnpm/@types+jest@29.5.14/node_modules/@types/jest/index.d.ts" />
+/**
+ * Smoke test of the FULL AppModule, bootstrapped like main.ts (prefix, URI versioning, pipes,
+ * filters, interceptors). It is the only suite that exercises the real middleware wiring in
+ * app.module.ts. Needs PostgreSQL (DATABASE_URL) and Redis (REDIS_HOST / REDIS_PORT / REDIS_PASSWORD).
+ *
+ * F-33b: the old version referenced a hard-coded pnpm path to @types/jest and did not compile.
+ */
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 
-describe('HexaOne API (e2e)', () => {
+jest.setTimeout(120_000);
+
+describe('HexaOne API smoke (full AppModule)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
+  const run = Date.now().toString(36);
+  const shop = `smoke${run}`;
+  const adminEmail = `owner-${run}@smoke.test`;
+  const adminPassword = `Smoke-${run}-Pass!`;
+  // supertest's default Host (127.0.0.1) would itself count as a shop hint; use a plain host.
+  const http = () => {
+    const agent = request(app.getHttpServer());
+    return {
+      get: (u: string) => agent.get(u).set('Host', 'localhost'),
+      post: (u: string) => agent.post(u).set('Host', 'localhost'),
+    };
+  };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
+    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     app.setGlobalPrefix('api');
-
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
+    app.useGlobalFilters(new HttpExceptionFilter(), new PrismaExceptionFilter());
+    app.useGlobalInterceptors(new ResponseInterceptor());
     await app.init();
   });
 
-  afterAll(async () => {
-    await app.close();
+  afterAll(async () => { await app?.close(); });
+
+  it('GET /api/v1/health → 200 without any tenant', async () => {
+    expect((await http().get('/api/v1/health')).status).toBe(200);
   });
 
-  // ── Health Check ──────────────────────────────────────────
-  describe('GET /api/health', () => {
-    it('should return 200 OK', () => {
-      return request(app.getHttpServer())
-        .get('/api/health')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.status).toBe('ok');
-        });
+  it('registers a new shop without a tenant header', async () => {
+    const res = await http().post('/api/v1/tenants/register').send({
+      companyName: `Smoke ${run}`, subdomain: shop, adminEmail, adminPassword,
+      adminFirstName: 'Smoke', adminLastName: 'Owner', shopType: 'GROCERY',
     });
+    expect(res.status).toBe(201);
   });
 
-  // ── Tenant Registration ───────────────────────────────────
-  describe('POST /api/v1/tenants/register', () => {
-    const registerDto = {
-      companyName: 'Test Fashion Store',
-      subdomain: `test-${Date.now()}`,
-      adminEmail: `admin-${Date.now()}@test.com`,
-      adminPassword: 'Admin@123456',
-      adminFirstName: 'Admin',
-      adminLastName: 'User',
-    };
-
-    it('should register a new tenant', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/tenants/register')
-        .send(registerDto)
-        .expect(201);
-
-      expect(res.body.data.tenant).toBeDefined();
-      expect(res.body.data.tenant.subdomain).toBe(registerDto.subdomain);
-      expect(res.body.data.adminUser.email).toBe(registerDto.adminEmail);
+  it('registration without adminPassword → 400', async () => {
+    const res = await http().post('/api/v1/tenants/register').send({
+      companyName: 'No Pass', subdomain: `nopass${run}`, adminEmail: `nopass-${run}@smoke.test`, adminFirstName: 'No', adminLastName: 'Pass',
     });
-
-    it('should return 400 when adminPassword is missing', () => {
-      return request(app.getHttpServer())
-        .post('/api/v1/tenants/register')
-        .send({
-          companyName: 'No Pass Store',
-          subdomain: `nopass-${Date.now()}`,
-          adminEmail: `nopass-${Date.now()}@test.com`,
-          adminFirstName: 'No',
-          adminLastName: 'Pass',
-        })
-        .expect(400);
-    });
+    expect(res.status).toBe(400);
   });
 
-  // ── Auth Flow ─────────────────────────────────────────────
-  describe('Auth endpoints', () => {
-    let accessToken: string;
-    let refreshToken: string;
+  it('login with no shop → 400; unknown shop → 401; wrong password → 401', async () => {
+    expect((await http().post('/api/v1/auth/login').send({ email: adminEmail, password: adminPassword })).status).toBe(400);
+    expect((await http().post('/api/v1/auth/login').set('x-tenant-id', `ghost${run}`).send({ email: adminEmail, password: adminPassword })).status).toBe(401);
+    expect((await http().post('/api/v1/auth/login').set('x-tenant-id', shop).send({ email: adminEmail, password: 'wrong-password' })).status).toBe(401);
+  });
 
-    const credentials = {
-      email: `user-${Date.now()}@test.com`,
-      password: 'Test@123456',
-    };
-
-    it('should return 401 for invalid credentials', () => {
-      return request(app.getHttpServer())
-        .post('/api/v1/auth/login')
-        .send({ email: 'nonexistent@test.com', password: 'wrong' })
-        .expect(401);
-    });
-
-    // Additional auth tests would be set up with seeded test data
+  it('the new shop admin can sign in and read their own customers; protected routes need a shop', async () => {
+    const login = await http().post('/api/v1/auth/login').set('x-tenant-id', shop).send({ email: adminEmail, password: adminPassword });
+    expect(login.status).toBe(200);
+    const token = login.body.data.accessToken as string;
+    expect(token).toBeTruthy();
+    const own = await http().get('/api/v1/customers').set({ Authorization: `Bearer ${token}`, 'x-tenant-id': shop });
+    expect(own.status).toBe(200);
+    const noShop = await http().get('/api/v1/customers').set({ Authorization: `Bearer ${token}` });
+    expect(noShop.status).toBe(400);
   });
 });

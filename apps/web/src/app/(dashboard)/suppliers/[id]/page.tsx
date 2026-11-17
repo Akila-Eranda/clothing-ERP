@@ -674,7 +674,7 @@ export default function SupplierDetailPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && searchProducts()}
-                    placeholder="Search by product name / SKU / barcode"
+                    placeholder="Search by product name / SKU / barcode" aria-label="Search by product name / SKU / barcode"
                     className="pl-8"
                   />
                 </div>

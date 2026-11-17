@@ -10,9 +10,12 @@ import { modalFooterButtonClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval } from "@/lib/cash-approval";
+import { useSubmitKey } from "@/lib/submit-key";
 import { cn, parseQty } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
+import { exactStock, withExactStock } from "@/lib/exact-stock";
 
 type Supplier = { id: string; name: string; phone?: string | null };
 
@@ -75,7 +78,9 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
   const [chequeBankName, setChequeBankName] = useState("");
   const [payReference, setPayReference] = useState("");
 
+  const submitKey = useSubmitKey();
   const reset = useCallback(() => {
+    submitKey.reset(); // a new GRN
     setSupplierId("");
     setNotes("");
     setItems([]);
@@ -103,7 +108,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     ])
       .then(([supR, prodR]) => {
         setSuppliers(parseApiList<Supplier>(supR.data));
-        setAllVariants(parsePosProducts<VariantOpt>(prodR));
+        setAllVariants(parsePosProducts<VariantOpt>(prodR).map(withExactStock)); // exact stock, negative included
       })
       .catch(() => toast.error("Failed to load GRN form data"))
       .finally(() => setBooting(false));
@@ -119,7 +124,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
       .get<VariantOpt[]>(`/pos/products?supplierId=${encodeURIComponent(supplierId)}&limit=2000`)
       .then((r) => {
         const list = parsePosProducts<VariantOpt>(r);
-        if (list.length > 0) setAllVariants(list);
+        if (list.length > 0) setAllVariants(list.map(withExactStock));
       })
       .catch(() => {});
 
@@ -209,7 +214,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
         sku: d.sku,
         barcode: d.barcode,
         costPrice: d.costPrice,
-        stock: d.stock,
+        stock: exactStock(d),
         lastBuyingPrice: d.lastBuyingPrice,
       });
     } catch {
@@ -289,7 +294,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     }
     setLoading(true);
     try {
-      const res = await api.post<{ grnNumber: string }>("/procurement/grn/quick", {
+      const res = await withManagerApproval("Approve supplier cash payment", (headers) => api.post<{ grnNumber: string }>("/procurement/grn/quick", {
         supplierId,
         notes: notes || undefined,
         lines: items.map((i) => ({
@@ -316,7 +321,10 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
               },
             }
           : {}),
-      });
+        // same key on retry / approval re-send: the API returns the first GRN, stock is not added twice
+        clientRequestId: submitKey.current(),
+      }, headers ? { headers } : undefined));
+      submitKey.reset();
       toast.success(
         payNow
           ? `GRN posted & supplier paid: ${res.data?.grnNumber ?? "OK"}`
@@ -433,7 +441,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                   }}
                   onFocus={() => setSearchOpen(true)}
                   onKeyDown={onSearchKeyDown}
-                  placeholder="Search name, SKU, or scan barcode… press Enter"
+                  placeholder="Search name, SKU, or scan barcode… press Enter" aria-label="Search name, SKU, or scan barcode… press Enter"
                   className="w-full pl-10 pr-10 py-2.5 text-sm border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 {searchOpen && searchQ.trim() && (
@@ -513,7 +521,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                     <thead className="bg-muted/30 border-b">
                       <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
                         <th className="px-3 py-2 text-left font-semibold">Product</th>
-                        <th className="px-3 py-2 text-right font-semibold w-20">Stock</th>
+                        <th className="px-3 py-2 text-right font-semibold w-24">Stock Preview</th>
                         <th className="px-3 py-2 text-right font-semibold w-24">Qty</th>
                         <th className="px-3 py-2 text-right font-semibold w-28">Unit Cost</th>
                         {showExpiry && (
@@ -536,8 +544,17 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                               {item.variantName ? ` · ${item.variantName}` : ""}
                             </p>
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums text-xs">
-                            {item.stock}
+                          <td className="px-3 py-2.5 text-right">
+                            <p
+                              className={cn(
+                                "text-sm font-semibold tabular-nums",
+                                item.stock + item.quantity < 0 && "text-rose-600 dark:text-rose-400",
+                              )}
+                              aria-label={`Stock preview for ${item.productName}`}
+                            >
+                              {item.stock + item.quantity}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Current: {item.stock}</p>
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <input

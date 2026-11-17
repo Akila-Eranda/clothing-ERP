@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Plus, RefreshCw, Layers, CheckCircle2, Ban, Package, Archive,
   TrendingUp, Search, X, Loader2,
@@ -282,23 +282,32 @@ export default function CollectionsPage() {
     }
   };
 
-  const searchProducts = async (q: string) => {
+  // Search audit: debounced, and only the newest response is applied (typing fast used to show stale hits).
+  const productSearchSeq = useRef(0);
+  const productSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchProducts = (q: string) => {
     setProductQuery(q);
-    if (q.trim().length < 2) {
+    if (productSearchTimer.current) clearTimeout(productSearchTimer.current);
+    const term = q.replace(/\s+/g, " ").trim();
+    const mine = ++productSearchSeq.current;
+    if (term.length < 2) {
       setProductHits([]);
+      setSearchingProducts(false);
       return;
     }
     setSearchingProducts(true);
-    try {
-      const res = await api.get<{ data?: { id: string; name: string }[] } | { id: string; name: string }[]>(
-        `/products?limit=25&search=${encodeURIComponent(q.trim())}`,
-      );
-      setProductHits(parseApiList(res.data));
-    } catch {
-      setProductHits([]);
-    } finally {
-      setSearchingProducts(false);
-    }
+    productSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await api.get<{ data?: { id: string; name: string }[] } | { id: string; name: string }[]>(
+          `/products?limit=25&search=${encodeURIComponent(term)}`,
+        );
+        if (mine === productSearchSeq.current) setProductHits(parseApiList(res.data));
+      } catch {
+        if (mine === productSearchSeq.current) setProductHits([]);
+      } finally {
+        if (mine === productSearchSeq.current) setSearchingProducts(false);
+      }
+    }, 300);
   };
 
   const assignProduct = async (productId: string) => {
@@ -547,9 +556,9 @@ export default function CollectionsPage() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-8"
-                  placeholder="Search products…"
+                  placeholder="Search products…" aria-label="Search products"
                   value={productQuery}
-                  onChange={(e) => void searchProducts(e.target.value)}
+                  onChange={(e) => searchProducts(e.target.value)}
                 />
               </div>
               {searchingProducts ? (

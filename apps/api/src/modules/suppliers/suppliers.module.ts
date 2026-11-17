@@ -1,13 +1,16 @@
+import { escapeLike, normalizeSearch, textSearch } from '@/shared/search.helper';
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, Max, MaxLength, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, Max, MaxLength, ValidateNested, Matches, ArrayMinSize, IsNotEmpty } from 'class-validator';
+import { CLIENT_REQUEST_ID_PATTERN, isClientRequestIdConflict, normalizeClientRequestId } from '@/modules/pos/pos-idempotency.helper';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus, PurchaseRequestStatus, SupplierLedgerEntryType } from '@prisma/client';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { PrismaService } from '@/prisma/prisma.service';
+import { NoCardNumber } from '@/shared/security/card-number.validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -16,17 +19,45 @@ import { InventoryService, InventoryModule } from '@/modules/inventory/inventory
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
+import { assertSupplierCashPayable } from '@/shared/cash-register.helper';
+import type { ApTxContext } from './supplier-ap.service';
 import { ProcurementService } from './procurement.service';
 import { SupplierApService } from './supplier-ap.service';
 import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
 import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
+import { sumExactStock } from '@/shared/exact-stock.helper';
+import {
+  isAllowedPurchaseOrderStatusTransition,
+} from './procurement.helper';
+import { assertVariantsInTenant } from '@/modules/inventory/tenant-ownership.helper';
+import { assertSupplierInTenant } from './procurement-ownership.helper';
 import {
   assertSupplierCreditLimit,
   bucketAging,
   computeSupplierOutstanding,
   syncSupplierBalanceWithLedger,
 } from './supplier-ap.helper';
+import {
+  isSupplierLookupQuery,
+  supplierBrowseArgs,
+  supplierBrowseLimit,
+  supplierBrowsePage,
+  supplierLookupArgs,
+  SUPPLIER_BROWSE_MAX_LIMIT,
+  SUPPLIER_LOOKUP_MAX_LIMIT,
+  type SupplierLookupRow,
+} from './supplier-lookup.helper';
+
+/** GET /suppliers/lookup — picker search, or (browse=true) the picker's first page by name. */
+export class SupplierLookupQueryDto {
+  @ApiPropertyOptional({ description: 'At least 2 non-blank characters; matches name, phone or code' })
+  @IsOptional() @IsString() @MaxLength(100) search?: string;
+  @ApiPropertyOptional({ description: `search: 1-${SUPPLIER_LOOKUP_MAX_LIMIT} (default 20); browse: 1-${SUPPLIER_BROWSE_MAX_LIMIT} (default 100)` })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(SUPPLIER_BROWSE_MAX_LIMIT) limit?: number;
+  @ApiPropertyOptional({ description: 'true: first page by name with the shop total ({ data, meta }); search is ignored' })
+  @IsOptional() @Transform(({ obj }) => obj?.browse === true || obj?.browse === 'true' || obj?.browse === '1') @IsBoolean() browse?: boolean;
+}
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -75,11 +106,14 @@ export class PurchaseItemDto {
 export class ReceivePaymentDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) @NoCardNumber() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) @NoCardNumber() chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+  @ApiPropertyOptional({ description: 'Idempotency key for this supplier payment' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class CreatePurchaseOrderDto {
@@ -100,6 +134,9 @@ export class CreatePurchaseOrderDto {
   @ApiPropertyOptional({ type: ReceivePaymentDto, description: 'Optional advance / pay-now against this PO' })
   @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
   payment?: ReceivePaymentDto;
+  @ApiPropertyOptional({ description: 'Idempotency key, one per submit attempt; a retry with the same key returns the first result' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class UpdatePOStatusDto {
@@ -120,16 +157,19 @@ export class ReceivePoBodyDto {
   items: ReceiveItemDto[];
   @ApiPropertyOptional({ type: ReceivePaymentDto }) @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
   payment?: ReceivePaymentDto;
+  @ApiPropertyOptional({ description: 'Idempotency key, one per submit attempt; a retry with the same key returns the first result' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class RecordPaymentDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
   @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) @NoCardNumber() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() paidAt?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) @NoCardNumber() chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
@@ -138,23 +178,49 @@ export class RecordPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() registerCheque?: boolean;
   /** Override cheque face amount when one cheque covers multiple PO payments. */
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0.01) chequeAmount?: number;
+  @ApiPropertyOptional({ description: 'Idempotency key for this supplier payment' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
+}
+
+export class ApplyAdvanceLineDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) purchaseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) invoiceId?: string;
+  @ApiProperty() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0.01) amount: number;
+}
+
+/** Apply the supplier's advance to open bills: explicit per-bill amounts, or one total spread oldest-first. */
+export class ApplySupplierAdvanceDto {
+  @ApiPropertyOptional({ type: [ApplyAdvanceLineDto] }) @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ApplyAdvanceLineDto)
+  allocations?: ApplyAdvanceLineDto[];
+  @ApiPropertyOptional() @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0.01) amount?: number;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) purchaseIds?: string[];
+  @ApiPropertyOptional({ description: 'Idempotency key, one per submit attempt; a retry returns the first result' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) notes?: string;
 }
 
 export class SupplierApPaymentDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiPropertyOptional({ description: 'Pay more than is payable and keep the excess as the supplier advance (default: refused)' })
+  @IsOptional() @IsBoolean() allowAdvance?: boolean;
   @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) method?: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) @NoCardNumber() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() invoiceId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) purchaseIds?: string[];
   @ApiPropertyOptional() @IsOptional() @IsDateString() paidAt?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) @NoCardNumber() chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
   /** Our company bank account (BANK_TRANSFER / CHEQUE) — from Accounting → Banks */
   @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
+  @ApiPropertyOptional({ description: 'Idempotency key for this supplier payment' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class AssignSupplierProductDto {
@@ -177,6 +243,30 @@ export class SuppliersService {
     private readonly numbering: DocumentNumberingService,
   ) {}
 
+  /**
+   * Picker lookup (POS Quick GRN supplier search): ONE tenant-scoped read of the suppliers table returning
+   * id / name / phone / code. No purchase orders, items or invoices are loaded and supplier.balance is never
+   * recalculated or written (unlike findAllSuppliers). Fewer than 2 non-blank characters → empty list, no query.
+   */
+  async lookupSuppliers(tenantId: string, search: string | undefined, limit?: number): Promise<SupplierLookupRow[]> {
+    if (!isSupplierLookupQuery(search)) return [];
+    return this.prisma.supplier.findMany(supplierLookupArgs(tenantId, search as string, limit));
+  }
+
+  /**
+   * Picker first page (POS Quick GRN initial load / Refresh): the first suppliers by name plus the shop's total.
+   * Two reads of the suppliers table only (findMany + count): no purchase orders / invoices, no balance
+   * recalculation, no writes.
+   */
+  async browseSuppliers(tenantId: string, limit?: number) {
+    const take = supplierBrowseLimit(limit);
+    const [rows, total] = await Promise.all([
+      this.prisma.supplier.findMany(supplierBrowseArgs(tenantId, take)) as Promise<SupplierLookupRow[]>,
+      this.prisma.supplier.count({ where: { tenantId } }),
+    ]);
+    return supplierBrowsePage(rows, total, take);
+  }
+
   async createSupplier(tenantId: string, dto: CreateSupplierDto) {
     const code = `SUP-${Date.now().toString(36).toUpperCase()}`;
     return this.prisma.supplier.create({ data: { tenantId, code, ...dto } });
@@ -186,12 +276,7 @@ export class SuppliersService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' as const } },
-          { phone: { contains: query.search } },
-        ],
-      }),
+      ...textSearch(query.search, ['name', 'phone', 'email', 'contactPerson', 'code']),
     };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.supplier.findMany({
@@ -288,6 +373,22 @@ export class SuppliersService {
     dto: CreatePurchaseOrderDto,
     opts?: { permissions?: string[]; roles?: string[] },
   ) {
+    // Retry of a create that already went through (double click, lost response): return that PO.
+    // Nothing is created, received or paid a second time.
+    const clientRequestId = normalizeClientRequestId(dto.clientRequestId);
+    const replay = async () => {
+      if (!clientRequestId) return null;
+      const existing = await this.prisma.purchaseOrder.findFirst({ where: { tenantId, clientRequestId }, select: { id: true, supplierId: true } });
+      if (!existing) return null;
+      if (existing.supplierId !== dto.supplierId) {
+        throw new ConflictException('clientRequestId was already used for a different purchase order');
+      }
+      const grn = await this.prisma.goodsReceipt.findFirst({ where: { tenantId, purchaseId: existing.id }, select: { id: true, grnNumber: true }, orderBy: { createdAt: 'asc' } });
+      return { ...(await this.findOnePO(existing.id, tenantId)), ...(grn ? { grn } : {}), replayed: true };
+    };
+    const earlier = await replay();
+    if (earlier) return earlier;
+
     if (dto.fromGrnId && dto.createAndReceive) {
       throw new BadRequestException('Cannot use createAndReceive together with fromGrnId');
     }
@@ -315,6 +416,10 @@ export class SuppliersService {
         throw new BadRequestException('Cheque due date is required');
       }
     }
+
+    // Supplier and every line variant must be this tenant's before a number is drawn or anything written (S-F8).
+    await assertSupplierInTenant(this.prisma, tenantId, dto.supplierId);
+    await assertVariantsInTenant(this.prisma, tenantId, (dto.items ?? []).map((i) => i.variantId));
 
     const poNumber = this.numbering.isEngineEnabled()
       ? await this.numbering.allocateStandalone(tenantId, 'PURCHASE_ORDER')
@@ -386,6 +491,7 @@ export class SuppliersService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         tenantId, branchId, supplierId: dto.supplierId,
+        clientRequestId,
         poNumber, subtotal, discountAmount, taxAmount,
         total: subtotal - discountAmount + taxAmount,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
@@ -403,20 +509,28 @@ export class SuppliersService {
             : {}),
       } as any,
       include: { items: true, supplier: true },
+    }).catch(async (e) => {
+      // Two identical requests at the same moment: the second loses the unique key race -> return the first PO.
+      if (clientRequestId && isClientRequestIdConflict(e)) {
+        const r = await replay();
+        if (r) return r;
+      }
+      throw e;
     });
+    if ('replayed' in po) return po;
 
     if (grnToLink) {
       await this.prisma.$transaction(async (tx) => {
+        // Link only if the GRN is still unlinked (checked above outside this transaction): the same GRN can
+        // never end up on two purchase orders (its stock was posted once, by the GRN itself).
+        const linked = await tx.goodsReceipt.updateMany({ where: { id: grnToLink!.id, tenantId, purchaseId: null }, data: { purchaseId: po.id } });
+        if (linked.count !== 1) throw new BadRequestException('This GRN is already linked to a purchase order');
         for (const pi of po.items) {
           await tx.purchaseOrderItem.update({
             where: { id: pi.id },
             data: { receivedQty: pi.orderedQty + Math.max(0, (pi as { freeQty?: number }).freeQty ?? 0) },
           });
         }
-        await tx.goodsReceipt.update({
-          where: { id: grnToLink!.id },
-          data: { purchaseId: po.id },
-        });
         for (const gi of grnToLink!.items) {
           const match = po.items.find((pi) => pi.variantId === gi.variantId);
           if (match) {
@@ -434,6 +548,9 @@ export class SuppliersService {
           notes: `PO ${po.poNumber} linked from GRN ${grnToLink!.grnNumber}`,
           createdBy: userId,
         });
+      }).catch(async (e) => {
+        await this.prisma.purchaseOrder.update({ where: { id: po.id }, data: { status: PurchaseOrderStatus.CANCELLED, clientRequestId: null } }).catch(() => undefined);
+        throw e;
       });
     }
 
@@ -465,14 +582,18 @@ export class SuppliersService {
           branchId,
           userId,
           receiveItems,
+          undefined,
+          { clientRequestId: clientRequestId ? `${clientRequestId}-grn` : null },
         );
         createReceiveGrn = received.grn
           ? { id: received.grn.id, grnNumber: received.grn.grnNumber }
           : null;
       } catch (e) {
+        // Nothing was received (the GRN transaction rolled back). Cancel this PO and free its key, so the user
+        // can correct the problem and submit again.
         await this.prisma.purchaseOrder.update({
           where: { id: po.id },
-          data: { status: PurchaseOrderStatus.CANCELLED },
+          data: { status: PurchaseOrderStatus.CANCELLED, clientRequestId: null },
         }).catch(() => undefined);
         throw e;
       }
@@ -491,6 +612,7 @@ export class SuppliersService {
           chequeNumber: dto.payment.chequeNumber,
           chequeDueDate: dto.payment.chequeDueDate,
           chequeBankName: dto.payment.chequeBankName,
+          clientRequestId: dto.payment.clientRequestId,
         });
       } catch (e) {
         if (createReceiveGrn || grnToLink) {
@@ -540,23 +662,21 @@ export class SuppliersService {
     id: string,
     tenantId: string,
     status: PurchaseOrderStatus,
-    userRoles: string[] = [],
   ) {
-    const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
-    if (!po) throw new NotFoundException('Purchase order not found');
-    if (po.status === PurchaseOrderStatus.PENDING_APPROVAL) {
-      throw new BadRequestException('Cannot change status while approval is pending');
-    }
-    if (
-      po.status === PurchaseOrderStatus.DRAFT &&
-      status === PurchaseOrderStatus.CONFIRMED &&
-      !bypassesWorkflowApproval(userRoles)
-    ) {
-      throw new BadRequestException(
-        'Use Submit for Approval to confirm this order. Direct confirmation requires admin access.',
-      );
-    }
-    return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "purchase_orders" WHERE id = ${id} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      const po = await tx.purchaseOrder.findFirst({ where: { id, tenantId } });
+      if (!po) throw new NotFoundException('Purchase order not found');
+      if (!isAllowedPurchaseOrderStatusTransition(po.status, status)) {
+        throw new BadRequestException(`Invalid purchase order status transition: ${po.status} -> ${status}`);
+      }
+      const updated = await tx.purchaseOrder.updateMany({
+        where: { id, tenantId, status: po.status },
+        data: { status },
+      });
+      if (updated.count !== 1) throw new ConflictException('Purchase order status changed concurrently');
+      return tx.purchaseOrder.findFirst({ where: { id, tenantId } });
+    });
   }
 
   async submitPOForApproval(id: string, tenantId: string, userId: string, userRoles: string[]) {
@@ -592,6 +712,8 @@ export class SuppliersService {
     branchId: string,
     userId: string,
     dto: RecordPaymentDto,
+    cash: { authorizedById?: string | null } = {},
+    ctx?: ApTxContext,
   ) {
     // All supplier payments go through unified AP settle (FIFO, allocations, CLOSED, CHEQUE→BANK).
     if (dto.method === PaymentMethod.CHEQUE && !(dto.chequeNumber ?? dto.reference)?.trim()) {
@@ -610,7 +732,8 @@ export class SuppliersService {
       chequeBankName: dto.chequeBankName,
       chequeBankAccountId: dto.chequeBankAccountId,
       bankAccountId: dto.bankAccountId,
-    });
+      clientRequestId: dto.clientRequestId,
+    }, cash, ctx);
   }
 
   async getPayments(supplierId: string, tenantId: string) {
@@ -688,6 +811,16 @@ export class SuppliersService {
     return this.prisma.supplierProductAssignment.delete({ where: { id: existing.id } });
   }
 
+  /** Approval + drawer cash for a payment made with a goods receipt, checked before anything is posted. */
+  assertCashPayable(tenantId: string, branchId: string | null | undefined, actor: { actorId: string; authorizerId: string | null }, payment?: { method?: string | null; amount?: number | null } | null) {
+    return assertSupplierCashPayable(this.prisma, payment, { tenantId, branchId, cashierId: actor.actorId, authorizerId: actor.authorizerId });
+  }
+
+  /** Acting PIN cashier + approving manager (see SupplierApService.resolveCash). */
+  resolveCash(tenantId: string, user: { id: string; roles?: string[] }, unlockToken?: string, approvalToken?: string) {
+    return this.apService.resolveCash(tenantId, user, unlockToken, approvalToken);
+  }
+
   async receiveItems(
     poId: string,
     tenantId: string,
@@ -695,26 +828,41 @@ export class SuppliersService {
     userId: string,
     items: ReceiveItemDto[],
     payment?: ReceivePaymentDto,
+    cash: { authorizedById?: string | null } = {},
+    clientRequestId?: string,
   ) {
-    // Phase 3: PO receive creates a formal GoodsReceipt (GRN from PO) + partial receive status
-    const result = await this.procurementService.receiveFromPurchaseOrder(poId, tenantId, branchId, userId, items);
-    let paymentResult: unknown = null;
-    if (payment && payment.amount > 0) {
-      const po = result.purchaseOrder;
-      if (!po) throw new BadRequestException('Purchase order missing after receive');
-      paymentResult = await this.recordPayment(po.supplierId, tenantId, branchId, userId, {
-        amount: payment.amount,
-        method: payment.method,
-        purchaseId: poId,
-        reference: payment.reference,
-        notes: payment.notes ?? `Payment on GRN ${result.grn?.grnNumber ?? poId}`,
-        chequeNumber: payment.chequeNumber,
-        chequeDueDate: payment.chequeDueDate,
-        chequeBankName: payment.chequeBankName,
-      });
+    // Phase 3: PO receive creates a formal GoodsReceipt (GRN from PO) + partial receive status. A payment
+    // made with the receipt runs INSIDE the GRN transaction: if it fails (approval, drawer cash, validation)
+    // nothing is received and nothing is paid.
+    const after: (() => void)[] = [];
+    let supplierId: string | null = null;
+    const pay = payment && payment.amount > 0 ? payment : null;
+    if (pay) {
+      const po = await this.prisma.purchaseOrder.findFirst({ where: { id: poId, tenantId }, select: { supplierId: true } });
+      if (!po) throw new NotFoundException('Purchase order not found');
+      supplierId = po.supplierId;
     }
+    const result = await this.procurementService.receiveFromPurchaseOrder(
+      poId, tenantId, branchId, userId, items,
+      pay && supplierId
+        ? (tx, g) => this.recordPayment(supplierId!, tenantId, branchId, userId, {
+            amount: pay.amount,
+            method: pay.method,
+            purchaseId: poId,
+            reference: pay.reference,
+            notes: pay.notes ?? `Payment on GRN ${g.grnNumber}`,
+            chequeNumber: pay.chequeNumber,
+            chequeDueDate: pay.chequeDueDate,
+            chequeBankName: pay.chequeBankName,
+            clientRequestId: pay.clientRequestId ?? clientRequestId,
+          }, cash, { tx, after })
+        : undefined,
+      { clientRequestId },
+    );
+    for (const fire of after) fire(); // payment events only once everything committed
+    const paymentResult = result.payment ?? null;
     // Backward-compatible shape for existing UI, plus grn document
-    return { ...result.purchaseOrder, grn: result.grn, payment: paymentResult };
+    return { ...result.purchaseOrder, grn: result.grn, payment: paymentResult, ...('replayed' in result && result.replayed ? { replayed: true } : {}) };
   }
 
   async getReorderSuggestions(tenantId: string, branchId?: string) {
@@ -769,7 +917,7 @@ export class SuppliersService {
     if (end < start) throw new BadRequestException('endDate must be on or after startDate');
 
     const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
-    const search = opts.search?.trim();
+    const search = escapeLike(normalizeSearch(opts.search)); // trimmed; %, _ match literally
     const scopedIds = (opts.variantIds ?? []).filter(Boolean);
 
     const items = await this.prisma.saleItem.findMany({
@@ -910,10 +1058,8 @@ export class SuppliersService {
 
       const stockById = new Map(
         variants.map((v) => {
-          const stock = (v.inventory ?? []).reduce(
-            (s, r) => s + Math.max(0, (r.quantity ?? 0) - (r.reservedQty ?? 0)),
-            0,
-          );
+          // PO planning shows exact stock (negative included), not clamped per row
+          const stock = sumExactStock(v.inventory ?? []);
           return [v.id, { stock, barcode: v.barcode ?? null }] as const;
         }),
       );
@@ -977,6 +1123,15 @@ export class SuppliersController {
   @RequirePermissions('suppliers:read')
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto) {
     return this.suppliersService.findAllSuppliers(user.tenantId, query);
+  }
+
+  // Declared before ':id' so 'lookup' is never read as a supplier id.
+  @Get('lookup')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'Lightweight supplier picker data (id, name, phone, code; no balances): search (min 2 characters) or browse=true (first page + total)' })
+  lookup(@CurrentUser() user: IAuthUser, @Query() query: SupplierLookupQueryDto) {
+    if (query.browse) return this.suppliersService.browseSuppliers(user.tenantId, query.limit);
+    return this.suppliersService.lookupSuppliers(user.tenantId, query.search, query.limit);
   }
 
   // ── Sprint 6 AP ───────────────────────────────────────────────────
@@ -1062,20 +1217,37 @@ export class SuppliersController {
   @Post(':id/ap/payment')
   @RequirePermissions('suppliers:update')
   @ApiOperation({ summary: 'Receive AP payment (FIFO across bills/POs)' })
-  apPayment(
+  async apPayment(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
     @Body() body: SupplierApPaymentDto,
     @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-cash-approval-token') approvalToken?: string,
   ) {
-    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    // The PIN cashier pays; above the cash-out limit a manager's PIN approval authorises it.
+    const actor = await this.apService.resolveCash(user.tenantId, user, unlockToken, approvalToken);
     return this.apService.receivePayment(
       id,
       user.tenantId,
       user.branchId ?? '',
-      cashierId,
+      actor.actorId,
       body,
+      { authorizedById: actor.authorizerId },
     );
+  }
+
+  @Get(':id/ap/advance')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'Supplier payable and advance balance (separately), open bills and the advance history' })
+  apAdvance(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Query('limit') limit?: string) {
+    return this.apService.getAdvanceOverview(id, user.tenantId, limit ? parseInt(limit, 10) : undefined);
+  }
+
+  @Post(':id/ap/advance/apply')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Apply the supplier advance to open bills (no cash moves; idempotent with clientRequestId)' })
+  apApplyAdvance(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: ApplySupplierAdvanceDto) {
+    return this.apService.applyAdvance(id, user.tenantId, user.id, body);
   }
 
   @Post(':id/ap/debit-notes')
@@ -1111,8 +1283,9 @@ export class SuppliersController {
   @Post(':id/payments')
   @RequirePermissions('suppliers:update')
   @ApiOperation({ summary: 'Record a payment to supplier' })
-  recordPayment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: RecordPaymentDto) {
-    return this.suppliersService.recordPayment(id, user.tenantId, user.branchId ?? '', user.id, dto);
+  async recordPayment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: RecordPaymentDto, @Headers('x-pos-cashier-token') unlockToken?: string, @Headers('x-cash-approval-token') approvalToken?: string) {
+    const actor = await this.apService.resolveCash(user.tenantId, user, unlockToken, approvalToken);
+    return this.suppliersService.recordPayment(id, user.tenantId, user.branchId ?? '', actor.actorId, dto, { authorizedById: actor.authorizerId });
   }
 
   @Get(':id/payments')
@@ -1216,24 +1389,32 @@ export class PurchasesController {
     @Param('id') id: string,
     @Body() dto: UpdatePOStatusDto,
   ) {
-    return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status, user.roles);
+    return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status);
   }
 
   @Post(':id/receive')
   @RequirePermissions('purchases:update')
   @ApiOperation({ summary: 'Receive items for a purchase order (optional pay supplier now)' })
-  receiveItems(
+  async receiveItems(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
     @Body() body: ReceivePoBodyDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-cash-approval-token') approvalToken?: string,
   ) {
+    // The PIN cashier receives and pays; a cash payment above the limit needs a manager (acting or PIN
+    // approval) and is checked BEFORE any stock is received.
+    const actor = await this.suppliersService.resolveCash(user.tenantId, user, unlockToken, approvalToken);
+    await this.suppliersService.assertCashPayable(user.tenantId, user.branchId, actor, body.payment);
     return this.suppliersService.receiveItems(
       id,
       user.tenantId,
       user.branchId ?? '',
-      user.id,
+      actor.actorId,
       body.items ?? [],
       body.payment,
+      { authorizedById: actor.authorizerId },
+      body.clientRequestId,
     );
   }
 
@@ -1293,12 +1474,16 @@ export class DirectGrnDto {
   @ApiProperty({ type: [DirectGrnLineDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => DirectGrnLineDto)
   lines: DirectGrnLineDto[];
+  @ApiPropertyOptional({ description: 'Idempotency key, one per submit attempt; a retry with the same key returns the first result' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
 }
 
 export class QuickGrnLineDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
-  @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional({ description: "Omit to receive at the product's existing purchase cost. A different cost needs an inventory / finance role." })
+  @IsOptional() @IsNumber() @Min(0) unitCost?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
@@ -1311,6 +1496,21 @@ export class QuickGrnDto {
   lines: QuickGrnLineDto[];
   @ApiPropertyOptional({ type: ReceivePaymentDto }) @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
   payment?: ReceivePaymentDto;
+  @ApiPropertyOptional({ description: 'Idempotency key, one per submit attempt; a retry with the same key returns the first result' })
+  @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId?: string;
+}
+
+/** One supplier return line (S-F7): quantity > 0 (3 dp, kg goods), unit cost >= 0, ids required. */
+export class SupplierReturnLineDto {
+  @ApiProperty() @IsString() @IsNotEmpty() variantId: string;
+  @ApiProperty() @IsString() @MaxLength(200) productName: string;
+  @ApiProperty() @IsString() @MaxLength(100) sku: string;
+  @ApiProperty() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 3 }) @Min(0.001) @Max(1_000_000_000) quantity: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(0) @Max(1_000_000_000) unitCost?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() lotId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) batchNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }
 
 export class CreateSupplierReturnDto {
@@ -1319,10 +1519,9 @@ export class CreateSupplierReturnDto {
   @ApiPropertyOptional() @IsOptional() @IsString() goodsReceiptId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiProperty({ type: 'array' }) @IsArray() items: {
-    variantId: string; productName: string; sku: string; quantity: number;
-    unitCost?: number; lotId?: string; batchNumber?: string; reason?: string;
-  }[];
+  @ApiProperty({ type: () => [SupplierReturnLineDto] })
+  @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => SupplierReturnLineDto)
+  items: SupplierReturnLineDto[];
 }
 
 export class CreateSupplierInvoiceDto {
@@ -1332,8 +1531,8 @@ export class CreateSupplierInvoiceDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() dueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() goodsReceiptId?: string;
-  @ApiProperty() @IsNumber() @Min(0) subtotal: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() taxAmount?: number;
+  @ApiProperty() @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(0) @Max(1_000_000_000) subtotal: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(0) @Max(1_000_000_000) taxAmount?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() post?: boolean;
 }
@@ -1341,9 +1540,9 @@ export class CreateSupplierInvoiceDto {
 export class PayInvoiceDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) @NoCardNumber() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) @NoCardNumber() chequeNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
@@ -1405,15 +1604,20 @@ export class ProcurementController {
   @Post('grn/direct')
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Direct GRN without purchase order' })
-  directGrn(@CurrentUser() user: IAuthUser, @Body() dto: DirectGrnDto) {
-    return this.procurement.createDirectGrn(user.tenantId, user.branchId ?? '', user.id, dto);
+  async directGrn(@CurrentUser() user: IAuthUser, @Body() dto: DirectGrnDto, @Headers('x-pos-cashier-token') unlockToken?: string) {
+    const actor = await this.procurement.resolveCash(user.tenantId, user, unlockToken);
+    return this.procurement.createDirectGrn(user.tenantId, user.branchId ?? '', actor.actorId, dto, actor.actorRoles);
   }
 
   @Post('grn/quick')
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Quick GRN for cashier / walk-in supplier stock' })
-  quickGrn(@CurrentUser() user: IAuthUser, @Body() dto: QuickGrnDto) {
-    return this.procurement.createQuickGrn(user.tenantId, user.branchId ?? '', user.id, dto);
+  async quickGrn(@CurrentUser() user: IAuthUser, @Body() dto: QuickGrnDto, @Headers('x-pos-cashier-token') unlockToken?: string, @Headers('x-cash-approval-token') approvalToken?: string) {
+    // Approval + drawer cash checked before the GRN posts stock; the payment itself then runs inside the
+    // GRN transaction (all or nothing).
+    const actor = await this.procurement.resolveCash(user.tenantId, user, unlockToken, approvalToken);
+    await this.procurement.assertCashPayable(user.tenantId, user.branchId, actor, dto.payment);
+    return this.procurement.createQuickGrn(user.tenantId, user.branchId ?? '', actor.actorId, dto, { authorizedById: actor.authorizerId }, actor.actorRoles);
   }
 
   // Supplier Returns
@@ -1456,8 +1660,9 @@ export class ProcurementController {
 
   @Post('supplier-invoices/:id/pay')
   @RequirePermissions('purchases:update')
-  payInvoice(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: PayInvoiceDto) {
-    return this.procurement.paySupplierInvoice(id, user.tenantId, user.branchId ?? '', user.id, dto);
+  async payInvoice(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: PayInvoiceDto, @Headers('x-pos-cashier-token') unlockToken?: string, @Headers('x-cash-approval-token') approvalToken?: string) {
+    const actor = await this.procurement.resolveCash(user.tenantId, user, unlockToken, approvalToken);
+    return this.procurement.paySupplierInvoice(id, user.tenantId, user.branchId ?? '', actor.actorId, dto, { authorizedById: actor.authorizerId });
   }
 }
 

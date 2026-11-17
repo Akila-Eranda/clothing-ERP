@@ -3,6 +3,8 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { fontMono, fontSans } from "@/lib/fonts";
 import { Toaster } from "sonner";
+import { ManagerApprovalHost } from "@/components/cash/manager-approval-host";
+import { BrowserKeyGuard } from "@/components/providers/browser-key-guard";
 import "./globals.css";
 import "./retail-theme.css";
 import "./pos-layouts.css";
@@ -53,6 +55,8 @@ export default function RootLayout({
         >
           <QueryProvider>
             {children}
+            <ManagerApprovalHost />
+            <BrowserKeyGuard />
             <Toaster
               position="top-right"
               richColors

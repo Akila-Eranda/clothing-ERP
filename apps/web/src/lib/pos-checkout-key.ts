@@ -1,5 +1,5 @@
 /**
- * POS sale idempotency key (clientRequestId).
+ * POS sale and customer payment idempotency keys (clientRequestId).
  *
  * One key per checkout attempt, kept in localStorage next to a signature of what is being
  * charged. Retrying the same cart + payments (double click, timeout, page reload after a lost
@@ -10,7 +10,7 @@
 const STORAGE_PREFIX = "fe_pos_checkout_key";
 
 /** Separate slots so a Quick Pay reload never overwrites the pending key of the main cart. */
-export type CheckoutKeySlot = "sale" | "reload";
+export type CheckoutKeySlot = "sale" | "reload" | `customer-payment:${string}`;
 const storageKey = (slot: CheckoutKeySlot) => `${STORAGE_PREFIX}:${slot}`;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 

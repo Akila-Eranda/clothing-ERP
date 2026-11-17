@@ -11,8 +11,10 @@ import * as path from 'path';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '@/prisma/prisma.service';
 import { NotificationChannel, NotificationType } from '@prisma/client';
-import { WhatsappSendBillDto, WhatsappSendDto } from './whatsapp.dto';
+import { WhatsappSendBillDto, WhatsappSendDto, WhatsappSendSaleBillDto } from './whatsapp.dto';
+import { buildSaleBillMessage } from '@/shared/sale-bill-message';
 import { toWhatsappJid } from './whatsapp-phone.util';
+import { assertWhatsappConnectAllowed } from './whatsapp-connect.guard';
 import type { WhatsappConnectionStatus, WhatsappStatusResponse } from './whatsapp.types';
 
 type SessionState = {
@@ -179,6 +181,7 @@ export class WhatsappService implements OnModuleDestroy {
   }
 
   async connect(tenantId: string): Promise<WhatsappStatusResponse> {
+    assertWhatsappConnectAllowed(this.config.get<string>('app.env'));
     const session = this.getOrCreate(tenantId);
     if (session.status === 'connected' && session.sock) {
       return this.getStatus(tenantId);
@@ -464,7 +467,13 @@ export class WhatsappService implements OnModuleDestroy {
     return this.getStatus(tenantId);
   }
 
-  async sendText(tenantId: string, userId: string, dto: WhatsappSendDto) {
+  async sendText(
+    tenantId: string,
+    userId: string,
+    dto: WhatsappSendDto,
+    options: { recordNotification?: boolean } = {},
+  ) {
+    assertWhatsappConnectAllowed(this.config.get<string>('app.env'));
     const session = this.getOrCreate(tenantId);
     if (session.status !== 'connected' || !session.sock) {
       throw new BadRequestException(
@@ -473,18 +482,28 @@ export class WhatsappService implements OnModuleDestroy {
     }
     const jid = toWhatsappJid(dto.phone);
     await session.sock.sendMessage(jid, { text: dto.message });
-    await this.prisma.notification.create({
-      data: {
-        tenantId,
-        title: 'WhatsApp message',
-        message: `[${dto.phone}] ${dto.message.slice(0, 200)}`,
-        type: NotificationType.INFO,
-        channel: NotificationChannel.WHATSAPP,
-        recipients: [userId],
-        data: { phone: dto.phone, status: 'sent', kind: 'text' },
-      },
-    });
+    if (options.recordNotification !== false) {
+      await this.prisma.notification.create({
+        data: {
+          tenantId,
+          title: 'WhatsApp message',
+          message: `[${dto.phone}] ${dto.message.slice(0, 200)}`,
+          type: NotificationType.INFO,
+          channel: NotificationChannel.WHATSAPP,
+          recipients: [userId],
+          data: { phone: dto.phone, status: 'sent', kind: 'text' },
+        },
+      });
+    }
     return { ok: true, phone: dto.phone };
+  }
+
+  /** Sends the same text the "copy bill message" button shows: shop template + real invoice + current credit balance. */
+  async sendSaleBill(tenantId: string, userId: string, dto: WhatsappSendSaleBillDto) {
+    const built = await buildSaleBillMessage(this.prisma, tenantId, dto.saleId);
+    const phone = (dto.phone ?? built.phone ?? '').trim();
+    if (!phone) throw new BadRequestException('This sale has no customer phone number');
+    return this.sendText(tenantId, userId, { phone, message: built.message });
   }
 
   async sendBill(tenantId: string, userId: string, dto: WhatsappSendBillDto) {

@@ -241,7 +241,7 @@ export function PromotionsHub() {
   const filtered = useMemo(() => {
     return promos.filter((p) => {
       const status = getPromoStatus(p);
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       const matchesSearch =
         p.name.toLowerCase().includes(q) ||
         (p.couponCode ?? "").toLowerCase().includes(q) ||
@@ -506,7 +506,7 @@ export function PromotionsHub() {
               <div className="relative flex-1 min-w-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
-                  placeholder="Search name, code, description…"
+                  placeholder="Search name, code, description…" aria-label="Search name, code, description"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9 h-8 text-xs bg-background"

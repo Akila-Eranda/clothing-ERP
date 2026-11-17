@@ -204,6 +204,13 @@ export class InventoryController {
     @Param('id') id: string,
     @Body() body: TransferStatusDto,
   ) {
-    return this.inventoryService.updateTransferStatus(id, user.tenantId, body.status, user.id, user.roles);
+    return this.inventoryService.updateTransferStatus(
+      id,
+      user.tenantId,
+      body.status,
+      user.id,
+      user.roles,
+      user.branchId,
+    );
   }
 }

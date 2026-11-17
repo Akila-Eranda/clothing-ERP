@@ -238,7 +238,7 @@ export function WarehouseTransferModal({ open, onClose, onCreated, warehouses, d
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                       <Input
                         className="h-8 pl-8 text-xs"
-                        placeholder="Search product / SKU…"
+                        placeholder="Search product / SKU…" aria-label="Search product / SKU"
                         value={pickerSearch}
                         onChange={(e) => setPickerSearch(e.target.value)}
                         autoFocus

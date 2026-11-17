@@ -219,13 +219,17 @@ describe('POS price guard & decimal quantities (integration)', () => {
       expect(await saleCount()).toBe(count);
     });
 
-    it('rejects a line discount that pushes the net price below cost', async () => {
+    it('a Cashier cannot apply a manual line discount at all while the approval policy is not configured (so none can push the net price below cost)', async () => {
+      const stock = await onHand(milk);
+      const count = await saleCount();
       await expect(
         pos.createSale(
           tenantId, branchId, cashierId,
           saleDto([line(milk, 2, 100, { discount: 50, discountType: 'FIXED' })]),
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(/Manual discounts require an approved manager workflow/);
+      expect(await onHand(milk)).toBe(stock);   // nothing sold, nothing deducted
+      expect(await saleCount()).toBe(count);
     });
 
     it('rejects a price above MRP', async () => {
@@ -252,12 +256,44 @@ describe('POS price guard & decimal quantities (integration)', () => {
       expect(item.costPrice).toBe(80);
     });
 
-    it('lets a manager sell above MRP and records it', async () => {
-      const sale = await pos.createSale(tenantId, branchId, managerId, saleDto([line(milk, 1, 130)]));
+    it('an authorised manager may sell above MRP only WITH a reason; the sale and an audit record carry user, reason and details', async () => {
+      const count = await saleCount();
+      const stock = await onHand(milk);
+      // no reason -> refused, nothing written
+      await expect(pos.createSale(tenantId, branchId, managerId, saleDto([line(milk, 1, 130)]))).rejects.toThrow(/needs a reason/);
+      await expect(
+        pos.createSale(tenantId, branchId, managerId, { ...saleDto([line(milk, 1, 130)]), priceOverrideReason: '   ' } as CreateSaleDto),
+      ).rejects.toThrow(/needs a reason/);
+      expect(await saleCount()).toBe(count);
+      expect(await onHand(milk)).toBe(stock);
+      expect(await prisma.auditLog.count({ where: { tenantId, resource: 'SalePriceOverride' } })).toBe(0);
+
+      const sale = await pos.createSale(tenantId, branchId, managerId, { ...saleDto([line(milk, 1, 130)]), priceOverrideReason: ' price tag misprinted ' } as CreateSaleDto);
       const row = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } });
-      expect((row.metadata as { priceOverrides?: Array<{ kind: string }> }).priceOverrides?.[0].kind).toBe(
-        'ABOVE_MAX_PRICE',
-      );
+      const overrides = (row.metadata as { priceOverrides?: Array<{ kind: string; overriddenBy?: string; reason?: string }> }).priceOverrides;
+      expect(overrides?.[0]).toMatchObject({ kind: 'ABOVE_MAX_PRICE', overriddenBy: managerId, reason: 'price tag misprinted' });
+      const audit = await prisma.auditLog.findMany({ where: { tenantId, resource: 'SalePriceOverride', resourceId: sale.id } });
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({ userId: managerId, action: 'APPROVE' });
+      expect(audit[0].newData).toMatchObject({
+        kind: 'ABOVE_MAX_PRICE', invoiceNumber: sale.invoiceNumber, branchId, saleTotal: 130, reason: 'price tag misprinted',
+        lines: [{ variantId: milk.variantId, unitPrice: 130, maximumPrice: 120 }],
+      });
+    });
+
+    it('a Cashier still cannot sell above MRP, even when sending a reason; nothing is written or audited', async () => {
+      const count = await saleCount();
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, { ...saleDto([line(milk, 1, 130)]), priceOverrideReason: 'please' } as CreateSaleDto),
+      ).rejects.toThrow(/above the allowed maximum/);
+      expect(await saleCount()).toBe(count);
+    });
+
+    it('a below-cost manager override keeps its existing behaviour (no reason needed, no MRP audit row)', async () => {
+      const before = await prisma.auditLog.count({ where: { tenantId, resource: 'SalePriceOverride' } });
+      const sale = await pos.createSale(tenantId, branchId, managerId, saleDto([line(milk, 1, 50)]));
+      expect(sale.id).toBeTruthy();
+      expect(await prisma.auditLog.count({ where: { tenantId, resource: 'SalePriceOverride' } })).toBe(before);
     });
   });
 
@@ -311,12 +347,37 @@ describe('POS price guard & decimal quantities (integration)', () => {
       }
     });
 
-    it('accepts a price-embedded scale line (whole value, qty 1) for weighed goods', async () => {
-      // 0.4 kg of rice @ 250/kg printed by the scale as LKR 100 for qty 1 — below per-kg cost, but allowed.
+    it('weighed goods no longer bypass the price floor: a bare "qty 1 at LKR 100" rice line (cost 200/kg) is refused for a Cashier', async () => {
+      const stock = await onHand(rice);
+      const count = await saleCount();
       await expect(
         pos.createSale(tenantId, branchId, cashierId, saleDto([line(rice, 1, 100)])),
+      ).rejects.toThrow(/below cost LKR 200\.00/);
+      expect(await onHand(rice)).toBe(stock);
+      expect(await saleCount()).toBe(count);
+    });
+
+    it('a genuine price-embedded scale label (LKR 100 = 0.4 kg @ 250) is accepted with its barcode evidence; wrong evidence is refused', async () => {
+      await prisma.productVariant.update({ where: { id: rice.variantId }, data: { barcode: '12345' } });
+      const check = (twelve: string) => {
+        const sum = twelve.split('').map(Number).reduce((x, d, i) => x + d * (i % 2 === 0 ? 1 : 3), 0);
+        return `${twelve}${(10 - (sum % 10)) % 10}`;
+      };
+      const label = check('201234510000');                // PLU 12345, embedded value 10000 -> LKR 100.00
+      const forged = check('201234510100');               // value 101.00 does not divide to a 3-decimal quantity at 250
+      const before = await onHand(rice);
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, saleDto([line(rice, 0.4, 250, { scaleBarcodes: [forged] })])),
+      ).rejects.toThrow(BadRequestException);
+      expect(await onHand(rice)).toBe(before);
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, saleDto([line(rice, 1, 250, { scaleBarcodes: [label] })])),
+      ).rejects.toThrow(/quantity does not match/);       // claimed quantity must equal the label's
+      expect(await onHand(rice)).toBe(before);
+      await expect(
+        pos.createSale(tenantId, branchId, cashierId, saleDto([line(rice, 0.4, 250, { scaleBarcodes: [label] })])),
       ).resolves.toBeDefined();
-      expect(await onHand(rice)).toBe(0.8);
+      expect(await onHand(rice)).toBeCloseTo(before - 0.4, 6);
     });
 
     it('deducts piece goods from lots FEFO as before', async () => {
@@ -423,14 +484,21 @@ describe('POS price guard & decimal quantities (integration)', () => {
   });
 
   describe('returns & receiving with decimals', () => {
-    it('returns 0.25 kg into stock', async () => {
-      const before = await onHand(rice);
-      await pos.processReturn(tenantId, branchId, cashierId, {
+    it('returns 0.25 kg into stock (against the original sale, with a clientRequestId)', async () => {
+      const sale = await pos.createSale(tenantId, branchId, cashierId, saleDto([line(rice, 0.25, 250)]));
+      const afterSale = await onHand(rice);
+      const returnDto = {
+        clientRequestId: `pq-ret-${Date.now().toString(36)}`,
+        originalSaleId: sale.id,
         items: [{ variantId: rice.variantId, quantity: 0.25, unitPrice: 250, productName: 'Rice', variantName: 'Default', sku: 'SKU' }],
-        reason: 'IT',
+        reason: 'DEFECTIVE',
         refundMethod: 'CASH',
-      });
-      expect(await onHand(rice)).toBe(before + 0.25);
+      };
+      await pos.processReturn(tenantId, branchId, { id: cashierId, roles: ['CASHIER'] }, returnDto as never);
+      expect(await onHand(rice)).toBe(afterSale + 0.25);
+      // the same request again changes nothing (idempotent replay)
+      await pos.processReturn(tenantId, branchId, { id: cashierId, roles: ['CASHIER'] }, returnDto as never);
+      expect(await onHand(rice)).toBe(afterSale + 0.25);
     });
 
     it('receives 12.5 kg into a new lot', async () => {

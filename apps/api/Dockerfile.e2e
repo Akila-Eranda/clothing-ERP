@@ -1,0 +1,21 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm@9.15.9
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --node-linker=hoisted
+
+COPY . .
+
+RUN DATABASE_URL='postgresql://hexa_e2e:build-only@postgres:5432/hexa_e2e_wave1?schema=public' \
+  pnpm exec prisma generate --schema=./prisma/schema.prisma
+
+ENV NODE_ENV=test
+
+ENTRYPOINT ["node", "test/run-wave1-e2e.mjs"]
+CMD ["--preflight"]

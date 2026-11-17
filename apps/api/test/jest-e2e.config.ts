@@ -6,6 +6,7 @@ const config: Config = {
   testRegex: '.e2e-spec.ts$',
   transform: { '^.+\\.(t|j)s$': 'ts-jest' },
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/e2e-wave1.guard.cjs',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/../src/$1',
     '^nanoid$': '<rootDir>/shims/nanoid.ts',

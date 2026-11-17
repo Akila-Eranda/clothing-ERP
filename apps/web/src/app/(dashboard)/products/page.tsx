@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
+import { PlusCircle, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag, Download, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { PageKpiGrid } from "@/components/ui/page-kpi";
@@ -10,7 +10,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { HEX_BTN } from "@/lib/app-button-classes";
-import { api } from "@/lib/api";
+import { api, tokenStorage } from "@/lib/api";
+import { permissionsFromToken } from "@/lib/bank-account";
 import { parseApiList } from "@/lib/parse-api-list";
 import { type Product } from "@/lib/product-types";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -18,6 +19,10 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { resolvePublicAssetUrl } from "@/lib/upload";
+import { buildProductCsvTemplate, canImportProducts, PRODUCT_CSV_HEADERS } from "@/lib/product-csv";
+import { downloadFile } from "@/lib/upload";
+import { ProductImportDialog } from "@/components/products/product-import-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 function ProductListThumb({ src }: { src: string }) {
   const [broken, setBroken] = useState(false);
@@ -125,40 +130,17 @@ function printLabels(rows: ProductListRow[], brandName: string) {
   w.document.close();
 }
 
-async function parseCsvAndImport(
-  file: File,
-  onProgress: (done: number, total: number) => void,
-): Promise<{ success: number; failed: number }> {
-  const text = await file.text();
-  const lines = text.trim().split("\n");
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-  const rows = lines.slice(1);
-  let success = 0, failed = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const cols = rows[i].split(",");
-    const obj: Record<string, string> = {};
-    headers.forEach((h, j) => { obj[h] = (cols[j] ?? "").replace(/^"|"$/g, "").trim(); });
-    try {
-      await api.post("/products", {
-        name: obj.name,
-        sellingPrice: parseFloat(obj.sellingprice || obj["selling price"] || "0"),
-        costPrice: parseFloat(obj.costprice || obj["cost price"] || "0"),
-        mrp: parseFloat(obj.mrp || "0"),
-        taxRate: parseFloat(obj.taxrate || "18"),
-        description: obj.description || undefined,
-        tags: obj.tags ? obj.tags.split("|").filter(Boolean) : [],
-        status: (obj.status?.toUpperCase() as "ACTIVE" | "DRAFT") || "DRAFT",
-        trackInventory: true,
-        openingStock: parseFloat(obj.openingstock || obj["opening stock"] || "0") || 0,
-        reorderLevel: obj.reorderlevel || obj["reorder level"]
-          ? parseInt(obj.reorderlevel || obj["reorder level"], 10) || 0
-          : undefined,
-      });
-      success++;
-    } catch { failed++; }
-    onProgress(i + 1, rows.length);
-  }
-  return { success, failed };
+function downloadCsv(fileName: string, csv: string, opts: { bom?: boolean } = {}) {
+  // Optional BOM so Excel opens UTF-8 (Sinhala / Tamil names) correctly
+  const blob = new Blob([opts.bom ? "﻿" + csv : csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function buildColumns(
@@ -284,8 +266,12 @@ export default function ProductsPage() {
   const brandName = receiptSettings.shopName || APP_NAME;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  // Import menu only for users the API will accept (products:create + products:update). Read after mount
+  // (the token lives in localStorage) so server and first client render match.
+  const [canImport, setCanImport] = useState(false);
+  useEffect(() => { setCanImport(canImportProducts(permissionsFromToken(tokenStorage.getAccess()))); }, []);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -309,19 +295,19 @@ export default function ProductsPage() {
     } catch (e: unknown) { toast.error((e as Error).message ?? "Delete failed"); }
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  // Excel / CSV import: the file is checked on the server and shown in a preview before anything is saved.
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     e.target.value = "";
-    setImporting(true);
-    const tid = toast.loading("Importing products…");
+    if (file) setImportFile(file);
+  };
+
+  const downloadExcelTemplate = async () => {
     try {
-      const { success, failed } = await parseCsvAndImport(file, (done, total) => {
-        toast.loading(`Importing… ${done}/${total}`, { id: tid });
-      });
-      toast.success(`Import complete: ${success} added, ${failed} failed`, { id: tid });
-      fetch();
-    } catch { toast.error("Import failed", { id: tid }); }
-    finally { setImporting(false); }
+      await downloadFile("/products/import/template.xlsx", "product-import-template.xlsx");
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Could not download the Excel template");
+    }
   };
 
   const total = products.length;
@@ -351,7 +337,7 @@ export default function ProductsPage() {
             Each variant shows as its own row · same product barcode · separate selling prices
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <Button variant="outline" onClick={() => fetch()} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -360,11 +346,36 @@ export default function ProductsPage() {
             <Tag className="h-[18px] w-[18px]" />
             {printLabel}
           </Button>
-          <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
-            <Upload className="h-[18px] w-[18px]" />
-            Import CSV
-          </Button>
-          <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
+          {canImport && (<>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={!!importFile} className="gap-1.5">
+                <Upload className="h-[18px] w-[18px]" />
+                Import CSV / Excel
+                <ChevronDown className="h-4 w-4 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem onClick={() => importRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5 mr-2" /> Upload Excel or CSV file
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => downloadCsv("products-import-template.csv", buildProductCsvTemplate())}>
+                <Download className="h-3.5 w-3.5 mr-2" /> Download template
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void downloadExcelTemplate()}>
+                <Download className="h-3.5 w-3.5 mr-2" /> Download Excel template
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[11px] font-normal leading-snug text-muted-foreground">
+                CSV import format: <span className="font-mono">{PRODUCT_CSV_HEADERS.join(", ")}</span>
+                {" "}— tags separated by <span className="font-mono">|</span>, status: ACTIVE or DRAFT.
+                {" "}Optional: sku, barcode, category, brand, unit, openingStock, reorderLevel. Every row is checked and shown before import.
+              </DropdownMenuLabel>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <input ref={importRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={handleImport} aria-label="Product import file" />
+          <ProductImportDialog file={importFile} onClose={() => setImportFile(null)} onImported={() => void fetch()} />
+          </>)}
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
           <Button onClick={() => router.push("/products/new")} className={HEX_BTN}>
             <PlusCircle className="h-[18px] w-[18px]" />

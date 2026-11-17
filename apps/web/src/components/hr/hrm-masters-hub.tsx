@@ -295,7 +295,7 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
-          placeholder={`Search ${meta.title.toLowerCase()}…`}
+          placeholder={`Search ${meta.title.toLowerCase()}…`} aria-label={`Search ${meta.title.toLowerCase()}`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9 h-9 text-sm rounded-[14px] bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]"

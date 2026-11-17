@@ -1,3 +1,4 @@
+import { textSearch } from '@/shared/search.helper';
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -10,6 +11,7 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 
 export class CreateBranchDto {
   @ApiProperty() @IsString() name: string;
@@ -41,11 +43,12 @@ export class BranchesService {
     return this.prisma.branch.create({ data: { tenantId, ...dto } });
   }
 
-  async findAll(tenantId: string, query: PaginationDto) {
+  async findAll(tenantId: string, query: PaginationDto, branchId?: string) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
-      ...(query.search && { name: { contains: query.search, mode: 'insensitive' as const } }),
+      ...(branchId ? { id: branchId } : {}),
+      ...textSearch(query.search, ['name', 'code', 'city']),
     };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.branch.findMany({
@@ -58,7 +61,8 @@ export class BranchesService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, tenantId: string, branchId?: string) {
+    if (branchId && branchId !== id) throw new NotFoundException('Branch not found');
     const branch = await this.prisma.branch.findFirst({
       where: { id, tenantId },
       include: {
@@ -99,12 +103,12 @@ export class BranchesController {
 
   @Get()
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto) {
-    return this.branchesService.findAll(user.tenantId, query);
+    return this.branchesService.findAll(user.tenantId, query, resolveBranchScope(user));
   }
 
   @Get(':id')
   findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.branchesService.findOne(id, user.tenantId);
+    return this.branchesService.findOne(id, user.tenantId, resolveBranchScope(user, id));
   }
 
   @Put(':id')

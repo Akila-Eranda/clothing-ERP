@@ -335,7 +335,7 @@ export function PosPromotionsPanel({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name / coupon…"
+              placeholder="Search name / coupon…" aria-label="Search name / coupon"
               className="h-9 rounded-xl border-0 text-white text-sm flex-1"
               style={fieldStyle}
             />

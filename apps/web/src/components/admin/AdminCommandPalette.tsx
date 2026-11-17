@@ -136,7 +136,7 @@ export default function AdminCommandPalette({ open, onClose }: Props) {
           <input
             ref={inputRef}
             className="flex-1 text-sm outline-none bg-transparent text-foreground placeholder:text-muted-foreground"
-            placeholder="Search tenants, users… or support:query"
+            placeholder="Search tenants, users… or support:query" aria-label="Search tenants, users… or support:query"
             value={query}
             onChange={e => setQuery(e.target.value)}
           />

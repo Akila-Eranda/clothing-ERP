@@ -1,7 +1,11 @@
-"use client";
-
+import { ReconciliationReport } from "@/components/accounting/reconciliation-report";
 import { CashBankHub } from "@/components/accounting/cash-bank-hub";
 
 export default function ReconciliationPage() {
-  return <CashBankHub initialTab="recon" />;
+  return (
+    <>
+      <ReconciliationReport />
+      <CashBankHub initialTab="recon" />
+    </>
+  );
 }

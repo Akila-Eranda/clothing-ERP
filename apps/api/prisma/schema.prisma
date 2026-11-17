@@ -455,6 +455,8 @@ model Tenant {
   supplierInvoices           SupplierInvoice[]
   supplierProductAssignments SupplierProductAssignment[]
   supplierLedgerEntries      SupplierLedgerEntry[]
+  supplierAdvanceEntries     SupplierAdvanceEntry[]
+  customerBankDetails        CustomerBankDetail[]
   supplierDebitNotes         SupplierDebitNote[]
   taxRates                   TaxRate[]
   vatReturns                 VatReturn[]
@@ -493,6 +495,8 @@ model Tenant {
   cashRegisters              CashRegister[]
   posCounters                PosCounter[]
   cashMovements              CashMovement[]
+  paymentQrCodes             PaymentQrCode[]
+  cashHandovers              CashHandover[]
   giftVouchers               GiftVoucher[]
   reloadOperators            ReloadOperator[]
   reloadDenominations        ReloadDenomination[]
@@ -525,6 +529,7 @@ enum ReceiptPrintType {
   PAYSLIP
   LABEL
   GRN
+  DAY_END
 }
 
 enum ReceiptPrintStatus {
@@ -981,12 +986,12 @@ model Inventory {
   variantId   String
   quantity    Float  @default(0)
   reservedQty Float  @default(0)
-  damagedQty  Float  @default(dbgenerated("'NaN'::double precision")) @map("damagedQtyDec")
+  damagedQty  Float  @default(0) @map("damagedQtyDec")
 
   /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
 
   damagedQtyLegacy  Int       @default(0) @map("damagedQty")
-  returnedQty       Float     @default(dbgenerated("'NaN'::double precision")) @map("returnedQtyDec")
+  returnedQty       Float     @default(0) @map("returnedQtyDec")
   /// Expand/contract: INTEGER column kept for older app versions; synced by DB trigger. Do not write from new code.
   returnedQtyLegacy Int       @default(0) @map("returnedQty")
   avgCost           Float     @default(0)
@@ -1032,6 +1037,8 @@ model InventoryLog {
   referenceType  String?
   notes          String?
   performedBy    String?
+  clientRequestId    String?
+  requestFingerprint String?
   createdAt      DateTime          @default(now())
 
   variant ProductVariant @relation(fields: [variantId], references: [id])
@@ -1045,6 +1052,7 @@ model InventoryLog {
   @@index([correlationId])
   @@index([lotId])
   @@index([tenantId, createdAt])
+  @@unique([tenantId, clientRequestId])
   @@map("inventory_logs")
 }
 
@@ -1287,6 +1295,7 @@ model Customer {
   sales            Sale[]
   loyaltyTxns      LoyaltyTransaction[]
   walletTxns       WalletTransaction[]
+  bankDetail       CustomerBankDetail?
   creditTxns       CustomerCreditTransaction[]
   creditSchedules  CustomerCreditSchedule[]
   creditReminders  CustomerCreditReminder[]
@@ -1650,9 +1659,14 @@ model WalletTransaction {
   customerId  String
   tenantId    String
   amount      Float
+  /// SALE_DEBIT, CHANGE_SAVED (POS change kept as store credit, referenceId = sale id), top-ups, refunds…
   type        String
   description String?
   referenceId String?
+  /// Manual top-up only: how it was paid (CASH, CARD, QR, BANK_TRANSFER). Goodwill credits have none.
+  paymentMethod  String?
+  /// Manual top-up / goodwill credit: the manager who authorised it.
+  authorizedById String?
   createdAt   DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -1792,6 +1806,9 @@ model Sale {
   total            Float
   amountPaid       Float         @default(0)
   changeDue        Float         @default(0)
+  /// Part of changeDue kept in the customer's wallet (store credit) with the customer's consent instead of
+  /// being handed back in cash. Cash actually given back = changeDue - changeSavedToWallet. 0 for older sales.
+  changeSavedToWallet Float      @default(0)
   paymentMethod    PaymentMethod @default(CASH)
   paymentStatus    PaymentStatus @default(COMPLETED)
   notes            String?
@@ -1805,6 +1822,8 @@ model Sale {
   isReturn         Boolean       @default(false)
   originalSaleId   String?
   terminalId       String?
+  /// Cashier wallet / shift (cash_registers.id) the sale was taken on; null for older sales
+  cashRegisterId   String?
   /// POS idempotency key (one per checkout attempt); retries with the same key return the original sale.
   clientRequestId  String?
   metadata         Json          @default("{}")
@@ -1827,6 +1846,7 @@ model Sale {
   @@index([customerId])
   @@index([invoiceDate])
   @@index([helperEmployeeId])
+  @@index([cashRegisterId])
   @@map("sales")
 }
 
@@ -2005,14 +2025,25 @@ model SalePayment {
   amount        Float
   reference     String?
   bankAccountId String?
+  /// QR code shown for a QR payment (bank / label / mode are on the code and its bank account)
+  qrCodeId      String?
+  /// CARD payments: last four digits only. Full card numbers and CVV are never stored.
+  cardLast4     String?       @db.VarChar(4)
+  /// QR payments: `amount` is the GROSS QR amount the customer paid; the bank deducts `feeAmount` and the business
+  /// receives `netAmount` (= amount − feeAmount). Stored with the sale, never recomputed. NULL on non-QR payments.
+  feePercent Float?
+  feeAmount  Float?
+  netAmount  Float?
   status        PaymentStatus @default(COMPLETED)
   processedAt   DateTime      @default(now())
 
-  sale        Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+  sale        Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  qrCode      PaymentQrCode? @relation(fields: [qrCodeId], references: [id])
 
   @@index([saleId])
   @@index([bankAccountId])
+  @@index([qrCodeId])
   @@map("sale_payments")
 }
 
@@ -2041,6 +2072,8 @@ model Return {
   branchId       String
   originalSaleId String
   returnNumber   String
+  clientRequestId String?
+  requestFingerprint String?
   reason         ReturnReason
   status         ReturnStatus @default(INITIATED)
   returnType     String       @default("RETURN")
@@ -2049,6 +2082,8 @@ model Return {
   refundAmount   Float        @default(0)
   exchangeAmount Float        @default(0)
   exchangeData   Json?
+  /// Exchange only: { due, collected[{method,amount,...}], change, excess, excessAs: REFUND|STORE_CREDIT }
+  exchangeSettlement Json?
   restockItems   Boolean      @default(true)
   processedBy    String?
   approvedBy     String?
@@ -2059,6 +2094,7 @@ model Return {
   items        ReturnItem[]
 
   @@unique([tenantId, returnNumber])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId])
   @@map("returns")
 }
@@ -2150,6 +2186,8 @@ model Supplier {
   creditDays    Int      @default(30)
   creditLimit   Float    @default(0)
   balance       Float    @default(0)
+  /// Prepaid / overpaid amount we hold with this supplier (never negative). Separate from `balance` (payable).
+  advanceBalance Float @default(0)
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
   notes         String?
@@ -2164,6 +2202,7 @@ model Supplier {
   invoices           SupplierInvoice[]
   productAssignments SupplierProductAssignment[]
   ledgerEntries      SupplierLedgerEntry[]
+  advanceEntries SupplierAdvanceEntry[]
   debitNotes         SupplierDebitNote[]
 
   @@index([tenantId])
@@ -2236,6 +2275,8 @@ model PurchaseOrder {
   reference      String?
   paymentTerms   String?             @map("paymentterms")
   createdBy      String?
+  /// Idempotency key from the client (one per submit attempt): a retried "Create PO" / "Create PO + GRN" returns the same PO.
+  clientRequestId String?
   approvedBy     String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -2251,6 +2292,7 @@ model PurchaseOrder {
   purchaseRequest    PurchaseRequest?
 
   @@unique([tenantId, poNumber])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId])
   @@index([paymentDueDate])
   @@map("purchase_orders")
@@ -2299,7 +2341,13 @@ model SupplierPayment {
   supplierId String
   purchaseId String?
   invoiceId  String?
+  /// Client supplied idempotency key for supplier payment creation.
+  clientRequestId String?
+  /// Stable request fingerprint used to reject key reuse with a different payload.
+  requestFingerprint String?
   amount     Float
+  /// Part of `amount` that exceeded what was payable and was kept as supplier advance (0 for normal payments).
+  advanceAmount Float @default(0)
   method     PaymentMethod
   reference  String?
   notes      String?
@@ -2313,6 +2361,7 @@ model SupplierPayment {
 
   @@index([supplierId])
   @@index([invoiceId])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId, paidAt])
   @@map("supplier_payments")
 }
@@ -2395,6 +2444,8 @@ model GoodsReceipt {
   receivedBy         String?
   notes              String?
   supplierInvoiceRef String?
+  /// Idempotency key from the client (one per submit attempt): a retried receive / Quick GRN / direct GRN returns the same GRN.
+  clientRequestId    String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -2406,6 +2457,7 @@ model GoodsReceipt {
   invoices SupplierInvoice[]
 
   @@unique([tenantId, grnNumber])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId])
   @@index([purchaseId])
   @@index([supplierId])
@@ -3108,6 +3160,10 @@ model BankAccount {
   type           BankAccountType @default(CURRENT)
   bankName       String?
   accountNumber  String?
+  /// Name the account is held under (shown to the customer with the QR payment details)
+  accountHolderName String?
+  branchName        String?
+  branchCode        String?
   currency       String          @default("LKR")
   openingBalance Float           @default(0)
   currentBalance Float           @default(0)
@@ -3122,6 +3178,7 @@ model BankAccount {
   cheques         Cheque[]
   reconciliations BankReconciliation[]
   salePayments    SalePayment[]
+  paymentQrCodes  PaymentQrCode[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3138,6 +3195,8 @@ model BankTransaction {
   txnDate          DateTime      @default(now())
   valueDate        DateTime?
   reference        String?
+  clientRequestId  String?
+  requestFingerprint String?
   description      String?
   expenseId        String?
   chequeId         String?
@@ -3150,6 +3209,7 @@ model BankTransaction {
 
   @@index([tenantId, bankAccountId])
   @@index([txnDate])
+  @@unique([tenantId, clientRequestId, type])
   @@map("bank_transactions")
 }
 
@@ -4090,12 +4150,14 @@ model CashRegister {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch     Branch         @relation(fields: [branchId], references: [id])
-  counter    PosCounter?    @relation(fields: [counterId], references: [id])
-  cashier    User           @relation("CashierRegisters", fields: [cashierId], references: [id])
-  approvedBy User?          @relation("CashRegisterApprover", fields: [approvedById], references: [id])
-  movements  CashMovement[]
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch       Branch         @relation(fields: [branchId], references: [id])
+  counter      PosCounter?    @relation(fields: [counterId], references: [id])
+  cashier      User           @relation("CashierRegisters", fields: [cashierId], references: [id])
+  approvedBy   User?          @relation("CashRegisterApprover", fields: [approvedById], references: [id])
+  movements    CashMovement[]
+  handoversOut CashHandover[] @relation("HandoverFrom")
+  handoversIn  CashHandover[] @relation("HandoverTo")
 
   @@index([tenantId, branchId, status])
   @@index([tenantId, counterId, status])
@@ -4106,15 +4168,17 @@ model CashRegister {
 }
 
 model CashMovement {
-  id          String           @id @default(cuid())
-  tenantId    String
-  registerId  String
-  type        CashMovementType
-  amount      Float
-  reference   String?
-  description String?
-  createdById String?
-  createdAt   DateTime         @default(now())
+  id             String           @id @default(cuid())
+  tenantId       String
+  registerId     String
+  type           CashMovementType
+  amount         Float
+  reference      String?
+  description    String?
+  createdById    String?
+  /// Manager / admin who authorised the movement (transfers, handovers); null when not needed
+  authorizedById String?
+  createdAt      DateTime         @default(now())
 
   tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   register  CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
@@ -4123,6 +4187,72 @@ model CashMovement {
   @@index([registerId, createdAt])
   @@index([tenantId, type])
   @@map("cash_movements")
+}
+
+// Cashier handover on a counter: the outgoing wallet is cleared to main cash and the same amount is
+// issued as the incoming cashier's opening float, in one transaction (counter cash never resets).
+model CashHandover {
+  id             String   @id @default(cuid())
+  tenantId       String
+  branchId       String
+  counterId      String
+  fromRegisterId String
+  toRegisterId   String
+  fromCashierId  String
+  toCashierId    String
+  /// What the system expected in the drawer at handover
+  expectedCash   Float
+  /// What was counted at handover (= expectedCash when not counted)
+  countedCash    Float
+  variance       Float    @default(0)
+  counted        Boolean  @default(false)
+  performedById  String
+  authorizedById String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromRegister CashRegister @relation("HandoverFrom", fields: [fromRegisterId], references: [id])
+  toRegister   CashRegister @relation("HandoverTo", fields: [toRegisterId], references: [id])
+
+  @@index([tenantId, counterId, createdAt])
+  @@index([tenantId, branchId, createdAt])
+  @@map("cash_handovers")
+}
+
+enum PaymentQrMode {
+  STATIC
+  DYNAMIC
+}
+
+// Bank QR codes shown at the POS for QR payments. Each belongs to the bank account that receives the money.
+model PaymentQrCode {
+  id              String        @id @default(cuid())
+  tenantId        String
+  /// null = every branch
+  branchId        String?
+  bankAccountId   String
+  label           String
+  mode            PaymentQrMode @default(STATIC)
+  /// Uploaded QR image (tenant upload path), shown for STATIC codes and as a fallback
+  imageUrl        String?
+  /// EMVCo / LankaQR merchant payload; DYNAMIC codes add the amount to it at checkout
+  merchantPayload String?
+  isActive        Boolean       @default(true)
+  isDefault       Boolean       @default(false)
+  sortOrder       Int           @default(0)
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id])
+  salePayments SalePayment[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, bankAccountId])
+  @@map("payment_qr_codes")
 }
 
 // ============================================================
@@ -4602,4 +4732,57 @@ model QtySyncLog {
 
   @@index([tableName, rowId])
   @@map("hx_qty_sync_log")
+}
+
+
+/// Supplier advance history (append-only). amount > 0 = advance created by an overpayment, < 0 = applied to a bill.
+model SupplierAdvanceEntry {
+  id              String   @id @default(cuid())
+  tenantId        String
+  supplierId      String
+  /// ADVANCE_IN | APPLIED
+  type            String
+  amount          Float
+  balanceAfter    Float
+  /// One id per operation (the payment id, or one "apply advance" request): groups its rows and its journal.
+  batchId         String
+  paymentId       String?
+  purchaseId      String?
+  invoiceId       String?
+  /// Idempotency key of an "apply advance" request (checked under the supplier row lock).
+  clientRequestId String?
+  requestFingerprint String?
+  notes           String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, supplierId, createdAt])
+  @@index([tenantId, batchId])
+  @@index([tenantId, clientRequestId])
+  @@map("supplier_advance_entries")
+}
+
+/// Bank account details of a customer. One row per customer; customers without a row are unaffected.
+/// Kept apart from `customers` so list / POS queries never carry the account number.
+model CustomerBankDetail {
+  id                String   @id @default(cuid())
+  tenantId          String
+  customerId        String   @unique
+  bankName          String
+  accountNumber     String
+  accountHolderName String
+  branchName        String?
+  branchCode        String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("customer_bank_details")
 }

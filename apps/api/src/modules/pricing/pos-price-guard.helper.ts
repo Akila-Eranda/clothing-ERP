@@ -24,10 +24,7 @@ export type PosCatalogPriceContext = {
   mrp: number;
   /** Server-side unit cost (0 = unknown → no below-cost check). */
   costPrice: number;
-  /**
-   * Weighed goods: price-embedded scale barcodes send the whole line value as unitPrice
-   * with qty 1, so per-unit price/cost rules cannot be applied.
-   */
+  /** Weighed goods use the lowest known catalog price as the floor when cost is unavailable. */
   isWeighted: boolean;
 };
 
@@ -66,14 +63,15 @@ export function findPosPriceViolation(
   line: CartLineInput,
   ctx: PosCatalogPriceContext,
 ): PosPriceViolation | null {
-  if (ctx.isWeighted) return null;
-
   const max = maxAllowedUnitPrice(ctx);
   if (max > 0 && line.unitPrice > max + PRICE_TOLERANCE) {
     return { kind: 'ABOVE_MAX_PRICE', unitPrice: round2(line.unitPrice), limit: round2(max) };
   }
 
-  const min = minAllowedUnitPrice(ctx);
+  const knownFloor = ctx.knownPrices.filter((price) => Number.isFinite(price) && price > 0);
+  const min = ctx.isWeighted && ctx.costPrice <= 0
+    ? (knownFloor.length ? Math.min(...knownFloor) : 0)
+    : minAllowedUnitPrice(ctx);
   const net = netUnitPrice(line);
   if (min > 0 && net < min - PRICE_TOLERANCE) {
     return { kind: 'BELOW_COST', unitPrice: net, limit: round2(min) };

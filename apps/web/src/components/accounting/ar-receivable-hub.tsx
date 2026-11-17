@@ -26,7 +26,9 @@ import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { isValidCardLast4, sanitizeCardLast4Input } from "@/lib/card-last4";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { checkoutRequestKey, clearCheckoutRequestKey } from "@/lib/pos-checkout-key";
 
 type Tab = "dashboard" | "statement" | "payment";
 
@@ -530,6 +532,7 @@ function PaymentPanel() {
   const [customerId, setCustomerId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("CASH");
+  const [cardLast4, setCardLast4] = useState("");
   const [desc, setDesc] = useState("Credit payment received");
   const [fromWallet, setFromWallet] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -606,18 +609,31 @@ function PaymentPanel() {
       toast.error("Select customer and amount");
       return;
     }
+    if (!fromWallet && method === "CARD" && !isValidCardLast4(cardLast4)) {
+      toast.error("Enter the last 4 digits of the card");
+      return;
+    }
     setBusy(true);
     try {
+      const request = {
+        amount: amt,
+        description: desc,
+        paymentMethod: method,
+        applyFromWallet: fromWallet,
+        ...(!fromWallet && method === "CARD" ? { cardLast4: cardLast4.trim() } : {}),
+      };
+      const requestSlot = `customer-payment:${customerId}` as const;
+      const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
       const res = await api.post<{
         appliedToCredit: number;
         advanceToWallet: number;
         creditBalance: number;
       }>(`/customers/${customerId}/credit/payment`, {
-        amount: amt,
-        description: desc,
-        paymentMethod: method,
-        applyFromWallet: fromWallet,
+        ...request,
+        clientRequestId,
       });
+      clearCheckoutRequestKey(requestSlot);
+      setCardLast4("");
       toast.success(
         `Applied ${formatNumber(res.data?.appliedToCredit ?? 0)}` +
           (res.data?.advanceToWallet ? ` · Advance ${formatNumber(res.data.advanceToWallet)}` : ""),
@@ -747,6 +763,24 @@ function PaymentPanel() {
                 </Select>
               </div>
             </div>
+
+            {!fromWallet && method === "CARD" && (
+              <div className="space-y-1">
+                <Label htmlFor="ar-card-last4" className="text-xs">Card last 4 digits *</Label>
+                <Input
+                  id="ar-card-last4"
+                  className="h-9 font-mono tracking-widest"
+                  value={cardLast4}
+                  onChange={(e) => setCardLast4(sanitizeCardLast4Input(e.target.value))}
+                  inputMode="numeric"
+                  maxLength={4}
+                  required
+                  autoComplete="off"
+                  placeholder="1234"
+                  disabled={busy}
+                />
+              </div>
+            )}
 
             <div className="space-y-1">
               <Label className="text-xs">Description</Label>

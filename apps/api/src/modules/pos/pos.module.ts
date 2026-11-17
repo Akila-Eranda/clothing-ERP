@@ -1,15 +1,18 @@
+import { escapeLike, normalizeSearch, textSearch } from '@/shared/search.helper';
 import { Module } from '@nestjs/common';
 import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString, Matches } from 'class-validator';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, HttpException, Logger } from '@nestjs/common';
+import { PinLockoutService } from '@/shared/security/pin-lockout.service';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString, Matches, MaxLength, ArrayMaxSize, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus, BankTxnType, BankTxnStatus, ReloadCardStatus, ReloadSaleType, Prisma } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus, BankTxnType, BankTxnStatus, ReloadCardStatus, ReloadSaleType, ReturnReason, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { NoCardNumber } from '@/shared/security/card-number.validator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { OptionalNotesDto } from '@/common/dto/notes.dto';
@@ -36,16 +39,45 @@ import {
   normalizeClientRequestId,
   saleRequestFingerprint,
 } from './pos-idempotency.helper';
+import {
+  catalogCustomLineRejection,
+  catalogReloadLineRejection,
+  customLineNeedsManager,
+} from './pos-reload-guard.helper';
+import {
+  parseScaleBarcode as parseScaleBarcodeValue,
+  sameScalePrice,
+  sameScaleQuantity,
+  scaleBarcodeMatchesKnownKeys,
+  scaleBarcodeQuantity,
+  resolveScaleBarcodeMode,
+  ScaleBarcodeMode,
+} from './pos-scale-barcode.helper';
+import { billDiscountRejection } from './pos-bill-discount.helper';
+import { heldBillScopeWhere, holdBillDataRejection } from './pos-hold.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { paymentLineReferences, preparePaymentLines } from './pos-payment-lines.helper';
+import { assertQrCodesForPayments } from '@/modules/payment-qr/payment-qr.helper';
+import { resolveQrFeeSettings, type QrFeeResult } from '@/shared/qr-fee.helper';
+import { computeQrFeeCents } from '@/shared/qr-fee-cents.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
 import { applyGiftVoucherRedeem, computeHelperCommission, computeReloadCommission, generateGiftVoucherCode, maskReloadPin, round2 } from './pos-phase6.helper';
+import { decideSaveChange, resolveSaveChangeSettings, walletDebitFloor } from './pos-save-change.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
+import { splitCustomerAccountTender } from './pos-customer-account.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { nanoid } from 'nanoid';
+import { isWholeReloadQuantity } from './pos-reload-guard.helper';
+import { fractionalQuantityRejection } from './pos-quantity.helper';
+import { PRICE_OVERRIDE_REASON_MAX, annotateOverrides, buildMrpOverrideAudit, priceOverrideReasonError } from './pos-price-override.helper';
 import { recordSaleCashMovement, findOpenRegister, ensureCashierWallet, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
+import { shopDateString, shopDayBounds } from '@/shared/day-end-report.helper';
+import { ReturnsModule, ReturnsService } from '@/modules/returns/returns.module';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { exactStockOfRow } from '@/shared/exact-stock.helper';
 import {
   assertValidPosPin,
   hashPosPin,
@@ -65,14 +97,18 @@ export class ReturnItemDto {
 }
 
 export class ReturnSaleDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() originalSaleId?: string;
+  @ApiProperty({ description: 'Stable key reused when retrying the same return attempt' })
+  @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
+  clientRequestId: string;
+  @ApiProperty() @IsString() originalSaleId: string;
   @ApiProperty({ type: [ReturnItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => ReturnItemDto) items: ReturnItemDto[];
-  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+  @ApiPropertyOptional({ enum: ReturnReason }) @IsOptional() @IsEnum(ReturnReason) reason?: ReturnReason;
   @ApiPropertyOptional() @IsOptional() @IsString() refundMethod?: string;
 }
 
 export class SaleItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() variantId?: string;
+  @ApiPropertyOptional({ type: [String], maxItems: 50 }) @IsOptional() @IsArray() @ArrayMaxSize(50) @IsString({ each: true }) scaleBarcodes?: string[];
   /** When true (or variantId omitted), line is bill-only — no catalog / stock. */
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isCustom?: boolean;
   @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
@@ -122,14 +158,21 @@ export class ImportReloadCardsDto {
 export class SalePaymentDto {
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
   @ApiProperty() @IsNumber() @Min(0) amount: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional({ maxLength: 64 }) @IsOptional() @IsString() @MaxLength(64) @NoCardNumber() reference?: string;
   /** Required for BANK_TRANSFER and QR — Accounting bank account that receives the funds. */
-  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) bankAccountId?: string;
+  /** QR payments: the configured QR code shown to the customer (must belong to bankAccountId). */
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) qrCodeId?: string;
+  /** QR payments: the fee (LKR) shown to the customer. The server computes the fee itself and refuses the sale (409) if it differs. */
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) expectedQrFee?: number;
+  /** CARD payments: exactly the last 4 digits. Never the full card number or CVV. */
+  @ApiPropertyOptional({ example: '1234' }) @IsOptional() @IsString() @MaxLength(4) cardLast4?: string;
 }
 
 export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() customerId?: string;
-  @ApiProperty({ type: [SaleItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => SaleItemDto) items: SaleItemDto[];
+  // A sale needs at least one line: an empty cart used to create a real invoice number and a total-0 sale.
+  @ApiProperty({ type: [SaleItemDto] }) @IsArray() @ArrayMinSize(1, { message: 'A sale needs at least one item' }) @ValidateNested({ each: true }) @Type(() => SaleItemDto) items: SaleItemDto[];
   @ApiProperty({ type: [SalePaymentDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => SalePaymentDto) payments: SalePaymentDto[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discountAmount?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) loyaltyPointsToRedeem?: number;
@@ -139,10 +182,19 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPartialPayment?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() applyTierDiscount?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() helperEmployeeId?: string;
+  /** Required when an authorised user sells ABOVE the maximum (MRP) price: why. Stored on the sale and audited. */
+  @ApiPropertyOptional({ description: 'Reason for selling above the maximum price (required for that override)' })
+  @IsOptional() @IsString() @MaxLength(PRICE_OVERRIDE_REASON_MAX) @NoCardNumber() priceOverrideReason?: string;
   /** Idempotency key — one per checkout attempt, re-sent unchanged on retry. */
   @ApiPropertyOptional({ description: 'Idempotency key (8–64 chars A-Z a-z 0-9 _ -), reused on retry' })
   @IsOptional() @IsString() @Matches(CLIENT_REQUEST_ID_PATTERN, { message: 'clientRequestId must be 8–64 chars of A-Z a-z 0-9 _ -' })
   clientRequestId?: string;
+  /** Amount of change to save to the customer's wallet (store credit). */
+  @ApiPropertyOptional({ description: 'Amount of change to save to the customer wallet' })
+  @IsOptional() @IsNumber() @Min(0) saveChangeAmount?: number;
+  /** Customer explicitly consented to saving change to their wallet. Must be true. */
+  @ApiPropertyOptional({ description: 'Customer consent to save change to wallet' })
+  @IsOptional() @IsBoolean() saveChangeConsent?: boolean;
 }
 
 export class IssueGiftVoucherDto {
@@ -169,13 +221,32 @@ export class HoldBillDto {
 
 @Injectable()
 export class PosService {
+  private readonly logger = new Logger(PosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly numbering: DocumentNumberingService,
     private readonly pricing: PricingService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly pinLockout: PinLockoutService,
+    private readonly returnsService: ReturnsService,
   ) {}
+
+  /** Wrong-PIN limits per terminal login (Redis, shared by all API instances): see PinLockoutService. */
+  static readonly UNLOCK_MAX_FAILS = 10;
+  static readonly PIN_SET_MAX_FAILS = 5;
+
+  private async reservePinAttempt(scope: string, max: number) {
+    const attempt = await this.pinLockout.begin(scope, Date.now(), max);
+    if (!attempt.allowed) {
+      const minutes = Math.max(1, Math.ceil((attempt.lockedUntil - Date.now()) / 60000));
+      throw new HttpException(
+        { statusCode: 429, error: 'PIN_LOCKED', message: `Too many wrong PINs on this terminal. Try again in ${minutes} minute(s) or sign in with a password.` },
+        429,
+      );
+    }
+  }
 
   async resolveBranchId(tenantId: string, branchId: string): Promise<string> {
     if (branchId) return branchId;
@@ -205,12 +276,34 @@ export class PosService {
     return Object.assign(existing, { idempotentReplay: true as const });
   }
 
+  /** Bank accounts and QR codes named by any payment line must be this shop's (active) ones. */
+  private async assertPaymentReferences(
+    tenantId: string,
+    branchId: string,
+    refs: { bankAccountIds: string[]; qr: { qrCodeId: string; bankAccountId?: string }[] },
+  ) {
+    if (refs.bankAccountIds.length) {
+      const found = await this.prisma.bankAccount.count({ where: { tenantId, id: { in: refs.bankAccountIds }, isActive: true } });
+      if (found !== refs.bankAccountIds.length) {
+        throw new BadRequestException('One or more bank accounts are invalid or inactive');
+      }
+    }
+    await assertQrCodesForPayments(
+      this.prisma,
+      tenantId,
+      branchId,
+      refs.qr.map((q) => ({ method: PaymentMethod.QR, qrCodeId: q.qrCodeId, bankAccountId: q.bankAccountId })),
+    );
+  }
+
   async createSale(
     tenantId: string,
     branchId: string,
     cashierId: string,
     dto: CreateSaleDto,
     counterId?: string | null,
+    /** Held-bill scope of the caller (managers / admins may resume any hold of the branch, like GET /pos/hold). */
+    holdScope?: { scopeAll?: boolean },
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
@@ -223,7 +316,12 @@ export class PosService {
       if (replay) return replay;
     }
 
-    await ensureCashierWallet(this.prisma, tenantId, branchId, cashierId, counterId);
+    // Every payment line is validated (whatever its amount) and every bank account / QR code it names is
+    // checked against this shop BEFORE anything is written; zero-amount lines are then not saved.
+    // (The idempotency fingerprint above is taken from the request as sent, so retries are unaffected.)
+    const paymentRefs = paymentLineReferences(dto.payments);
+    dto.payments = preparePaymentLines(dto.payments) as SalePaymentDto[];
+    await this.assertPaymentReferences(tenantId, branchId, paymentRefs);
 
     // Invoice number allocated inside the sale transaction (engine) or just before (legacy)
     let invoiceNumber: string | null = null;
@@ -232,12 +330,45 @@ export class PosService {
     }
 
     for (const item of dto.items) {
+      const customCatalogRejection = catalogCustomLineRejection(item);
+      if (customCatalogRejection) throw new BadRequestException(customCatalogRejection);
       const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
+      if (isCustom && item.scaleBarcodes?.length) {
+        throw new BadRequestException('Scale barcode evidence can only be used with a catalog product.');
+      }
+      if (isCustom && item.reloadType && !item.reloadOperatorId) {
+        throw new BadRequestException('Reload lines require a provider.');
+      }
+      // P-F21: every unit of a reload / recharge-card line is its own ReloadSale (a physical card has its own PIN), so
+      // the quantity is a whole number of units. A fraction would be charged in full but recorded as fewer units.
+      if (item.reloadType && !isWholeReloadQuantity(item.quantity)) {
+        throw new BadRequestException('Reload and recharge-card quantity must be a whole number of units.');
+      }
       if (isCustom && !item.productName?.trim()) {
         throw new BadRequestException('Custom bill items require a product name');
       }
-      if (!isCustom && !item.variantId?.trim()) {
-        throw new BadRequestException('Catalog items require a variantId');
+    }
+    if (dto.items.some(customLineNeedsManager)) {
+      const roles = await this.prisma.userRole.findMany({
+        where: { userId: cashierId, user: { tenantId } },
+        select: { role: { select: { type: true } } },
+      });
+      if (!canOverridePosPrice(roles.map((row) => row.role.type))) {
+        throw new ForbiddenException('Custom bill-only items require manager authorization.');
+      }
+    }
+
+    const disguisedCatalogIds = dto.items.flatMap((item) => {
+      const id = item.variantId?.trim() ?? '';
+      return id.startsWith('custom-') && id.length > 'custom-'.length ? [id.slice('custom-'.length)] : [];
+    });
+    if (disguisedCatalogIds.length) {
+      const disguisedCatalogItems = await this.prisma.productVariant.findMany({
+        where: { id: { in: disguisedCatalogIds }, product: { tenantId } },
+        select: { id: true },
+      });
+      if (disguisedCatalogItems.length) {
+        throw new BadRequestException('A catalog variant cannot be submitted as a custom bill item.');
       }
     }
 
@@ -249,12 +380,30 @@ export class PosService {
           .map((i) => i.variantId!.trim()),
       ),
     ];
+    const hasManualDiscount =
+      (dto.discountAmount ?? 0) > 0 ||
+      dto.items.some((item) => (item.discount ?? 0) > 0);
+    let manualDiscountApprovedBy: string | null = null;
+    if (hasManualDiscount) {
+      const roles = await this.prisma.userRole.findMany({
+        where: { userId: cashierId, user: { tenantId } },
+        select: { role: { select: { type: true } } },
+      });
+      if (!bypassesWorkflowApproval(roles.map((row) => row.role.type))) {
+        throw new ForbiddenException(
+          'Manual discounts require an approved manager workflow. The discount approval policy is not configured for direct checkout.',
+        );
+      }
+      manualDiscountApprovedBy = cashierId;
+    }
     const priceOverrides: Array<{ variantId: string; unitPrice: number; limit: number; kind: string }> = [];
     if (catalogVariantIds.length > 0) {
       const found = await this.prisma.productVariant.findMany({
         where: { id: { in: catalogVariantIds }, product: { tenantId } },
         select: {
           id: true,
+          sku: true,
+          barcode: true,
           sellingPrice: true,
           costPrice: true,
           mrp: true,
@@ -266,6 +415,8 @@ export class PosService {
               mrp: true,
               productKind: true,
               unit: true,
+              allowDecimalSelling: true,
+              barcode: true,
             },
           },
         },
@@ -315,13 +466,57 @@ export class PosService {
         select: { role: { select: { type: true } } },
       });
       const canOverride = canOverridePosPrice(cashierRoles.map((r) => r.role.type));
+      let scaleMode: ScaleBarcodeMode | null = null;
 
       for (const item of dto.items) {
         if (item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-')) continue;
         const ctx = priceCtx.get(item.variantId.trim());
         if (!ctx) continue;
+        const variant = found.find((row) => row.id === item.variantId!.trim());
+        if (!variant) continue;
+        // P-F16: a piece good is sold in whole units (same rule the POS screen applies); scale-label lines are weighed goods.
+        const fractionRejection = fractionalQuantityRejection(item.productName?.trim() || item.sku || 'Item', item.quantity, variant.product);
+        if (fractionRejection) throw new BadRequestException(fractionRejection);
+        if (item.scaleBarcodes?.length) {
+          if (!ctx.isWeighted) {
+            throw new BadRequestException('Scale barcode evidence is only valid for a weighed catalog product.');
+          }
+          const parsed = item.scaleBarcodes.map((code) => this.parseScaleBarcode(code));
+          if (parsed.some((scale) => !scale)) {
+            throw new BadRequestException('A scale barcode is invalid or has an incorrect check digit.');
+          }
+          const knownKeys = [
+            variant.sku,
+            variant.barcode,
+            variant.product.barcode,
+          ].flatMap((key) => this.barcodeLookupKeys(key ?? ''));
+          if (parsed.some((scale) => !scale || !scaleBarcodeMatchesKnownKeys(scale, knownKeys))) {
+            throw new BadRequestException('Scale barcode does not identify the selected catalog product.');
+          }
+          // The shop's label-scale encoding (Settings -> POS); unset keeps the original price-or-weight behaviour.
+          scaleMode ??= resolveScaleBarcodeMode(
+            (await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }))?.settings,
+          );
+          const mode = scaleMode;
+          const expectedQuantity = parsed.reduce((sum, scale) => {
+            if (!scale) return Number.NaN;
+            const quantity = scaleBarcodeQuantity(scale, variant.sellingPrice, mode);
+            return quantity === null ? Number.NaN : sum + quantity;
+          }, 0);
+          const roundedQuantity = Math.round((expectedQuantity + Number.EPSILON) * 1000) / 1000;
+          if (!Number.isFinite(roundedQuantity) || !sameScaleQuantity(item.quantity, roundedQuantity)) {
+            throw new BadRequestException('Scale barcode quantity does not match the weighed quantity.');
+          }
+          if (!sameScalePrice(item.unitPrice, variant.sellingPrice)) {
+            throw new BadRequestException('Scale barcode price must use the catalog selling price.');
+          }
+          item.quantity = roundedQuantity;
+          item.unitPrice = round2(variant.sellingPrice);
+        }
         item.costPrice = ctx.costPrice;
-        if (item.reloadType) continue;
+        // Reload lines are bill-only (custom) lines; a catalog line flagged as a reload would skip the guard (P-F1).
+        const reloadRejection = catalogReloadLineRejection(item);
+        if (reloadRejection) throw new BadRequestException(reloadRejection);
         const violation = findPosPriceViolation(item, ctx);
         if (!violation) continue;
         if (!canOverride) {
@@ -331,6 +526,9 @@ export class PosService {
         }
         priceOverrides.push({ variantId: item.variantId.trim(), ...violation });
       }
+      // Above-MRP overrides are audited: the authorised user must say why (checked before anything is written).
+      const reasonError = priceOverrideReasonError(priceOverrides, dto.priceOverrideReason);
+      if (reasonError) throw new BadRequestException(reasonError);
     }
 
     let customerRecord: { id: string; firstName: string; lastName: string | null; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
@@ -367,6 +565,16 @@ export class PosService {
       throw new BadRequestException((e as Error).message);
     }
 
+    // P-F2 (cap only): the bill discount can never exceed what is being sold (no LKR 0 sale from one field).
+    const discountRejection = billDiscountRejection({
+      manualDiscount: dto.discountAmount,
+      subtotal: priced.subtotal,
+      taxAmount: priced.taxAmount,
+      couponDiscount: priced.couponDiscount,
+      tierDiscount: priced.tierDiscount,
+    });
+    if (discountRejection) throw new BadRequestException(discountRejection);
+
     const subtotal = priced.subtotal;
     const taxAmount = priced.taxAmount;
     const couponDiscount = priced.couponDiscount;
@@ -379,15 +587,16 @@ export class PosService {
     let pointsEarned = priced.pointsEarned;
     const amountDue = priced.amountDue;
     const promotionId = priced.promotionId;
-    const totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
+    let totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
     const walletPayments = dto.payments.filter((p) => p.method === PaymentMethod.WALLET);
-    const walletTotal = walletPayments.reduce((s, p) => s + p.amount, 0);
+    let walletTotal = walletPayments.reduce((s, p) => s + p.amount, 0);
     const creditPayments = dto.payments.filter((p) => p.method === PaymentMethod.CUSTOMER_CREDIT);
-    const creditPayTotal = creditPayments.reduce((s, p) => s + p.amount, 0);
+    let creditPayTotal = creditPayments.reduce((s, p) => s + p.amount, 0);
+    const unifiedAccountSelected = creditPayTotal > 0;
 
     if (walletTotal > 0) {
       if (!dto.customerId) throw new BadRequestException('Customer required for wallet payment');
-      if (!customerRecord || customerRecord.walletBalance < walletTotal) {
+      if (!customerRecord || customerRecord.walletBalance < walletDebitFloor(walletTotal)) {
         throw new BadRequestException('Insufficient wallet balance');
       }
     }
@@ -396,12 +605,12 @@ export class PosService {
       throw new BadRequestException('Customer required for credit payment');
     }
 
-    const isPartial = totalPaid + 0.01 < amountDue;
-    const partialCredit = isPartial ? amountDue - totalPaid : 0;
-    const totalCreditCharge = creditPayTotal + partialCredit;
-
-    if (totalCreditCharge > 0 && customerRecord) {
-      assertCreditAvailable(customerRecord.creditLimit, customerRecord.creditBalance, totalCreditCharge);
+    let isPartial = totalPaid + 0.01 < amountDue;
+    let partialCredit = isPartial ? amountDue - totalPaid : 0;
+    if (isPartial && creditPayTotal <= 0.01) {
+      throw new BadRequestException(
+        'Payment is short. Cash, card, bank, QR, and cheque payments cannot be moved to customer credit or wallet; select Customer Credit for the unpaid amount.',
+      );
     }
 
     if (isPartial) {
@@ -410,7 +619,7 @@ export class PosService {
           'Customer required for partial payment — unpaid balance is charged to customer credit',
         );
       }
-      if (customerRecord.creditLimit <= 0) {
+      if (!unifiedAccountSelected && customerRecord.creditLimit <= 0) {
         throw new BadRequestException(
           'Customer has no credit limit — set a limit or collect the full amount',
         );
@@ -421,9 +630,43 @@ export class PosService {
       throw new BadRequestException(`Payment short by LKR ${(amountDue - totalPaid).toFixed(2)}. Enable partial payment or add more.`);
     }
 
-    const changeDue = Math.max(0, totalPaid - amountDue);
-    const paymentStatus = isPartial ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
-    const paymentMethods = dto.payments.map((p) => p.method);
+    let changeDue = Math.max(0, totalPaid - amountDue);
+    const cashPaidTotal = dto.payments
+      .filter((p) => p.method === PaymentMethod.CASH)
+      .reduce((s, p) => s + p.amount, 0);
+    if (changeDue > 0.01 && cashPaidTotal + 0.01 < changeDue) {
+      throw new BadRequestException(
+        'Overpayment must include enough cash to give the customer change; reduce the non-cash payment.',
+      );
+    }
+    let paymentStatus = isPartial ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
+    let paymentMethods = dto.payments.map((p) => p.method);
+
+    // ── Save change to customer wallet ──────────────────────────────────
+    // Resolve settings eagerly (also used by QR fees below).
+    const tenantRowForSettings = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    const saveChangeSettings = resolveSaveChangeSettings(tenantRowForSettings?.settings);
+    if (round2(dto.saveChangeAmount ?? 0) > 0 && !unifiedAccountSelected) {
+      throw new BadRequestException('Customer wallet changes require the Credit / Wallet payment method.');
+    }
+    const saveChangeDecision = decideSaveChange({
+      requested: dto.saveChangeAmount,
+      consent: dto.saveChangeConsent,
+      customerId: dto.customerId,
+      changeDue,
+      cashPaid: cashPaidTotal,
+      isPartial,
+      creditPayTotal,
+      settings: saveChangeSettings,
+    });
+    if (!saveChangeDecision.ok) {
+      // A positive request that was refused → reject the sale so the cashier knows.
+      const requestedAmt = round2(dto.saveChangeAmount ?? 0);
+      if (requestedAmt > 0) {
+        throw new BadRequestException(saveChangeDecision.reason);
+      }
+    }
+    const changeSavedToWallet = saveChangeDecision.ok ? saveChangeDecision.amount : 0;
 
     let helperEmployeeId: string | undefined;
     let helperName: string | undefined;
@@ -439,30 +682,14 @@ export class PosService {
       helperCommission = computeHelperCommission(amountDue, helper.commissionRate ?? 0);
     }
 
-    // Pre-validate gift voucher payments
+    // Validate references before opening the transaction; balances are re-read under a
+    // row lock inside the transaction so concurrent checkouts cannot overspend a voucher.
     const giftPays = dto.payments.filter((p) => p.method === PaymentMethod.GIFT_VOUCHER);
-    const giftUpdates: { id: string; applied: number; remainingBalance: number; status: GiftVoucherStatus }[] = [];
+    const giftAmounts = new Map<string, number>();
     for (const gp of giftPays) {
       const code = (gp.reference ?? '').trim().toUpperCase();
       if (!code) throw new BadRequestException('Gift voucher code required in payment reference');
-      const voucher = await this.prisma.giftVoucher.findFirst({
-        where: { tenantId, code, status: { in: [GiftVoucherStatus.ACTIVE, GiftVoucherStatus.PARTIALLY_USED] } },
-      });
-      if (!voucher) throw new BadRequestException(`Gift voucher not found: ${code}`);
-      if (voucher.expiresAt && voucher.expiresAt < new Date()) {
-        throw new BadRequestException(`Gift voucher expired: ${code}`);
-      }
-      const redeem = applyGiftVoucherRedeem(voucher.balance, gp.amount, gp.amount);
-      if (!redeem.ok) throw new BadRequestException(redeem.reason);
-      if (Math.abs(redeem.applied - gp.amount) > 0.02) {
-        throw new BadRequestException(`Gift voucher ${code} can only apply LKR ${redeem.applied.toFixed(2)}`);
-      }
-      giftUpdates.push({
-        id: voucher.id,
-        applied: redeem.applied,
-        remainingBalance: redeem.remainingBalance,
-        status: redeem.status as GiftVoucherStatus,
-      });
+      giftAmounts.set(code, (giftAmounts.get(code) ?? 0) + gp.amount);
     }
 
     const chequePays = dto.payments.filter((p) => p.method === PaymentMethod.CHEQUE && p.amount > 0);
@@ -472,14 +699,7 @@ export class PosService {
       }
     }
 
-    const cardPays = dto.payments.filter((p) => p.method === PaymentMethod.CARD && p.amount > 0);
-    for (const cp of cardPays) {
-      const digits = (cp.reference ?? '').replace(/\D/g, '');
-      if (digits.length !== 3) {
-        throw new BadRequestException('Last 3 card digits required in payment reference for CARD payments');
-      }
-      cp.reference = digits;
-    }
+    // Card digits (exactly 4) and stray card / bank / QR fields were handled by preparePaymentLines.
 
     const bankTenderPays = dto.payments.filter(
       (p) =>
@@ -504,6 +724,39 @@ export class PosService {
     if (bankAccounts.length !== bankAccountIds.length) {
       throw new BadRequestException('One or more bank accounts are invalid or inactive');
     }
+    await assertQrCodesForPayments(this.prisma, tenantId, branchId, bankTenderPays);
+
+    // QR fee (deducted by the bank from each QR tender; the invoice total and the amount the customer pays are
+    // unchanged): worked out here from the shop settings of this moment and stored with the payment (gross,
+    // percentage, fee, net). It is never recomputed later (settings changes do not touch past sales) and a retry
+    // of this sale returns the stored sale before reaching this point, so the fee can only be applied once.
+    const qrFees = new Map<SalePaymentDto, QrFeeResult>();
+    const qrLines = dto.payments.filter((p) => p.method === PaymentMethod.QR && p.amount > 0);
+    if (qrLines.length > 0) {
+      const feeSettings = resolveQrFeeSettings(tenantRowForSettings?.settings);
+      for (const p of qrLines) {
+        const fee = computeQrFeeCents(p.amount, feeSettings);
+        if (p.expectedQrFee != null && Math.round(p.expectedQrFee * 100) !== Math.round(fee.feeAmount * 100)) {
+          throw new ConflictException(
+            `The QR fee changed: the screen showed LKR ${p.expectedQrFee.toFixed(2)}, it is now LKR ${fee.feeAmount.toFixed(2)}. Review the QR payment and confirm again.`,
+          );
+        }
+        qrFees.set(p, fee);
+      }
+    }
+
+    // P-F10: the held bill being checked out must be one this cashier may use (tenant + branch, own hold
+    // unless manager / admin). Checked before any write; a foreign or unknown id is refused, so it can never
+    // release another hold's stock reservation or delete another shop's / branch's held bill.
+    const heldBillWhere = dto.heldBillId
+      ? heldBillScopeWhere(dto.heldBillId, tenantId, branchId, { cashierId, scopeAll: holdScope?.scopeAll })
+      : null;
+    if (heldBillWhere) {
+      const held = await this.prisma.heldBill.findFirst({ where: heldBillWhere, select: { id: true } });
+      if (!held) {
+        throw new NotFoundException('Held bill not found (it was removed, or belongs to another cashier or branch).');
+      }
+    }
 
     const outcome = await this.prisma.$transaction(async (tx) => {
       await this.inventoryService.assertSaleStockAvailable(
@@ -515,6 +768,124 @@ export class PosService {
         dto.heldBillId,
         tx,
       );
+
+      if (dto.customerId) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "customers"
+          WHERE "id" = ${dto.customerId} AND "tenantId" = ${tenantId}
+          FOR UPDATE
+        `;
+        const lockedCustomer = await tx.customer.findFirst({
+          where: { id: dto.customerId, tenantId },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            loyaltyPoints: true,
+            walletBalance: true,
+            creditLimit: true,
+            creditBalance: true,
+            creditDays: true,
+            tier: true,
+          },
+        });
+        if (!lockedCustomer) throw new BadRequestException('Customer not found');
+        customerRecord = lockedCustomer;
+
+        if (unifiedAccountSelected) {
+          if (lockedCustomer.walletBalance + 0.001 < walletTotal) {
+            throw new ConflictException('Customer wallet changed during checkout. Refresh the customer account and retry.');
+          }
+          const otherTenderTotal = dto.payments
+            .filter((p) => p.method !== PaymentMethod.CUSTOMER_CREDIT && p.method !== PaymentMethod.WALLET)
+            .reduce((sum, p) => sum + p.amount, 0);
+          const accountAmount = round2(amountDue - otherTenderTotal - walletTotal);
+          if (accountAmount <= 0.009) {
+            throw new BadRequestException('Credit / Wallet cannot be combined with an overpayment.');
+          }
+          if (creditPayTotal > accountAmount + 0.01) {
+            throw new BadRequestException('Credit / Wallet amount exceeds the remaining bill amount.');
+          }
+
+          const allocation = splitCustomerAccountTender(
+            accountAmount,
+            lockedCustomer.walletBalance - walletTotal,
+          );
+          assertCreditAvailable(
+            lockedCustomer.creditLimit,
+            lockedCustomer.creditBalance,
+            allocation.creditAmount,
+          );
+
+          dto.payments = dto.payments.filter((p) => p.method !== PaymentMethod.CUSTOMER_CREDIT);
+          if (allocation.walletAmount > 0.009) {
+            dto.payments.push({ method: PaymentMethod.WALLET, amount: allocation.walletAmount });
+          }
+          if (allocation.creditAmount > 0.009) {
+            dto.payments.push({ method: PaymentMethod.CUSTOMER_CREDIT, amount: allocation.creditAmount });
+          }
+          walletTotal = round2(walletTotal + allocation.walletAmount);
+          creditPayTotal = allocation.creditAmount;
+          partialCredit = 0;
+          isPartial = false;
+          totalPaid = round2(dto.payments.reduce((sum, payment) => sum + payment.amount, 0));
+          changeDue = Math.max(0, totalPaid - amountDue);
+          paymentStatus = PaymentStatus.COMPLETED;
+          paymentMethods = dto.payments.map((payment) => payment.method);
+        }
+
+        if (walletTotal > 0 && lockedCustomer.walletBalance < walletDebitFloor(walletTotal)) {
+          throw new ConflictException('Customer wallet changed during checkout. Refresh the customer account and retry.');
+        }
+        const creditCharge = round2(creditPayTotal + partialCredit);
+        if (creditCharge > 0.009) {
+          assertCreditAvailable(lockedCustomer.creditLimit, lockedCustomer.creditBalance, creditCharge);
+        }
+      }
+
+      // The wallet (shift) this sale is taken on — created only here, inside the sale transaction, after
+      // every check: a refused checkout (bad payment, item, customer credit, voucher, stock…) rolls it back,
+      // so it never leaves an empty cashier wallet behind. Stored on the sale for exact day-end collections.
+      const wallet = await ensureCashierWallet(tx, tenantId, branchId, cashierId, counterId);
+
+      for (const [code, requested] of giftAmounts) {
+        const locked = await tx.$queryRaw<Array<{
+          id: string;
+          balance: number;
+          status: GiftVoucherStatus;
+          expiresAt: Date | null;
+        }>>`
+          SELECT "id", "balance", "status", "expiresAt"
+          FROM "gift_vouchers"
+          WHERE "tenantId" = ${tenantId}
+            AND "code" = ${code}
+            AND ("branchId" IS NULL OR "branchId" = ${branchId})
+            AND "status" IN ('ACTIVE', 'PARTIALLY_USED')
+          FOR UPDATE
+        `;
+        const voucher = locked[0];
+        if (!voucher) throw new BadRequestException(`Gift voucher not found: ${code}`);
+        if (voucher.expiresAt && voucher.expiresAt < new Date()) {
+          throw new BadRequestException(`Gift voucher expired: ${code}`);
+        }
+        const redeem = applyGiftVoucherRedeem(voucher.balance, requested, requested);
+        if (!redeem.ok) throw new BadRequestException(redeem.reason);
+        if (Math.abs(redeem.applied - requested) > 0.02) {
+          throw new BadRequestException(`Gift voucher ${code} can only apply LKR ${redeem.applied.toFixed(2)}`);
+        }
+        const updated = await tx.giftVoucher.updateMany({
+          where: {
+            id: voucher.id,
+            tenantId,
+            status: { in: [GiftVoucherStatus.ACTIVE, GiftVoucherStatus.PARTIALLY_USED] },
+            balance: { gte: requested },
+          },
+          data: { balance: redeem.remainingBalance, status: redeem.status as GiftVoucherStatus },
+        });
+        if (updated.count !== 1) {
+          throw new ConflictException(`Gift voucher ${code} was redeemed by another checkout. Please retry.`);
+        }
+      }
 
       const resolvedInvoice =
         invoiceNumber ??
@@ -531,6 +902,7 @@ export class PosService {
           helperCommission,
           invoiceNumber: resolvedInvoice,
           clientRequestId,
+          cashRegisterId: wallet.id,
           status: SaleStatus.COMPLETED,
           subtotal,
           discountAmount: totalDiscount,
@@ -540,18 +912,23 @@ export class PosService {
           total: amountDue,
           amountPaid: totalPaid,
           changeDue,
+          changeSavedToWallet,
           paymentMethod: dto.payments[0]?.method ?? PaymentMethod.CASH,
           paymentStatus,
           pointsRedeemed,
+          // Points are credited only to a customer (below); the sale records what it earned so a refund
+          // can reverse it (was never stored: always 0).
+          pointsEarned: dto.customerId ? pointsEarned : 0,
           notes: dto.notes,
           couponCode: dto.couponCode?.trim().toUpperCase() || null,
           couponDiscount,
           metadata: {
             tierDiscount,
+            ...(manualDiscountApprovedBy ? { manualDiscountApprovedBy } : {}),
             paymentSummary: buildPaymentsSummary(paymentMethods),
             partialBalance: isPartial ? amountDue - totalPaid : 0,
             helperCommission,
-            ...(priceOverrides.length ? { priceOverrides } : {}),
+            ...(priceOverrides.length ? { priceOverrides: annotateOverrides(priceOverrides, cashierId, dto.priceOverrideReason) } : {}),
             ...(requestFingerprint ? { requestFingerprint } : {}),
           },
           items: {
@@ -589,6 +966,11 @@ export class PosService {
                 p.method === PaymentMethod.BANK_TRANSFER || p.method === PaymentMethod.QR
                   ? p.bankAccountId?.trim() || null
                   : null,
+              qrCodeId: p.method === PaymentMethod.QR ? p.qrCodeId?.trim() || null : null,
+              cardLast4: p.method === PaymentMethod.CARD ? p.cardLast4 ?? null : null,
+              ...(qrFees.has(p)
+                ? { feePercent: qrFees.get(p)!.feePercent, feeAmount: qrFees.get(p)!.feeAmount, netAmount: qrFees.get(p)!.netAmount }
+                : {}),
               status: paymentStatus,
             })),
           },
@@ -599,16 +981,6 @@ export class PosService {
           customer: true,
         },
       });
-
-      for (const gu of giftUpdates) {
-        await tx.giftVoucher.update({
-          where: { id: gu.id },
-          data: {
-            balance: gu.remainingBalance,
-            status: gu.status,
-          },
-        });
-      }
 
       if (promotionId) {
         await this.pricing.recordCouponUsage(tx, promotionId);
@@ -641,17 +1013,25 @@ export class PosService {
 
       if (dto.customerId && customerRecord) {
         const creditIncrement = creditPayTotal + partialCredit;
-        await tx.customer.update({
-          where: { id: dto.customerId },
+        const walletBalanceWhere = walletTotal > 0
+          ? { walletBalance: { gte: walletDebitFloor(walletTotal) } }
+          : {};
+        const customerUpdate = await tx.customer.updateMany({
+          where: { id: dto.customerId, tenantId, ...walletBalanceWhere },
           data: {
             totalSpent: { increment: amountDue },
             totalOrders: { increment: 1 },
             loyaltyPoints: { increment: pointsEarned - pointsRedeemed },
             lastPurchaseAt: new Date(),
-            ...(walletTotal > 0 ? { walletBalance: { decrement: walletTotal } } : {}),
+            ...((walletTotal > 0 || changeSavedToWallet > 0)
+              ? { walletBalance: { increment: round2(changeSavedToWallet - walletTotal) } }
+              : {}),
             ...(creditIncrement > 0 ? { creditBalance: { increment: creditIncrement } } : {}),
           },
         });
+        if (customerUpdate.count !== 1) {
+          throw new BadRequestException('Insufficient wallet balance');
+        }
 
         if (creditIncrement > 0) {
           await tx.customerCreditTransaction.create({
@@ -663,7 +1043,7 @@ export class PosService {
               status: 'OPEN',
               paidAmount: 0,
               dueDate: computeChargeDueDate(new Date(), customerRecord.creditDays ?? 30),
-              description: `POS sale ${invoiceNumber}`,
+              description: `POS sale ${created.invoiceNumber}`,
               referenceId: created.id,
             },
           });
@@ -676,7 +1056,19 @@ export class PosService {
               tenantId,
               amount: -walletTotal,
               type: 'SALE_DEBIT',
-              description: `POS sale ${invoiceNumber}`,
+              description: `POS sale ${created.invoiceNumber}`,
+              referenceId: created.id,
+            },
+          });
+        }
+        if (changeSavedToWallet > 0) {
+          await tx.walletTransaction.create({
+            data: {
+              customerId: dto.customerId,
+              tenantId,
+              amount: changeSavedToWallet,
+              type: 'CHANGE_SAVED',
+              description: `Change saved from POS sale ${created.invoiceNumber}`,
               referenceId: created.id,
             },
           });
@@ -689,7 +1081,7 @@ export class PosService {
               tenantId,
               points: pointsEarned,
               type: 'EARNED',
-              description: `Sale ${invoiceNumber}`,
+              description: `Sale ${created.invoiceNumber}`,
               referenceId: created.id,
             },
           });
@@ -701,15 +1093,16 @@ export class PosService {
               tenantId,
               points: -pointsRedeemed,
               type: 'REDEEMED',
-              description: `Sale ${invoiceNumber}`,
+              description: `Sale ${created.invoiceNumber}`,
               referenceId: created.id,
             },
           });
         }
       }
 
-      if (dto.heldBillId) {
-        await tx.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
+      if (heldBillWhere) {
+        // Scoped delete (never by id alone); 0 rows if another request removed it meanwhile.
+        await tx.heldBill.deleteMany({ where: heldBillWhere });
       }
 
       for (const cp of chequePays) {
@@ -726,7 +1119,7 @@ export class PosService {
             partyType: dto.customerId ? 'CUSTOMER' : 'WALK_IN',
             partyId: dto.customerId || undefined,
             partyName,
-            notes: chequeSourceNotes('Sale', created.id, `POS sale ${invoiceNumber}`),
+            notes: chequeSourceNotes('Sale', created.id, `POS sale ${created.invoiceNumber}`),
             createdBy: cashierId,
           },
         });
@@ -753,6 +1146,39 @@ export class PosService {
         });
       }
 
+      // Audit record for an above-MRP override, in the SAME transaction: no override sale exists without its record.
+      if (priceOverrides.some((o) => o.kind === 'ABOVE_MAX_PRICE')) {
+        const names: Record<string, string> = {};
+        for (const it of dto.items) if (it.variantId) names[it.variantId.trim()] = it.productName?.trim() || it.sku;
+        await tx.auditLog.create({
+          data: buildMrpOverrideAudit({
+            tenantId, userId: cashierId, saleId: created.id, invoiceNumber: created.invoiceNumber, branchId,
+            total: amountDue, reason: dto.priceOverrideReason ?? '', lines: priceOverrides, productNames: names,
+          }),
+        });
+      }
+
+      // P-F17: the drawer movement of a cash sale is part of THIS transaction. If it cannot be written the whole
+      // sale (stock, payments, invoice number, loyalty, vouchers …) rolls back — a committed cash sale always has
+      // the cash it brought into the drawer.
+      const movementRegisterId = await recordSaleCashMovement(
+        tx,
+        tenantId,
+        branchId,
+        cashierId,
+        created.id,
+        created.invoiceNumber,
+        dto.payments,
+        changeDue,
+        changeSavedToWallet,
+        counterId,
+        wallet.id,
+      );
+      if (movementRegisterId && movementRegisterId !== wallet.id) {
+        // the wallet was cleared by a handover a moment ago: keep the sale pointing at the register that holds its cash
+        await tx.sale.update({ where: { id: created.id }, data: { cashRegisterId: movementRegisterId } });
+      }
+
       return created;
     })
       .then((created) => ({ created, replay: null }))
@@ -769,17 +1195,6 @@ export class PosService {
     const sale = outcome.created!;
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
-    void recordSaleCashMovement(
-      this.prisma,
-      tenantId,
-      branchId,
-      cashierId,
-      sale.id,
-      sale.invoiceNumber,
-      dto.payments,
-      changeDue,
-      counterId,
-    );
     return sale;
   }
 
@@ -831,25 +1246,21 @@ export class PosService {
     const page  = parseInt(String(query.page  ?? 1),  10);
     const limit = parseInt(String(query.limit ?? 20), 10);
     const skip = (page - 1) * limit;
-    const targetDate = query.date ? dayjs(query.date) : dayjs();
+    const shopDay = await this.getShopDayBounds(tenantId, query.date);
     const register = await this.resolveCashShiftRegister(
       tenantId,
       resolvedBranchId,
-      targetDate,
+      shopDay.from,
+      shopDay.to,
       opts,
     );
-    const { start: rangeStart, end: rangeEnd } = this.shiftDateRange(register, targetDate);
+    const { start: rangeStart, end: rangeEnd } = this.shiftDateRange(register, shopDay.from, shopDay.to);
 
     const where = {
       tenantId,
       branchId: resolvedBranchId,
       ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-      ...(query.search && {
-        OR: [
-          { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
-          { customer: { phone: { contains: query.search } } },
-        ],
-      }),
+      ...textSearch(query.search, ['invoiceNumber', 'customer.phone', 'customer.firstName', 'customer.lastName']),
       ...(query.date || register
         ? { invoiceDate: { gte: rangeStart, lte: rangeEnd } }
         : {}),
@@ -878,7 +1289,7 @@ export class PosService {
       },
       include: {
         items: { include: { variant: { include: { product: true } } } },
-        payments: true,
+        payments: { include: { bankAccount: { select: { name: true, bankName: true } }, qrCode: { select: { label: true } } } },
         customer: true,
         cashier: true,
       },
@@ -888,6 +1299,8 @@ export class PosService {
   }
 
   async holdBill(tenantId: string, branchId: string, cashierId: string, dto: HoldBillDto) {
+    const holdRejection = holdBillDataRejection(dto.data);
+    if (holdRejection) throw new BadRequestException(holdRejection);
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const data = dto.data as { items?: { variantId: string; quantity: number }[] };
 
@@ -924,33 +1337,43 @@ export class PosService {
     });
   }
 
-  async deleteHeldBill(id: string, tenantId: string, opts?: { cashierId?: string; scopeAll?: boolean }) {
-    const bill = await this.prisma.heldBill.findFirst({
-      where: {
-        id,
-        tenantId,
-        ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-      },
+  async deleteHeldBill(
+    id: string,
+    tenantId: string,
+    branchId: string,
+    opts?: { cashierId?: string; scopeAll?: boolean },
+  ) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    return this.prisma.$transaction(async (tx) => {
+      const bill = await tx.heldBill.findFirst({
+        where: {
+          id,
+          tenantId,
+          branchId: resolvedBranchId,
+          ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+        },
+      });
+      if (!bill) throw new NotFoundException('Held bill not found');
+      await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', id, false, tx);
+      return tx.heldBill.delete({
+        where: { id: bill.id },
+      });
     });
-    if (!bill) throw new NotFoundException('Held bill not found');
-    await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', id);
-    return this.prisma.heldBill.delete({ where: { id } });
   }
 
   /** Cash shift for cashier (open first, else latest closed on that calendar day). */
   private async resolveCashShiftRegister(
     tenantId: string,
     branchId: string,
-    targetDate: dayjs.Dayjs,
+    dayStart: Date,
+    dayEnd: Date,
     opts?: { cashierId?: string; scopeAll?: boolean },
   ) {
-    const dayStart = targetDate.startOf('day').toDate();
-    const dayEnd = targetDate.endOf('day').toDate();
     const include = { movements: { orderBy: { createdAt: 'asc' as const } } };
 
     if (opts?.cashierId && !opts?.scopeAll) {
       const open = await findOpenRegister(this.prisma, tenantId, branchId, opts.cashierId);
-      if (open && dayjs(open.openingTime).isSame(targetDate, 'day')) return open;
+      if (open && open.openingTime >= dayStart && open.openingTime <= dayEnd) return open;
       return this.prisma.cashRegister.findFirst({
         where: {
           tenantId,
@@ -986,12 +1409,24 @@ export class PosService {
     });
   }
 
+  private async getShopDayBounds(tenantId: string, date?: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const summaryDate = date ?? shopDateString(new Date(), tenant?.timezone);
+    try {
+      return { date: summaryDate, ...shopDayBounds(summaryDate, tenant?.timezone) };
+    } catch {
+      throw new BadRequestException('Invalid date (use YYYY-MM-DD)');
+    }
+  }
+
   private shiftDateRange(
     register: { openingTime: Date; closingTime: Date | null; status: CashRegisterStatus } | null,
-    targetDate: dayjs.Dayjs,
+    dayStart: Date,
+    dayEnd: Date,
   ) {
-    const dayStart = targetDate.startOf('day').toDate();
-    const dayEnd = targetDate.endOf('day').toDate();
     if (!register) return { start: dayStart, end: dayEnd, scoped: false as const };
     return {
       start: register.openingTime,
@@ -1009,16 +1444,18 @@ export class PosService {
     opts?: { cashierId?: string; scopeAll?: boolean },
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const targetDate = date ? dayjs(date) : dayjs();
+    const dayBounds = await this.getShopDayBounds(tenantId, date);
     const register = await this.resolveCashShiftRegister(
       tenantId,
       resolvedBranchId,
-      targetDate,
+      dayBounds.from,
+      dayBounds.to,
       opts,
     );
     const { start: rangeStart, end: rangeEnd, scoped: shiftScoped } = this.shiftDateRange(
       register,
-      targetDate,
+      dayBounds.from,
+      dayBounds.to,
     );
 
     const where = {
@@ -1064,6 +1501,31 @@ export class PosService {
         select: { amount: true, method: true },
       }),
     ]);
+    const registerIds = [...new Set(sales.map((sale) => sale.cashRegisterId).filter((id): id is string => Boolean(id)))];
+    const registers = registerIds.length
+      ? await this.prisma.cashRegister.findMany({
+          where: { id: { in: registerIds }, tenantId, branchId: resolvedBranchId },
+          select: { id: true, counter: { select: { id: true, name: true, code: true } } },
+        })
+      : [];
+    const registerById = new Map(registers.map((register) => [register.id, register.counter]));
+    const byCounter = sales.reduce(
+      (acc: Record<string, { name: string; code: string; orders: number; amount: number }>, sale) => {
+        const counter = sale.cashRegisterId ? registerById.get(sale.cashRegisterId) : null;
+        const key = counter?.id ?? 'unassigned';
+        const row = acc[key] ?? {
+          name: counter?.name ?? 'Unassigned',
+          code: counter?.code ?? '-',
+          orders: 0,
+          amount: 0,
+        };
+        row.orders += 1;
+        row.amount += sale.total;
+        acc[key] = row;
+        return acc;
+      },
+      {},
+    );
 
     const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
       for (const payment of sale.payments) {
@@ -1074,7 +1536,7 @@ export class PosService {
 
     let cashSalesNet = 0;
     for (const sale of sales) {
-      cashSalesNet += netCashFromSalePayments(sale.payments, sale.changeDue);
+      cashSalesNet += netCashFromSalePayments(sale.payments, sale.changeDue, sale.changeSavedToWallet);
     }
     cashSalesNet = Math.round(cashSalesNet * 100) / 100;
 
@@ -1109,12 +1571,16 @@ export class PosService {
       : Math.round((openingBalance + cashSalesNet - cashExpensesFromDb - cashSupplierPaymentsFromDb - refunds) * 100) / 100;
 
     return {
-      date: targetDate.format('YYYY-MM-DD'),
+      date: dayBounds.date,
       totalSales: totals._count.id,
       totalRevenue: income,
       totalTax: totals._sum.taxAmount ?? 0,
       totalDiscount: totals._sum.discountAmount ?? 0,
       totalItems: itemTotals._sum.quantity ?? 0,
+      byCounter: Object.values(byCounter).map((counter) => ({
+        ...counter,
+        amount: Math.round(counter.amount * 100) / 100,
+      })),
       byPaymentMethod,
       openingBalance,
       income,
@@ -1166,26 +1632,22 @@ export class PosService {
    * digits 2–6 = PLU/article, 7–11 = price (cents) or weight×1000.
    */
   private parseScaleBarcode(code: string): {
+    code: string;
     pluKeys: string[];
     embeddedValue: number;
     asPrice: number;
     asWeightKg: number;
   } | null {
-    const raw = code.trim();
-    if (!/^2\d{12}$/.test(raw)) return null;
-    const embeddedValue = parseInt(raw.slice(7, 12), 10);
-    if (Number.isNaN(embeddedValue)) return null;
-    return {
-      pluKeys: [raw.slice(2, 7), raw.slice(1, 7), raw.slice(0, 7)],
-      embeddedValue,
-      asPrice: embeddedValue / 100,
-      asWeightKg: embeddedValue / 1000,
-    };
+    return parseScaleBarcodeValue(code);
   }
 
   async lookupBarcode(tenantId: string, branchId: string, code: string, supplierId?: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const scale = this.parseScaleBarcode(code.trim());
+    // The shop's label-scale encoding decides the quantity returned for the scan; the sale re-checks it with the same mode.
+    const scaleMode: ScaleBarcodeMode = scale
+      ? resolveScaleBarcodeMode((await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }))?.settings)
+      : 'AUTO';
     const keys = this.barcodeLookupKeys(code);
 
     type VariantRow = Awaited<ReturnType<typeof this.prisma.productVariant.findMany>>[number] & {
@@ -1215,10 +1677,19 @@ export class PosService {
       const reserved = variant.inventory[0]?.reservedQty ?? 0;
       const available = Math.max(0, onHand - reserved);
       const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
-      const unitPrice = resolveUnitPrice(variant.sellingPrice, scale?.asPrice);
-      const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
-        ? scale.asWeightKg
+      const weighted =
+        variant.product.productKind === 'WEIGHTED' ||
+        ['kg', 'g', 'gram', 'grams', 'kilogram', 'kilograms'].includes((variant.product.unit ?? '').trim().toLowerCase());
+      const scaleQty = scale
+        ? weighted
+          ? scaleBarcodeQuantity(scale, variant.sellingPrice, scaleMode) ?? undefined
+          : scale.asPrice < 1 && scale.asWeightKg > 0
+            ? scale.asWeightKg
+            : undefined
         : undefined;
+      const unitPrice = scale && weighted
+        ? round2(variant.sellingPrice)
+        : resolveUnitPrice(variant.sellingPrice, scale?.asPrice);
       const assignment = Array.isArray(variant.supplierAssignments) ? variant.supplierAssignments[0] : undefined;
       const shelfLocations = (variant as VariantRow & {
         shelfLocations?: Parameters<typeof formatShelfLocationLabel>[0][];
@@ -1256,7 +1727,7 @@ export class PosService {
         supplierProductCode: assignment?.supplierProductCode ?? null,
         leadTimeDays: assignment?.leadTimeDays ?? null,
         lastBuyingPrice: assignment?.lastBuyingPrice ?? null,
-        ...(scale ? { isScaleBarcode: true, scaleQty, embeddedValue: scale.embeddedValue } : {}),
+        ...(scale ? { isScaleBarcode: true, scaleBarcode: scale.code, scaleQty, embeddedValue: scale.embeddedValue } : {}),
       };
     };
 
@@ -1465,7 +1936,8 @@ export class PosService {
           tenantId,
           branchId,
           supplierId,
-          [{ variantId: result.variantId, stock: result.stock }],
+          // purchase insights use exact stock (−2 counts as 2 more sold), not the clamped selling figure
+          [{ variantId: result.variantId, stock: exactStockOfRow(result) }],
         );
         const insight = insights.get(result.variantId);
 
@@ -1488,23 +1960,29 @@ export class PosService {
     return this.withPurchasePrices(tenantId, enriched);
   }
 
-  async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
-    await assertShopModule(this.prisma, tenantId, 'returns');
-    const refundNumber = `RET-${dayjs().format('YYYYMMDD')}-${nanoid(4).toUpperCase()}`;
-    const total = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of dto.items) {
-        await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+  async processReturn(
+    tenantId: string,
+    branchId: string,
+    user: { id: string; roles?: string[] },
+    dto: ReturnSaleDto,
+    unlockToken?: string,
+  ) {
+    return this.returnsService.create(
+      tenantId,
+      branchId,
+      { user: user, unlockToken },
+      {
+        clientRequestId: dto.clientRequestId,
+        originalSaleId: dto.originalSaleId,
+        reason: dto.reason ?? ReturnReason.OTHER,
+        items: dto.items.map((item) => ({
           variantId: item.variantId,
           quantity: item.quantity,
-          movementType: StockMovementType.RETURN,
-          referenceId: refundNumber,
-          notes: dto.reason ?? 'Customer return',
-        }, tx);
-      }
-    });
-    return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
+          unitPrice: item.unitPrice,
+        })),
+        notes: dto.reason,
+      },
+    );
   }
 
   private async attachPurchasePriceOptions(
@@ -1736,7 +2214,7 @@ export class PosService {
       : Math.min(Math.max(opts?.limit ?? 1500, 1), 15000);
     const page = paginated ? Math.max(1, opts!.page!) : 1;
     const skip = paginated ? (page - 1) * take : 0;
-    const search = opts?.search?.trim();
+    const search = escapeLike(normalizeSearch(opts?.search)); // trimmed; %, _ match literally
     const category = opts?.category?.trim();
     const where = {
       isActive: true,
@@ -2014,7 +2492,7 @@ export class PosService {
         tenantId,
         resolvedBranchId,
         opts.supplierId,
-        mapped.map((m) => ({ variantId: m.variantId, stock: m.stock })),
+        mapped.map((m) => ({ variantId: m.variantId, stock: exactStockOfRow(m) })),
       );
       items = mapped.map(({ assignment: _a, ...m }) => {
         const insight = insights.get(m.variantId);
@@ -2121,14 +2599,14 @@ export class PosService {
     let cashTendered = 0;
     let changeGiven = 0;
     for (const sale of sales) {
-      const net = netCashFromSalePayments(sale.payments, sale.changeDue);
+      const net = netCashFromSalePayments(sale.payments, sale.changeDue, sale.changeSavedToWallet);
       cashSalesNet += net;
       const tendered = sale.payments
         .filter((p) => p.method === PaymentMethod.CASH)
         .reduce((s, p) => s + p.amount, 0);
       if (tendered > 0) {
         cashTendered += tendered;
-        changeGiven += sale.changeDue ?? 0;
+        changeGiven += Math.max(0, (sale.changeDue ?? 0) - (sale.changeSavedToWallet ?? 0));
       }
     }
     cashSalesNet = Math.round(cashSalesNet * 100) / 100;
@@ -2468,7 +2946,11 @@ export class PosService {
   ) {
     for (const item of items) {
       if (!item.reloadType || !item.reloadOperatorId) continue;
-      const qty = Math.max(1, Math.floor(item.quantity || 1));
+      // Charged quantity and recorded units must never diverge (validated up front; this is the last line of defence).
+      if (!isWholeReloadQuantity(item.quantity)) {
+        throw new BadRequestException('Reload and recharge-card quantity must be a whole number of units.');
+      }
+      const qty = Math.round(item.quantity);
       const operator = await tx.reloadOperator.findFirst({
         where: { id: item.reloadOperatorId, tenantId, isActive: true },
       });
@@ -2622,17 +3104,22 @@ export class PosService {
 
   async setPosPin(tenantId: string, userId: string, pin: string) {
     assertValidPosPin(pin);
+    // PINs identify the user at unlock, so they must be unique — which makes "is this PIN taken?" an
+    // oracle. It is rate-limited like any PIN check and never says WHOSE PIN it is (it used to name the
+    // user, letting anyone discover a manager's PIN by trying to set it).
+    const scope = `pinset:${tenantId}:${userId}`;
+    await this.reservePinAttempt(scope, PosService.PIN_SET_MAX_FAILS);
     const users = await this.prisma.user.findMany({
       where: { tenantId, posPinHash: { not: null }, NOT: { id: userId } },
-      select: { id: true, posPinHash: true, firstName: true, lastName: true },
+      select: { id: true, posPinHash: true },
     });
     for (const u of users) {
       if (u.posPinHash && (await verifyPosPinHash(pin, u.posPinHash))) {
-        throw new BadRequestException(
-          `PIN already used by ${u.firstName} ${u.lastName}`.trim(),
-        );
+        await this.pinLockout.fail(scope, Date.now(), PosService.PIN_SET_MAX_FAILS);
+        throw new BadRequestException('This PIN cannot be used. Choose a different 4-digit PIN.');
       }
     }
+    await this.pinLockout.succeed(scope);
     const posPinHash = await hashPosPin(pin);
     await this.prisma.user.update({
       where: { id: userId },
@@ -2648,8 +3135,12 @@ export class PosService {
     return { ok: true, hasPin: false };
   }
 
-  async unlockWithPosPin(tenantId: string, branchId: string, pin: string, _counterId?: string | null) {
+  async unlockWithPosPin(tenantId: string, branchId: string, pin: string, _counterId?: string | null, terminalUserId?: string) {
     assertValidPosPin(pin);
+    // Brute-force limit per terminal login: without it every PIN (incl. a manager's) could be found in
+    // ~17 minutes, and a PIN-switched manager authorises cash actions.
+    const scope = `unlock:${tenantId}:${terminalUserId ?? 'unknown'}`;
+    await this.reservePinAttempt(scope, PosService.UNLOCK_MAX_FAILS);
     const candidates = await this.prisma.user.findMany({
       where: {
         tenantId,
@@ -2678,13 +3169,17 @@ export class PosService {
         break;
       }
     }
-    if (!matched) throw new BadRequestException('Incorrect PIN');
+    if (!matched) {
+      await this.pinLockout.fail(scope, Date.now(), PosService.UNLOCK_MAX_FAILS);
+      throw new BadRequestException('Incorrect PIN');
+    }
+    await this.pinLockout.succeed(scope);
 
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const ownRegister = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, matched.id);
     const sharedRegister = ownRegister?.status === CashRegisterStatus.OPEN ? ownRegister : null;
 
-    const unlockToken = signPosUnlockToken(tenantId, matched.id);
+    const unlockToken = signPosUnlockToken(tenantId, matched.id, resolvedBranchId, terminalUserId);
     const name = `${matched.firstName} ${matched.lastName}`.trim();
     return {
       unlockToken,
@@ -2721,7 +3216,7 @@ export class PosController {
   constructor(private readonly posService: PosService) {}
 
   private actingCashier(user: IAuthUser, unlockToken?: string) {
-    return resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return resolveActingCashierId(user.tenantId, user.id, unlockToken, user.branchId ?? undefined);
   }
 
   @Post('sale')
@@ -2739,6 +3234,7 @@ export class PosController {
       this.actingCashier(user, unlockToken),
       dto,
       counterId || undefined,
+      { scopeAll: canViewAllPosSales(user.roles ?? []) },
     );
   }
 
@@ -2773,6 +3269,7 @@ export class PosController {
   }
 
   @Post('hold')
+  @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Hold a bill for later' })
   holdBill(
     @CurrentUser() user: IAuthUser,
@@ -2788,6 +3285,7 @@ export class PosController {
   }
 
   @Get('hold')
+  @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Get held bills (cashiers: own holds only)' })
   getHeldBills(
     @CurrentUser() user: IAuthUser,
@@ -2802,6 +3300,7 @@ export class PosController {
 
   @Delete('hold/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Delete held bill (cashiers: own holds only)' })
   deleteHeldBill(
     @CurrentUser() user: IAuthUser,
@@ -2809,7 +3308,7 @@ export class PosController {
     @Headers('x-pos-cashier-token') unlockToken?: string,
   ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
-    return this.posService.deleteHeldBill(id, user.tenantId, {
+    return this.posService.deleteHeldBill(id, user.tenantId, user.branchId ?? '', {
       cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
@@ -2831,6 +3330,7 @@ export class PosController {
   }
 
   @Get('products')
+  @RequirePermissions('products:read')
   @ApiOperation({ summary: 'Get POS products/variants with stock (pass page= for 20/page pagination)' })
   getProducts(
     @CurrentUser() user: IAuthUser,
@@ -2870,6 +3370,7 @@ export class PosController {
   }
 
   @Get('barcode/:code')
+  @RequirePermissions('products:read')
   @ApiOperation({ summary: 'Lookup variant by barcode or SKU' })
   lookupBarcode(
     @CurrentUser() user: IAuthUser,
@@ -2882,11 +3383,22 @@ export class PosController {
   @Post('returns')
   @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Process a return/exchange' })
-  processReturn(@CurrentUser() user: IAuthUser, @Body() dto: ReturnSaleDto) {
-    return this.posService.processReturn(user.tenantId, user.branchId ?? '', user.id, dto);
+  processReturn(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: ReturnSaleDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    return this.posService.processReturn(
+      user.tenantId,
+      user.branchId ?? '',
+      { id: user.id, roles: user.roles ?? [] },
+      dto,
+      unlockToken,
+    );
   }
 
   @Get('coupons/validate/:code')
+  @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Validate coupon or gift voucher for POS checkout' })
   validateCoupon(
     @CurrentUser() user: IAuthUser,
@@ -2965,6 +3477,7 @@ export class PosController {
       user.branchId ?? '',
       dto.pin,
       counterId || undefined,
+      user.id,
     );
   }
 
@@ -3029,9 +3542,9 @@ export class PosController {
 }
 
 @Module({
-  imports: [InventoryModule, DocumentNumberingModule, PricingModule],
+  imports: [InventoryModule, DocumentNumberingModule, PricingModule, ReturnsModule],
   controllers: [PosController],
-  providers: [PosService],
+  providers: [PosService, PinLockoutService],
   exports: [PosService],
 })
 export class PosModule {}

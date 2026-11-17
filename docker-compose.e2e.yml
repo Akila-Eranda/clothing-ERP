@@ -1,0 +1,107 @@
+name: hexaone-e2e-wave1
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: hexa_e2e_bootstrap
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_bootstrap_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ./docker/e2e/init-postgres.sh
+        target: /docker-entrypoint-initdb.d/10-create-e2e-identity.sh
+        read_only: true
+    secrets:
+      - postgres_bootstrap_password
+      - e2e_database_password
+    networks:
+      - e2e
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready --host=127.0.0.1 --username=hexa_e2e --dbname=hexa_e2e_wave1
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --aclfile
+      - /run/secrets/redis_acl
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_data:/data
+    secrets:
+      - redis_acl
+    networks:
+      - e2e
+
+  e2e-runner:
+    profiles:
+      - verification
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.e2e
+    image: hexaone-e2e-wave1-runner:local
+    environment:
+      NODE_ENV: test
+      E2E_WAVE1: "1"
+      E2E_WAVE1_RUNNER_MODE: container
+      E2E_WAVE1_PROJECT: hexaone-e2e-wave1
+      E2E_WAVE1_NETWORK: hexaone_e2e_wave1_network
+      HOME: /tmp
+      TMPDIR: /tmp
+      KEYCLOAK_URL: http://127.0.0.1:9
+      KEYCLOAK_AUTH_ENABLED: "false"
+      KC_CLIENT_ID: e2e-local-disabled
+      KC_ADMIN_CLIENT_ID: e2e-local-disabled
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "9"
+      STORAGE_PROVIDER: local
+      E2E_BROWSER_SUBDOMAIN: "${E2E_BROWSER_SUBDOMAIN:-}"
+    secrets:
+      - e2e_database_password
+      - e2e_redis_password
+      - e2e_browser_password
+    networks:
+      - e2e
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: "no"
+
+volumes:
+  postgres_data:
+    name: hexaone_e2e_wave1_postgres_data
+  redis_data:
+    name: hexaone_e2e_wave1_redis_data
+
+networks:
+  e2e:
+    name: hexaone_e2e_wave1_network
+    driver: bridge
+    internal: true
+
+secrets:
+  postgres_bootstrap_password:
+    file: "${E2E_PG_BOOTSTRAP_PASSWORD_FILE:?Set E2E_PG_BOOTSTRAP_PASSWORD_FILE to an external secret file}"
+  e2e_database_password:
+    file: "${E2E_DATABASE_PASSWORD_FILE:?Set E2E_DATABASE_PASSWORD_FILE to an external secret file}"
+  redis_acl:
+    file: "${E2E_REDIS_ACL_FILE:?Set E2E_REDIS_ACL_FILE to an external ACL file}"
+  e2e_redis_password:
+    file: "${E2E_REDIS_PASSWORD_FILE:?Set E2E_REDIS_PASSWORD_FILE to an external secret file}"
+  e2e_browser_password:
+    file: "${E2E_BROWSER_PASSWORD_FILE:?Set E2E_BROWSER_PASSWORD_FILE to an external secret file}"

@@ -13,6 +13,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { escapeLike, normalizeSearch } from '@/shared/search.helper';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import {
@@ -147,15 +148,23 @@ export class SparePartsService {
   }) {
     await this.assertModule(tenantId, 'vehicles');
 
-    if (query.vin) {
+    const vin = normalizeSearch(query.vin);
+    if (vin) {
+      // VIN or chassis number, escaped so "%" / "_" are literal. An unknown VIN (or a vehicle with no
+      // catalogue model) returns no parts instead of silently ignoring the VIN and listing every part.
+      const vinLike = escapeLike(vin);
       const vehicle = await this.prisma.customerVehicle.findFirst({
         where: {
           tenantId,
-          vin: { contains: query.vin, mode: 'insensitive' as const },
+          OR: [
+            { vin: { contains: vinLike, mode: 'insensitive' as const } },
+            { chassisNo: { contains: vinLike, mode: 'insensitive' as const } },
+          ],
         },
         include: { vehicleModel: { include: { brand: true } } },
       });
-      if (vehicle?.vehicleModelId) query.modelId = vehicle.vehicleModelId;
+      if (!vehicle?.vehicleModelId) return { models: [], parts: [] };
+      query.modelId = vehicle.vehicleModelId;
     }
 
     const modelWhere: Record<string, unknown> = { tenantId, isActive: true };
@@ -192,8 +201,8 @@ export class SparePartsService {
       product: c.variant.product,
     }));
 
-    if (query.search) {
-      const q = query.search.toLowerCase();
+    if (query.search?.trim()) {
+      const q = query.search.trim().replace(/\s+/g, ' ').toLowerCase();
       parts = parts.filter(
         (p) =>
           p.product.name.toLowerCase().includes(q) ||

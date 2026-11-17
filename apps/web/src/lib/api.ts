@@ -11,6 +11,14 @@ export interface ApiResponse<T = unknown> {
   meta?: { page: number; limit: number; total: number; totalPages: number };
 }
 
+/** Failed API call: `status` is the HTTP status, `code` the API's machine-readable `error` (e.g. PIN_LOCKED). */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 // ── Token helpers (localStorage) ─────────────────────────────────────────
 const TOKEN_KEY   = 'fe_access_token';
 const REFRESH_KEY = 'fe_refresh_token';
@@ -110,7 +118,14 @@ async function tryRefresh(): Promise<string | null> {
 function needsPosCashierHeader(path: string): boolean {
   if (path.startsWith('/pos') || path.startsWith('/cash')) return true;
   if (path.startsWith('/accounting/expenses')) return true;
-  return /\/suppliers\/[^/]+\/ap\/payment/.test(path);
+  // Refunds: the PIN cashier refunds from THEIR drawer on this counter (never as the terminal login).
+  if (path === '/returns' || path.startsWith('/returns?')) return true;
+  // Manual wallet top-up: the person at the till acts (cash goes into THEIR drawer); needs a manager PIN.
+  if (/^\/customers\/[^/]+\/wallet\/topup/.test(path)) return true;
+  // Supplier cash from the drawer: AP payment, PO receive with payment, Quick GRN with payment.
+  if (path.startsWith('/procurement/grn/quick')) return true;
+  if (/^\/purchases\/[^/]+\/receive/.test(path)) return true;
+  return /\/suppliers\/[^/]+\/(ap\/payment|payments)/.test(path);
 }
 
 async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<ApiResponse<T>> {
@@ -196,11 +211,13 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    let code: string | undefined;
     try {
       const body = await res.json();
-      message = body?.message ?? message;
+      message = (Array.isArray(body?.message) ? body.message.join(', ') : body?.message) ?? message;
+      code = typeof body?.error === 'string' ? body.error : undefined;
     } catch {}
-    throw new Error(message);
+    throw new ApiError(message, res.status, code);
   }
 
   return res.json() as Promise<ApiResponse<T>>;

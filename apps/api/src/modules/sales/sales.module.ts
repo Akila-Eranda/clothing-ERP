@@ -1,3 +1,4 @@
+import { textSearch } from '@/shared/search.helper';
 import { Module } from '@nestjs/common';
 import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -7,11 +8,19 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
+import { buildSaleBillMessage } from '@/shared/sale-bill-message';
 import * as dayjs from 'dayjs';
 
 @Injectable()
 export class SalesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Bill message of a sale the caller may see (same scope as the sale detail). */
+  async billMessage(tenantId: string, id: string, scope: { cashierId?: string; scopeAll?: boolean }) {
+    await this.findOne(id, tenantId, scope);
+    return buildSaleBillMessage(this.prisma, tenantId, id);
+  }
 
   async findAll(tenantId: string, query: {
     page?: number; limit?: number; branchId?: string;
@@ -30,12 +39,7 @@ export class SalesService {
           lte: dayjs(query.endDate).endOf('day').toDate(),
         },
       }),
-      ...(query.search && {
-        OR: [
-          { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
-          { customer: { phone: { contains: query.search } } },
-        ],
-      }),
+      ...textSearch(query.search, ['invoiceNumber', 'customer.phone', 'customer.firstName', 'customer.lastName']),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -59,7 +63,7 @@ export class SalesService {
       },
       include: {
         items: { include: { variant: { include: { product: true } } } },
-        payments: true, customer: true, branch: true, cashier: true,
+        payments: { include: { bankAccount: { select: { name: true, bankName: true } }, qrCode: { select: { label: true } } } }, customer: true, branch: true, cashier: true,
       },
     });
     if (!sale) throw new NotFoundException('Sale not found');
@@ -115,9 +119,17 @@ export class SalesController {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.salesService.findAll(user.tenantId, {
       ...query,
+      branchId: resolveBranchScope(user, query.branchId),
       cashierId: user.id,
       scopeAll,
     });
+  }
+
+  @Get(':id/bill-message')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Customer bill message of this sale (shop template, real invoice data) for copy / share' })
+  billMessage(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.salesService.billMessage(user.tenantId, id, { cashierId: user.id, scopeAll: canViewAllPosSales(user.roles ?? []) });
   }
 
   @Get('top-products')

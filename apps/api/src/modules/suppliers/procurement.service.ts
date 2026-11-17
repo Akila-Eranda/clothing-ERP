@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { assertSupplierCashPayable } from '@/shared/cash-register.helper';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ChequeDirection,
@@ -25,12 +26,29 @@ import {
   applyPartialReceive,
   canConvertPurchaseRequest,
   canReceiveAgainstPo,
+  buildMrpWarnings,
+  canEditGrnPricing,
+  calculatePoReceiptPayable,
+  effectivePoReceiptUnitCost,
+  grnRequestMatches,
+  isUniqueConflictOn,
+  matchGrnItemsToLines,
 } from './procurement.helper';
+import { isClientRequestIdConflict, normalizeClientRequestId } from '@/modules/pos/pos-idempotency.helper';
 import {
   assertSupplierCreditLimit,
   syncSupplierBalanceWithLedger,
 } from './supplier-ap.helper';
-import { SupplierApService } from './supplier-ap.service';
+import { SupplierApService , ApTxContext } from './supplier-ap.service';
+import { assertVariantsInTenant } from '@/modules/inventory/tenant-ownership.helper';
+import {
+  assertGoodsReceiptInTenant,
+  assertPurchaseItemsInTenant,
+  assertPurchaseOrderInTenant,
+  assertReturnLinesReturnable,
+  assertReturnLotsInTenant,
+  assertSupplierInTenant,
+} from './procurement-ownership.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
 import type { NumberSeriesKey } from '@/modules/document-numbering/document-numbering.helper';
@@ -112,6 +130,7 @@ export class ProcurementService {
     notes?: string,
   ) {
     if (!items?.length) throw new BadRequestException('At least one item is required');
+    await assertVariantsInTenant(this.prisma, tenantId, items.map((i) => i.variantId));
     const requestNumber = await this.nextNumber(tenantId, 'PR', 'pr');
     return this.prisma.purchaseRequest.create({
       data: {
@@ -307,17 +326,122 @@ export class ProcurementService {
     payableAmount?: number;
     /** Runs inside the same DB transaction after stock is posted (e.g. PO qty updates). */
     afterStock?: (tx: Prisma.TransactionClient, grn: { id: string; items: { id: string; variantId: string; lotId: string | null }[] }) => Promise<void>;
+    /**
+     * Runs LAST inside the same DB transaction (after the auto invoice and supplier ledger exist), e.g. the
+     * supplier payment of a PO receive / Quick GRN: if it throws, the whole GRN — stock, lots, PO quantities,
+     * invoice, ledger — rolls back. Nothing of a failed payment, nor of its goods receipt, remains.
+     */
+    beforeCommit?: (tx: Prisma.TransactionClient, grn: { id: string; grnNumber: string }) => Promise<void>;
+    /**
+     * Runs FIRST inside the transaction, before anything is written: lock the source document and re-check it
+     * against fresh data (e.g. PO receive: row lock + over-receipt check). May return the payable amount and
+     * final lines computed from that fresh data.
+     */
+    lockAndCheck?: (tx: Prisma.TransactionClient) => Promise<{ payableAmount?: number; lines?: GrnLineInput[] } | void>;
+    /** Idempotency key: a second request with the same key returns the first GRN and posts nothing. */
+    clientRequestId?: string | null;
+    actorRoles?: string[];
   }) {
-    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines, afterStock, payableAmount } = params;
+    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines, afterStock, beforeCommit, payableAmount, lockAndCheck } = params;
+    const clientRequestId = normalizeClientRequestId(params.clientRequestId);
     if (!lines?.length) throw new BadRequestException('At least one GRN line is required');
     if (!branchId) throw new BadRequestException('Branch is required to post GRN');
 
     const effectiveLines = lines.filter((l) => l.receivedQty > 0 || (l.rejectedQty ?? 0) > 0);
     if (!effectiveLines.length) throw new BadRequestException('Enter at least one received quantity');
+    // Every id that reaches a write must be this tenant's: supplier and each variant (S-F8). PO receive passes
+    // the PO's own supplier/variants, Direct and Quick GRN pass client ids; all are checked here, before anything.
+    await assertSupplierInTenant(this.prisma, tenantId, supplierId);
+    await assertVariantsInTenant(this.prisma, tenantId, effectiveLines.map((l) => l.variantId));
+    if (
+      // Quick GRN decides cost authority itself (createQuickGrn): existing cost is open to a Cashier, edits are not.
+      source === GoodsReceiptSource.DIRECT
+      && effectiveLines.some((line) => line.unitCost != null || line.sellingPrice != null || line.mrp != null)
+      && !canEditGrnPricing(params.actorRoles ?? [])
+    ) {
+      throw new ForbiddenException('Changing GRN purchase cost, selling price or MRP requires an authorised inventory or finance role');
+    }
 
-    const grnNumber = await this.nextNumber(tenantId, 'GRN', 'grn');
+    // Selling price above MRP is a WARNING only: stock receiving is never blocked by it.
+    const warnings = buildMrpWarnings(effectiveLines);
 
-    const grn = await this.prisma.$transaction(async (tx) => {
+    const replayOf = async () => {
+      if (!clientRequestId) return null;
+      const existing = await this.prisma.goodsReceipt.findFirst({
+        where: { tenantId, clientRequestId },
+        include: { items: true },
+      });
+      if (!existing) return null;
+      if (existing.branchId !== branchId || existing.supplierId !== supplierId || (existing.purchaseId ?? null) !== (purchaseId ?? null)) {
+        throw new ConflictException('clientRequestId was already used for a different goods receipt');
+      }
+      const full = await this.getGoodsReceipt(existing.id, tenantId);
+      if (!grnRequestMatches(existing.items, effectiveLines)) {
+        throw new ConflictException('clientRequestId was already used for a different goods receipt payload');
+      }
+      return { ...full, warnings, replayed: true as const };
+    };
+    const earlier = await replayOf();
+    if (earlier) return earlier;
+
+    // The legacy GRN number is count + 1, so two receipts at the same moment can draw the same number:
+    // retry with a fresh number instead of failing (the unique index keeps numbers distinct).
+    let grn: { id: string } | null = null;
+    for (let attempt = 1; ; attempt++) {
+      const grnNumber = await this.nextNumber(tenantId, 'GRN', 'grn');
+      try {
+        grn = await this.postGoodsReceiptTx({ ...params, clientRequestId, effectiveLines, grnNumber, lockAndCheck, payableAmount });
+        break;
+      } catch (e) {
+        if (clientRequestId && isClientRequestIdConflict(e)) {
+          const replay = await replayOf();
+          if (replay) return replay;
+        }
+        if (attempt < 3 && isUniqueConflictOn(e, 'grnNumber')) continue;
+        throw e;
+      }
+    }
+
+    this.eventEmitter.emit('accounting.grn.posted', {
+      grnId: grn!.id,
+      tenantId,
+      userId,
+    });
+
+    if (warnings.length) {
+      // Best-effort audit trail (existing audit_logs table); never breaks the receipt.
+      try {
+        await this.prisma.auditLog.create({
+          data: { tenantId, userId, action: 'GRN_PRICE_ABOVE_MRP', resource: 'GoodsReceipt', resourceId: grn!.id, newData: { warnings } as unknown as Prisma.InputJsonValue },
+        });
+      } catch { /* audit must never block receiving */ }
+    }
+
+    return { ...(await this.getGoodsReceipt(grn!.id, tenantId)), warnings };
+  }
+
+  private async postGoodsReceiptTx(p: {
+    tenantId: string;
+    branchId: string;
+    userId: string;
+    supplierId: string;
+    source: GoodsReceiptSource;
+    purchaseId?: string;
+    notes?: string;
+    supplierInvoiceRef?: string;
+    effectiveLines: GrnLineInput[];
+    grnNumber: string;
+    clientRequestId: string | null;
+    payableAmount?: number;
+    afterStock?: (tx: Prisma.TransactionClient, grn: { id: string; items: { id: string; variantId: string; lotId: string | null }[] }) => Promise<void>;
+    beforeCommit?: (tx: Prisma.TransactionClient, grn: { id: string; grnNumber: string }) => Promise<void>;
+    lockAndCheck?: (tx: Prisma.TransactionClient) => Promise<{ payableAmount?: number; lines?: GrnLineInput[] } | void>;
+  }) {
+    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, grnNumber, clientRequestId, afterStock, beforeCommit, lockAndCheck } = p;
+    return this.prisma.$transaction(async (tx) => {
+      const checked = lockAndCheck ? await lockAndCheck(tx) : undefined;
+      const payableAmount = checked && checked.payableAmount != null ? checked.payableAmount : p.payableAmount;
+      const effectiveLines = checked && checked.lines ? checked.lines : p.effectiveLines;
       const created = await tx.goodsReceipt.create({
         data: {
           tenantId,
@@ -330,6 +454,7 @@ export class ProcurementService {
           receivedBy: userId,
           notes,
           supplierInvoiceRef,
+          clientRequestId,
           items: {
             create: effectiveLines.map((l) => ({
               purchaseItemId: l.purchaseItemId,
@@ -350,9 +475,11 @@ export class ProcurementService {
         include: { items: true },
       });
 
-      for (const line of effectiveLines) {
+      const itemIdxByLine = matchGrnItemsToLines(effectiveLines, created.items);
+      for (let li = 0; li < effectiveLines.length; li++) {
+        const line = effectiveLines[li];
         if (line.receivedQty <= 0) continue;
-        await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+        const stock = await this.inventoryService.adjustStock(tenantId, branchId, userId, {
           variantId: line.variantId,
           quantity: line.receivedQty,
           movementType: StockMovementType.PURCHASE,
@@ -368,8 +495,8 @@ export class ProcurementService {
         const sell = line.sellingPrice != null && line.sellingPrice > 0 ? line.sellingPrice : null;
         const mrp = line.mrp != null && line.mrp > 0 ? line.mrp : null;
         if (sell != null || mrp != null) {
-          await tx.productVariant.update({
-            where: { id: line.variantId },
+          await tx.productVariant.updateMany({
+            where: { id: line.variantId, product: { tenantId } },
             data: {
               ...(sell != null ? { sellingPrice: sell } : {}),
               ...(mrp != null ? { mrp } : {}),
@@ -377,25 +504,12 @@ export class ProcurementService {
           });
         }
 
-        const lotLog = await tx.inventoryLog.findFirst({
-          where: {
-            tenantId,
-            referenceId: created.id,
-            referenceType: 'GoodsReceipt',
-            variantId: line.variantId,
-            lotId: { not: null },
-            NOT: { notes: 'LOT_ALLOCATION' },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-        if (lotLog?.lotId) {
-          const item = created.items.find((i) => i.variantId === line.variantId && !i.lotId);
-          if (item) {
-            await tx.goodsReceiptItem.update({
-              where: { id: item.id },
-              data: { lotId: lotLog.lotId },
-            });
-          }
+        // Link the item to the exact lot this line created/topped up (returned by adjustStock), not "any lot of the variant".
+        const lotId = (stock as { _lotId?: string | null })._lotId;
+        const item = itemIdxByLine[li] >= 0 ? created.items[itemIdxByLine[li]] : undefined;
+        if (lotId && item) {
+          await tx.goodsReceiptItem.update({ where: { id: item.id }, data: { lotId } });
+          item.lotId = lotId;
         }
       }
 
@@ -467,16 +581,10 @@ export class ProcurementService {
         createdBy: userId,
       });
 
+      if (beforeCommit) await beforeCommit(tx, { id: created.id, grnNumber });
+
       return created;
-    });
-
-    this.eventEmitter.emit('accounting.grn.posted', {
-      grnId: grn.id,
-      tenantId,
-      userId,
-    });
-
-    return this.getGoodsReceipt(grn.id, tenantId);
+    }, { timeout: 30_000, maxWait: 10_000 });
   }
 
   /** GRN from PO — also updates PO line qtys / status (partial receive). */
@@ -493,12 +601,52 @@ export class ProcurementService {
       expiryDate?: string;
       manufactureDate?: string;
     }[],
+    /** Supplier payment made with this receipt: runs inside the GRN transaction (all or nothing). */
+    pay?: (tx: Prisma.TransactionClient, grn: { id: string; grnNumber: string }) => Promise<unknown>,
+    opts: { clientRequestId?: string | null } = {},
   ) {
     const po = await this.prisma.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
       include: { items: true, supplier: true },
     });
+    let paymentResult: unknown = null;
     if (!po) throw new NotFoundException('Purchase order not found');
+
+    // Retry of a receipt that already went through (lost response, double click): return it, post nothing.
+    const clientRequestId = normalizeClientRequestId(opts.clientRequestId);
+    if (clientRequestId) {
+      const existing = await this.prisma.goodsReceipt.findFirst({
+        where: { tenantId, clientRequestId },
+        include: { items: true },
+      });
+      if (existing) {
+        if (existing.purchaseId !== poId) {
+          throw new ConflictException('clientRequestId was already used for a different goods receipt');
+        }
+        const replayLines = items.map((item) => {
+          const poItem = po.items.find((candidate) => candidate.id === item.itemId);
+          return {
+            variantId: poItem?.variantId ?? '',
+            purchaseItemId: item.itemId,
+            receivedQty: item.receivedQty,
+            rejectedQty: item.rejectedQty,
+            unitCost: poItem?.unitCost ?? 0,
+            batchNumber: item.batchNumber,
+            expiryDate: item.expiryDate,
+          };
+        });
+        if (!grnRequestMatches(existing.items, replayLines)) {
+          throw new ConflictException('clientRequestId was already used for a different goods receipt payload');
+        }
+        return {
+          grn: await this.getGoodsReceipt(existing.id, tenantId),
+          payment: null,
+          replayed: true,
+          purchaseOrder: await this.prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { items: true, supplier: true } }),
+        };
+      }
+    }
+
     if (!canReceiveAgainstPo(po.status)) {
       throw new BadRequestException('Purchase order must be approved before receiving items');
     }
@@ -508,58 +656,63 @@ export class ProcurementService {
       throw new BadRequestException('Switch to the purchase order branch before receiving goods');
     }
 
-    const planLines = po.items.map((pi) => {
-      const incoming = items.find((i) => i.itemId === pi.id);
-      const freeQty = (pi as { freeQty?: number }).freeQty ?? 0;
-      const expectedQty = pi.orderedQty + Math.max(0, freeQty);
-      return {
-        orderedQty: expectedQty,
-        receivedQty: pi.receivedQty,
-        thisReceive: incoming?.receivedQty ?? 0,
-      };
-    });
-    const plan = applyPartialReceive(planLines);
-
-    const grnLines: GrnLineInput[] = [];
-    for (const item of items) {
-      const poItem = po.items.find((i) => i.id === item.itemId);
-      if (!poItem) throw new BadRequestException(`Invalid line item: ${item.itemId}`);
-      if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
-      const freeQty = (poItem as { freeQty?: number }).freeQty ?? 0;
-      const expectedQty = poItem.orderedQty + Math.max(0, freeQty);
-      const expiry =
-        item.expiryDate
-        || ((poItem as { expiryDate?: Date | null }).expiryDate
-          ? new Date((poItem as { expiryDate: Date }).expiryDate).toISOString().slice(0, 10)
-          : undefined);
-      const poSell = (poItem as { sellingPrice?: number | null }).sellingPrice;
-      const poMrp = (poItem as { mrp?: number | null }).mrp;
-      grnLines.push({
-        variantId: poItem.variantId,
-        productName: poItem.productName,
-        variantName: poItem.variantName,
-        sku: poItem.sku,
-        receivedQty: item.receivedQty,
-        rejectedQty: item.rejectedQty,
-        unitCost: poItem.unitCost,
-        sellingPrice: poSell != null && poSell > 0 ? poSell : null,
-        mrp: poMrp != null && poMrp > 0 ? poMrp : null,
-        orderedQty: expectedQty,
-        purchaseItemId: poItem.id,
-        batchNumber: item.batchNumber,
-        expiryDate: expiry,
-        manufactureDate: item.manufactureDate,
-      });
-    }
-
+    type PoLine = { id: string; orderedQty: number; receivedQty: number; unitCost: number; discount?: number | null; freeQty?: number | null };
+    const planFor = (poItems: PoLine[]) => {
+      try {
+        return applyPartialReceive(poItems.map((pi) => {
+          const incoming = items.find((i) => i.itemId === pi.id);
+          return {
+            orderedQty: pi.orderedQty + Math.max(0, pi.freeQty ?? 0),
+            receivedQty: pi.receivedQty,
+            thisReceive: incoming?.receivedQty ?? 0,
+          };
+        }));
+      } catch (e) {
+        throw new BadRequestException((e as Error).message);
+      }
+    };
     // Payable value: only ordered (paid) qty, not free bonus units
-    const receiveValue = items.reduce((sum, item) => {
-      const poItem = po.items.find((i) => i.id === item.itemId);
-      if (!poItem || item.receivedQty <= 0) return sum;
-      const paidAlready = Math.min(poItem.receivedQty, poItem.orderedQty);
-      const paidThis = Math.min(item.receivedQty, Math.max(0, poItem.orderedQty - paidAlready));
-      return sum + paidThis * poItem.unitCost;
-    }, 0);
+    const payableFor = (poItems: PoLine[]) => calculatePoReceiptPayable(poItems, items);
+    // Early, friendly check on the data read above; the binding check runs again under the PO row lock.
+    let plan = planFor(po.items);
+
+    const buildGrnLines = (poItems: typeof po.items): GrnLineInput[] => {
+      const lines: GrnLineInput[] = [];
+      for (const item of items) {
+        const poItem = poItems.find((i) => i.id === item.itemId);
+        if (!poItem) throw new BadRequestException(`Invalid line item: ${item.itemId}`);
+        if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
+        const freeQty = (poItem as { freeQty?: number }).freeQty ?? 0;
+        const expectedQty = poItem.orderedQty + Math.max(0, freeQty);
+        const expiry =
+          item.expiryDate
+          || ((poItem as { expiryDate?: Date | null }).expiryDate
+            ? new Date((poItem as { expiryDate: Date }).expiryDate).toISOString().slice(0, 10)
+            : undefined);
+        const poSell = (poItem as { sellingPrice?: number | null }).sellingPrice;
+        const poMrp = (poItem as { mrp?: number | null }).mrp;
+        lines.push({
+          variantId: poItem.variantId,
+          productName: poItem.productName,
+          variantName: poItem.variantName,
+          sku: poItem.sku,
+          receivedQty: item.receivedQty,
+          rejectedQty: item.rejectedQty,
+          unitCost: effectivePoReceiptUnitCost(poItem, item.receivedQty),
+          sellingPrice: poSell != null && poSell > 0 ? poSell : null,
+          mrp: poMrp != null && poMrp > 0 ? poMrp : null,
+          orderedQty: expectedQty,
+          purchaseItemId: poItem.id,
+          batchNumber: item.batchNumber,
+          expiryDate: expiry,
+          manufactureDate: item.manufactureDate,
+        });
+      }
+      return lines;
+    };
+    const grnLines = buildGrnLines(po.items);
+
+    const receiveValue = payableFor(po.items);
     try {
       await assertSupplierCreditLimit(this.prisma, tenantId, po.supplierId, receiveValue);
     } catch (e) {
@@ -576,6 +729,24 @@ export class ProcurementService {
       notes: `GRN from PO ${po.poNumber}`,
       lines: grnLines,
       payableAmount: receiveValue,
+      clientRequestId,
+      // Concurrent receipts of the same PO run one after the other: lock the PO row, then re-check the
+      // over-receipt rule and the payable value against what is received NOW (not what was read before).
+      lockAndCheck: async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "purchase_orders" WHERE id = ${poId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+        const fresh = await tx.purchaseOrder.findFirst({ where: { id: poId, tenantId }, include: { items: true } });
+        if (!fresh || !canReceiveAgainstPo(fresh.status)) {
+          throw new BadRequestException('Purchase order must be approved before receiving items');
+        }
+        plan = planFor(fresh.items);
+        const freshPayable = payableFor(fresh.items);
+        try {
+          await assertSupplierCreditLimit(tx, tenantId, po.supplierId, freshPayable);
+        } catch (e) {
+          throw new BadRequestException((e as Error).message);
+        }
+        return { payableAmount: freshPayable, lines: buildGrnLines(fresh.items) };
+      },
       afterStock: async (tx) => {
         for (const item of items) {
           if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
@@ -600,10 +771,12 @@ export class ProcurementService {
           },
         });
       },
+      beforeCommit: pay ? async (tx, g) => { paymentResult = await pay(tx, g); } : undefined,
     });
 
     return {
       grn,
+      payment: paymentResult,
       purchaseOrder: await this.prisma.purchaseOrder.findUnique({
         where: { id: poId },
         include: { items: true, supplier: true },
@@ -616,8 +789,11 @@ export class ProcurementService {
     tenantId: string,
     branchId: string,
     userId: string,
-    dto: { supplierId: string; notes?: string; supplierInvoiceRef?: string; lines: GrnLineInput[] },
+    dto: { supplierId: string; notes?: string; supplierInvoiceRef?: string; lines: GrnLineInput[]; clientRequestId?: string },
+    actorRoles: string[] = [],
   ) {
+    // Optional PO line links must be lines of this tenant's POs for the same variant (S-F8).
+    await assertPurchaseItemsInTenant(this.prisma, tenantId, dto.lines ?? []);
     return this.postGoodsReceipt({
       tenantId,
       branchId,
@@ -627,6 +803,8 @@ export class ProcurementService {
       notes: dto.notes,
       supplierInvoiceRef: dto.supplierInvoiceRef,
       lines: dto.lines,
+      clientRequestId: dto.clientRequestId,
+      actorRoles,
     });
   }
 
@@ -641,7 +819,8 @@ export class ProcurementService {
       lines: {
         variantId: string;
         quantity: number;
-        unitCost: number;
+        /** Optional: omitted = the product's existing purchase cost. Any other value needs a pricing role. */
+        unitCost?: number;
         batchNumber?: string;
         expiryDate?: string;
         manufactureDate?: string;
@@ -655,33 +834,61 @@ export class ProcurementService {
         chequeDueDate?: string;
         chequeBankName?: string;
         chequeBankAccountId?: string;
+        clientRequestId?: string;
       };
+      clientRequestId?: string;
     },
+    cash: { authorizedById?: string | null } = {},
+    actorRoles: string[] = [],
   ) {
     if (!dto.lines?.length) throw new BadRequestException('Add at least one product');
+    // Ownership first: a foreign supplier is a 404 whatever else is wrong with the request (S-F8), before cost authority is judged.
+    await assertSupplierInTenant(this.prisma, tenantId, dto.supplierId);
     const variants = await this.prisma.productVariant.findMany({
       where: { id: { in: dto.lines.map((l) => l.variantId) }, product: { tenantId } },
       include: { product: true },
     });
     const map = new Map(variants.map((v) => [v.id, v]));
 
+    const mayEditPricing = canEditGrnPricing(actorRoles);
     const lines: GrnLineInput[] = dto.lines.map((l) => {
       const v = map.get(l.variantId);
       if (!v) throw new BadRequestException(`Variant not found: ${l.variantId}`);
       if (l.quantity <= 0) throw new BadRequestException('Quantity must be positive');
+      // A Cashier receives stock at the product's EXISTING cost; cost is never typed by them (and a manager's PIN
+      // approval authorises cash, not pricing). Sending the unchanged cost is not an edit, anything else is.
+      const catalogCost = v.costPrice > 0 ? v.costPrice : (v.product.costPrice ?? 0);
+      const requested = l.unitCost;
+      const isCostEdit = requested != null && Math.abs(requested - catalogCost) > 0.005;
+      if (isCostEdit && !mayEditPricing) {
+        throw new ForbiddenException('Changing GRN purchase cost, selling price or MRP requires an authorised inventory or finance role');
+      }
+      const unitCost = requested ?? catalogCost;
+      if (!(unitCost > 0)) {
+        throw new BadRequestException(
+          mayEditPricing
+            ? `Enter the unit cost for ${v.product.name}: it has no purchase cost yet`
+            : `${v.product.name} has no purchase cost yet — ask a manager to receive it`,
+        );
+      }
       return {
         variantId: v.id,
         productName: v.product.name,
         variantName: v.name,
         sku: v.sku,
         receivedQty: l.quantity,
-        unitCost: l.unitCost,
+        unitCost,
         batchNumber: l.batchNumber,
         expiryDate: l.expiryDate,
         manufactureDate: l.manufactureDate,
       };
     });
 
+    // Payment (if any) is part of the GRN transaction: approval, drawer cash (locked) or any other payment
+    // error rolls back the stock receipt as well — no received-but-unpaid goods, no half-recorded payment.
+    let payment: unknown = null;
+    const after: (() => void)[] = [];
+    const pay = dto.payment && dto.payment.amount > 0 ? dto.payment : null;
     const grn = await this.postGoodsReceipt({
       tenantId,
       branchId,
@@ -690,28 +897,30 @@ export class ProcurementService {
       source: GoodsReceiptSource.QUICK,
       notes: dto.notes ?? 'Quick GRN (cashier)',
       lines,
+      clientRequestId: dto.clientRequestId,
+      actorRoles,
+      beforeCommit: pay
+        ? async (tx, g) => {
+            const inv = await tx.supplierInvoice.findFirst({
+              where: { tenantId, goodsReceiptId: g.id, status: { not: SupplierInvoiceStatus.CANCELLED } },
+              orderBy: { createdAt: 'desc' },
+            });
+            if (!inv) throw new BadRequestException('Auto invoice not found for GRN — cannot record payment');
+            payment = await this.paySupplierInvoice(inv.id, tenantId, branchId, userId, {
+              amount: pay.amount,
+              method: pay.method,
+              reference: pay.reference,
+              notes: pay.notes ?? `Payment on GRN ${g.grnNumber}`,
+              chequeNumber: pay.chequeNumber,
+              chequeDueDate: pay.chequeDueDate,
+              chequeBankName: pay.chequeBankName,
+              chequeBankAccountId: pay.chequeBankAccountId,
+              clientRequestId: pay.clientRequestId ?? dto.clientRequestId,
+            }, cash, { tx, after });
+          }
+        : undefined,
     });
-
-    let payment: unknown = null;
-    if (dto.payment && dto.payment.amount > 0) {
-      const inv = await this.prisma.supplierInvoice.findFirst({
-        where: { tenantId, goodsReceiptId: grn.id, status: { not: SupplierInvoiceStatus.CANCELLED } },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!inv) {
-        throw new BadRequestException('Auto invoice not found for GRN — cannot record payment');
-      }
-      payment = await this.paySupplierInvoice(inv.id, tenantId, branchId, userId, {
-        amount: dto.payment.amount,
-        method: dto.payment.method,
-        reference: dto.payment.reference,
-        notes: dto.payment.notes ?? `Payment on GRN ${grn.grnNumber}`,
-        chequeNumber: dto.payment.chequeNumber,
-        chequeDueDate: dto.payment.chequeDueDate,
-        chequeBankName: dto.payment.chequeBankName,
-        chequeBankAccountId: dto.payment.chequeBankAccountId,
-      });
-    }
+    for (const fire of after) fire(); // payment events only once the GRN + payment committed
 
     return { ...grn, payment };
   }
@@ -741,6 +950,19 @@ export class ProcurementService {
     },
   ) {
     if (!dto.items?.length) throw new BadRequestException('At least one return line is required');
+    // Defence in depth behind the DTO (S-F7): the service may be called without the ValidationPipe.
+    for (const i of dto.items) {
+      if (!Number.isFinite(i.quantity) || i.quantity <= 0) throw new BadRequestException('Return quantity must be greater than zero');
+      if (i.unitCost != null && (!Number.isFinite(i.unitCost) || i.unitCost < 0)) {
+        throw new BadRequestException('Unit cost must be zero or more');
+      }
+    }
+    // Every id must be this tenant's (S-F8), and quantities must fit what the GRN / PO received (S-F7).
+    await assertSupplierInTenant(this.prisma, tenantId, dto.supplierId);
+    await assertVariantsInTenant(this.prisma, tenantId, dto.items.map((i) => i.variantId));
+    if (dto.purchaseId) await assertPurchaseOrderInTenant(this.prisma, tenantId, dto.purchaseId, dto.supplierId);
+    await assertReturnLotsInTenant(this.prisma, tenantId, branchId, dto.items);
+    await assertReturnLinesReturnable(this.prisma, tenantId, { ...dto, branchId });
     const returnNumber = await this.nextNumber(tenantId, 'SRET', 'sret');
     return this.prisma.supplierReturn.create({
       data: {
@@ -782,6 +1004,24 @@ export class ProcurementService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // Claim the return first: of two simultaneous posts only one moves DRAFT -> POSTED, so stock leaves once.
+      const claimed = await tx.supplierReturn.updateMany({
+        where: { id, tenantId, status: SupplierReturnStatus.DRAFT },
+        data: { status: SupplierReturnStatus.POSTED, postedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new BadRequestException('Only draft returns can be posted');
+
+      // Re-check against POSTED returns under a lock on the source GRN / PO, so two different drafts posted at
+      // once cannot together return more than was received (S-F7); also refuses drafts that point at another
+      // tenant's GRN / PO (S-F8). Validation only: the credit below is computed exactly as before.
+      if (doc.goodsReceiptId) {
+        await tx.$queryRaw`SELECT id FROM "goods_receipts" WHERE id = ${doc.goodsReceiptId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      } else if (doc.purchaseId) {
+        await tx.$queryRaw`SELECT id FROM "purchase_orders" WHERE id = ${doc.purchaseId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      }
+      if (doc.purchaseId) await assertPurchaseOrderInTenant(tx, tenantId, doc.purchaseId, doc.supplierId);
+      await assertReturnLinesReturnable(tx, tenantId, doc, doc.id);
+
       for (const item of doc.items) {
         await this.inventoryService.adjustStock(tenantId, doc.branchId, userId, {
           variantId: item.variantId,
@@ -799,8 +1039,8 @@ export class ProcurementService {
 
       // Apply credit against linked PO or GRN auto-invoice so outstanding drops
       if (doc.purchaseId) {
-        await tx.purchaseOrder.update({
-          where: { id: doc.purchaseId },
+        await tx.purchaseOrder.updateMany({
+          where: { id: doc.purchaseId, tenantId },
           data: { paidAmount: { increment: credit } },
         });
       } else if (doc.goodsReceiptId) {
@@ -822,11 +1062,6 @@ export class ProcurementService {
           });
         }
       }
-
-      await tx.supplierReturn.update({
-        where: { id },
-        data: { status: SupplierReturnStatus.POSTED, postedAt: new Date() },
-      });
 
       await syncSupplierBalanceWithLedger(tx, tenantId, doc.supplierId, {
         entryType: SupplierLedgerEntryType.RETURN,
@@ -899,7 +1134,15 @@ export class ProcurementService {
     },
   ) {
     const tax = dto.taxAmount ?? 0;
+    // Validation only (H4); the DTO enforces the same, this guards callers that bypass the ValidationPipe.
+    if (!Number.isFinite(dto.subtotal) || dto.subtotal < 0 || !Number.isFinite(tax) || tax < 0) {
+      throw new BadRequestException('Invoice amounts must be zero or more');
+    }
     const total = dto.subtotal + tax;
+    // supplier / PO / GRN must be this tenant's and belong together, before anything is written (S-F8).
+    await assertSupplierInTenant(this.prisma, tenantId, dto.supplierId);
+    if (dto.purchaseId) await assertPurchaseOrderInTenant(this.prisma, tenantId, dto.purchaseId, dto.supplierId);
+    if (dto.goodsReceiptId) await assertGoodsReceiptInTenant(this.prisma, tenantId, dto.goodsReceiptId, dto.supplierId);
     if (dto.post) {
       try {
         await assertSupplierCreditLimit(this.prisma, tenantId, dto.supplierId, total);
@@ -962,6 +1205,16 @@ export class ProcurementService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
+  /** Approval + drawer cash for a payment made with a goods receipt, checked before anything is posted. */
+  assertCashPayable(tenantId: string, branchId: string | null | undefined, actor: { actorId: string; authorizerId: string | null }, payment?: { method?: string | null; amount?: number | null } | null) {
+    return assertSupplierCashPayable(this.prisma, payment, { tenantId, branchId, cashierId: actor.actorId, authorizerId: actor.authorizerId });
+  }
+
+  /** Acting PIN cashier + approving manager for drawer cash (see SupplierApService.resolveCash). */
+  resolveCash(tenantId: string, user: { id: string; roles?: string[] }, unlockToken?: string, approvalToken?: string) {
+    return this.apService.resolveCash(tenantId, user, unlockToken, approvalToken);
+  }
+
   async paySupplierInvoice(
     invoiceId: string,
     tenantId: string,
@@ -977,9 +1230,13 @@ export class ProcurementService {
       chequeBankName?: string;
       chequeBankAccountId?: string;
       paidAt?: string;
+      clientRequestId?: string;
     },
+    cash: { authorizedById?: string | null } = {},
+    ctx?: ApTxContext,
   ) {
-    const inv = await this.prisma.supplierInvoice.findFirst({
+    const db = ctx?.tx ?? this.prisma;
+    const inv = await db.supplierInvoice.findFirst({
       where: { id: invoiceId, tenantId },
       include: { supplier: true },
     });
@@ -1010,13 +1267,16 @@ export class ProcurementService {
         chequeDueDate: dto.chequeDueDate,
         chequeBankName: dto.chequeBankName,
         chequeBankAccountId: dto.chequeBankAccountId,
+        clientRequestId: dto.clientRequestId,
       },
+      cash,
+      ctx,
     );
 
     return {
-      payment: result.payment ?? result.payments?.[0],
-      invoice: await this.prisma.supplierInvoice.findUnique({ where: { id: inv.id } }),
-      supplierBalance: result.supplierBalance,
+      payment: result.payment,
+      invoice: await db.supplierInvoice.findUnique({ where: { id: inv.id } }),
+      supplierBalance: result.balanceAfter,
     };
   }
 }

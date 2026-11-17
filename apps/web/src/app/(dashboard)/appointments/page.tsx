@@ -462,6 +462,7 @@ export default function AppointmentsPage() {
             columns={columns}
             searchableColumns={[
               { id: "appointmentNumber", title: "Appt #" },
+              { id: "customerSearch", title: "customer / phone / vehicle", getValue: (r: Appointment) => `${r.customer ? `${r.customer.firstName} ${r.customer.lastName ?? ""} ${r.customer.phone}` : ""} ${r.customerVehicle ? `${r.customerVehicle.registrationNo ?? ""} ${r.customerVehicle.make ?? ""} ${r.customerVehicle.model ?? ""}` : ""}` },
             ]}
             filterableColumns={[
               {

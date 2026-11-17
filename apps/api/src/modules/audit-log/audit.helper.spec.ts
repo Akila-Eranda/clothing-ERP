@@ -6,6 +6,7 @@ import {
   normalizeJournalAuditAction,
   resolveAuditAction,
   sanitizeAuditData,
+  redactSensitiveKeys,
   shouldAuditHttpRequest,
   shouldSkipAuditPath,
   buildPosSaleAudit,
@@ -67,6 +68,27 @@ describe('Audit Engine', () => {
     expect(cleaned.password).toBe('[redacted]');
     expect((cleaned.nested as Record<string, unknown>).refreshToken).toBe('[redacted]');
     expect((cleaned.nested as Record<string, unknown>).name).toBe('ok');
+  });
+
+  it('redacts POS / manager PINs, reload-card PINs and approval / unlock tokens', () => {
+    const cleaned = sanitizeAuditData({ pin: '2468', pins: '1111 2222', approvalToken: 'a.b', unlockToken: 'c.d', reason: 'ok' }) as Record<string, unknown>;
+    expect(cleaned).toEqual({ pin: '[redacted]', pins: '[redacted]', approvalToken: '[redacted]', unlockToken: '[redacted]', reason: 'ok' });
+  });
+
+  it('redacts PIN / token variants case-insensitively at any depth, keeps postal pincode', () => {
+    const cleaned = sanitizeAuditData({ managerPin: '2468', PIN: '1', nested: { newPin: '1111', cashierPinHash: 'h', x: { approvalToken: 't' } }, pincode: '10100', cardNumber: '4111111111111111', CVV: '123' }) as Record<string, any>;
+    expect(cleaned).toEqual({ managerPin: '[redacted]', PIN: '[redacted]', nested: { newPin: '[redacted]', cashierPinHash: '[redacted]', x: { approvalToken: '[redacted]' } }, pincode: '10100', cardNumber: '[redacted]', CVV: '[redacted]' });
+  });
+
+  it('bank account numbers are redacted, other bank details are kept', () => {
+    expect(redactSensitiveKeys({ bankName: 'BOC', accountNumber: '0012345678', accountHolderName: 'K N Perera', branchCode: '7010' }))
+      .toEqual({ bankName: 'BOC', accountNumber: '[redacted]', accountHolderName: 'K N Perera', branchCode: '7010' });
+    expect(redactSensitiveKeys({ bankDetails: { accountNumber: '1234567890' } })).toEqual({ bankDetails: { accountNumber: '[redacted]' } });
+  });
+
+  it('redactSensitiveKeys keeps dates / arrays intact and only blanks credentials', () => {
+    const d = new Date('2026-11-10T00:00:00Z');
+    expect(redactSensitiveKeys({ at: d, rows: [{ pin: '1' }, 2], title: 'x' })).toEqual({ at: d, rows: [{ pin: '[redacted]' }, 2], title: 'x' });
   });
 
   it('validates client PRINT/EXPORT actions', () => {

@@ -156,8 +156,9 @@ export async function syncSupplierBalance(
   supplierId: string,
 ): Promise<number> {
   const { outstanding } = await computeSupplierOutstanding(db, tenantId, supplierId);
-  await db.supplier.update({
-    where: { id: supplierId },
+  // Scoped by tenant: a supplier id of another shop is never written (S-F8).
+  await db.supplier.updateMany({
+    where: { id: supplierId, tenantId },
     data: { balance: outstanding },
   });
   return outstanding;

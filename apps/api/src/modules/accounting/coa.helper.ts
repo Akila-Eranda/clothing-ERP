@@ -203,6 +203,7 @@ export function defaultCoaSeed(): {
     { code: '1200', name: 'Bank — Main', type: AccountType.ASSET, parentCode: '1000' },
     { code: '1210', name: 'Card Clearing', type: AccountType.ASSET, parentCode: '1000', description: 'Card settlement clearing' },
     { code: '1120', name: 'UPI / Wallet Clearing', type: AccountType.ASSET, parentCode: '1000', description: 'UPI and digital wallet clearing' },
+    { code: '1250', name: 'Supplier Advances', type: AccountType.ASSET, parentCode: '1000', description: 'Prepaid / overpaid amounts held with suppliers, applied against later bills' },
     { code: '1220', name: 'Cheques Receivable', type: AccountType.ASSET, parentCode: '1000', description: 'Customer cheques awaiting clearance' },
     { code: '1300', name: 'Accounts Receivable', type: AccountType.ASSET, parentCode: '1000' },
     { code: '1400', name: 'Inventory — Mobile Devices', type: AccountType.ASSET, parentCode: '1000' },
@@ -241,6 +242,8 @@ export function defaultCoaSeed(): {
     { code: '5320', name: 'ETF Contribution', type: AccountType.EXPENSE, parentCode: '5000' },
     { code: '5500', name: 'Depreciation Expense', type: AccountType.EXPENSE, parentCode: '5000' },
     { code: '5600', name: 'Operating Expenses', type: AccountType.EXPENSE, parentCode: '5000' },
+    { code: '5610', name: 'Customer Goodwill Credits', type: AccountType.EXPENSE, parentCode: '5000', description: 'Non-cash wallet credits given to customers (goodwill); never cash received' },
+    { code: '5620', name: 'Bank & QR Payment Charges', type: AccountType.EXPENSE, parentCode: '5000', description: 'Fees the bank deducts from QR (and other bank) payments; the bank account receives the net amount' },
     { code: '5700', name: 'Cash Over / Short', type: AccountType.EXPENSE, parentCode: '5000' },
     { code: '5999', name: 'Sales Returns Contra (legacy)', type: AccountType.EXPENSE, parentCode: '5000', description: 'Optional contra; prefer 4200' },
   ];

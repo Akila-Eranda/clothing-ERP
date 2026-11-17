@@ -59,10 +59,11 @@ export class ReportsService {
     };
   }
 
-  async stockMovementReport(tenantId: string, startDate: string, endDate: string) {
+  async stockMovementReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
     return this.prisma.inventoryLog.findMany({
       where: {
         tenantId,
+        ...(branchId && { branchId }),
         NOT: { notes: 'LOT_ALLOCATION' },
         createdAt: dayRange(startDate, endDate),
       },
@@ -251,11 +252,11 @@ export class ReportsService {
     };
   }
 
-  async branchReport(tenantId: string, startDate: string, endDate: string) {
+  async branchReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
     const dateRange = dayRange(startDate, endDate);
     const grouped = await this.prisma.sale.groupBy({
       by: ['branchId'],
-      where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
+      where: { tenantId, ...(branchId && { branchId }), invoiceDate: dateRange, status: { not: 'CANCELLED' } },
       _sum: { total: true, taxAmount: true, discountAmount: true },
       _count: { id: true },
     });

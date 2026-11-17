@@ -46,9 +46,11 @@ const CASHIER_PERMS = ['customers:read', 'customers:update', 'products:read', 's
 type Shop = {
   tenantId: string;
   branchId: string;
+  secondBranchId: string;
   adminRoleId: string;
   adminId: string;
   cashierId: string;
+  productCreatorToken: string;
   productId: string;
   variantId: string;
   customerId: string;
@@ -76,6 +78,7 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
     });
     const tenantId = tenant.id;
     const branch = await prisma.branch.create({ data: { tenantId, name: `Main ${label}`, code: 'MAIN' } });
+    const secondBranch = await prisma.branch.create({ data: { tenantId, name: `Second ${label}`, code: 'SECOND' } });
 
     const adminRole = await prisma.role.create({
       data: {
@@ -87,6 +90,14 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
       data: {
         tenantId, name: `Cashier ${label}`, type: RoleType.CASHIER,
         permissions: { create: CASHIER_PERMS.map((k) => ({ permissionId: permissionIds.get(k)! })) },
+      },
+    });
+    const productCreatorRole = await prisma.role.create({
+      data: {
+        tenantId,
+        name: `Product Creator ${label}`,
+        type: RoleType.CUSTOM,
+        permissions: { create: [{ permissionId: permissionIds.get('products:create')! }] },
       },
     });
     const mkUser = (who: string, roleId: string) =>
@@ -101,6 +112,7 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
       });
     const admin = await mkUser('admin', adminRole.id);
     const cashier = await mkUser('cashier', cashierRole.id);
+    const productCreator = await mkUser('product-creator', productCreatorRole.id);
 
     const product = await prisma.product.create({
       data: {
@@ -119,7 +131,8 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
 
     const sign = (id: string, email: string) => jwt.sign({ sub: id, email, tenantId, roles: [], permissions: [] });
     return {
-      tenantId, branchId: branch.id, adminRoleId: adminRole.id, adminId: admin.id, cashierId: cashier.id,
+      tenantId, branchId: branch.id, secondBranchId: secondBranch.id, adminRoleId: adminRole.id, adminId: admin.id, cashierId: cashier.id,
+      productCreatorToken: sign(productCreator.id, productCreator.email),
       productId: product.id, variantId: product.variants[0].id, customerId: customer.id, employeeId: employee.id,
       adminToken: sign(admin.id, admin.email), cashierToken: sign(cashier.id, cashier.email),
     };
@@ -295,7 +308,8 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
     it('blocks cashier wallet top-ups and loyalty adjustments; validates amounts for admins', async () => {
       expect((await http().post(`/api/v1/customers/${A.customerId}/wallet/topup`).set(as(A.cashierToken)).send({ amount: 5000 })).status).toBe(403);
       expect((await http().post(`/api/v1/customers/${A.customerId}/wallet/topup`).set(as(A.adminToken)).send({ amount: -50 })).status).toBe(400);
-      expect((await http().post(`/api/v1/customers/${A.customerId}/wallet/topup`).set(as(A.adminToken)).send({ amount: 500 })).status).toBe(201);
+      expect((await http().post(`/api/v1/customers/${A.customerId}/wallet/topup`).set(as(A.adminToken)).send({ amount: 500 })).status).toBe(400); // a funded top-up must say how it was paid
+      expect((await http().post(`/api/v1/customers/${A.customerId}/wallet/topup`).set(as(A.adminToken)).send({ amount: 500, paymentMethod: 'CASH' })).status).toBe(201);
       expect((await prisma.customer.findUnique({ where: { id: A.customerId } }))?.walletBalance).toBe(500);
       expect((await http().post(`/api/v1/customers/${A.customerId}/credit/credit-notes`).set(as(A.cashierToken)).send({ amount: 100 })).status).toBe(403);
     });
@@ -311,9 +325,75 @@ describe('Security: tenant isolation & authorization (HTTP)', () => {
   // ── HR, branches, users ───────────────────────────────────────────────
 
   describe('HR, branches and users', () => {
+    it('limits branch list and detail access to the assigned branch while admins retain tenant scope', async () => {
+      const cashierList = await http().get('/api/v1/branches').set(as(A.cashierToken));
+      expect(cashierList.status).toBe(200);
+      expect(cashierList.body.data.data.map((branch: { id: string }) => branch.id)).toEqual([A.branchId]);
+
+      const cashierDetail = await http().get(`/api/v1/branches/${A.secondBranchId}`).set(as(A.cashierToken));
+      expect(cashierDetail.status).toBe(404);
+
+      const adminList = await http().get('/api/v1/branches').set(as(A.adminToken));
+      expect(adminList.status).toBe(200);
+      expect(adminList.body.data.data.map((branch: { id: string }) => branch.id)).toEqual(
+        expect.arrayContaining([A.branchId, A.secondBranchId]),
+      );
+      expect((await http().get(`/api/v1/branches/${A.secondBranchId}`).set(as(A.adminToken))).status).toBe(200);
+    });
+
     it("cannot move an employee into another shop's branch", async () => {
       const res = await http().put(`/api/v1/hr/employees/${A.employeeId}`).set(as(A.adminToken)).send({ branchId: B.branchId });
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(403);
+      expect((await prisma.employee.findUnique({ where: { id: A.employeeId } }))?.branchId).toBe(A.branchId);
+    });
+
+    describe('product opening stock branch scope', () => {
+      it('does not let an assigned user seed opening stock across all branches', async () => {
+        const otherBranch = await prisma.branch.create({
+          data: { tenantId: A.tenantId, name: 'Stock Other', code: `STOCK-${run}` },
+        });
+        const response = await http().post('/api/v1/products').set(as(A.productCreatorToken)).send({
+          name: `Scoped Product ${run}`,
+          sku: `SCOPED-${run}`,
+          sellingPrice: 10,
+          costPrice: 8,
+          mrp: 12,
+          openingStock: 2,
+          branchScope: 'ALL',
+        });
+        expect(response.status).toBe(201);
+        const variant = await prisma.productVariant.findFirstOrThrow({
+          where: { productId: response.body.data.id },
+          select: { id: true },
+        });
+        const stock = await prisma.inventory.findMany({
+          where: { tenantId: A.tenantId, variantId: variant.id },
+          select: { branchId: true, quantity: true },
+        });
+        expect(stock).toEqual([{ branchId: A.branchId, quantity: 2 }]);
+        expect(await prisma.branch.findUnique({ where: { id: otherBranch.id } })).not.toBeNull();
+      });
+    });
+
+    it('limits employee listing to the assigned branch', async () => {
+      const otherBranch = await prisma.branch.create({
+        data: { tenantId: A.tenantId, name: 'Other', code: `OTHER-${run}` },
+      });
+      const otherEmployee = await prisma.employee.create({
+        data: {
+          tenantId: A.tenantId,
+          branchId: otherBranch.id,
+          firstName: 'Other',
+          lastName: 'Branch',
+          phone: `078${run.slice(-7)}`,
+          joiningDate: new Date(),
+          basicSalary: 50000,
+        },
+      });
+      const res = await http().get('/api/v1/hr/employees').set(as(A.cashierToken));
+      expect(res.status).toBe(200);
+      expect(res.body.data.data.map((employee: { id: string }) => employee.id)).toContain(A.employeeId);
+      expect(res.body.data.data.map((employee: { id: string }) => employee.id)).not.toContain(otherEmployee.id);
     });
 
     it("cannot write attendance for another shop's employee", async () => {

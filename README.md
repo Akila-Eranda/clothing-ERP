@@ -67,8 +67,8 @@ docker-compose up --build
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | admin@demo.fashionerp.com | Admin@123456 |
-| Cashier | cashier@demo.fashionerp.com | Cashier@123456 |
+| Admin | admin@demo.fashionerp.com | value of `SEED_ADMIN_PASSWORD` when you seeded |
+| Cashier | cashier@demo.fashionerp.com | value of `SEED_CASHIER_PASSWORD` when you seeded |
 
 ## Backend API Modules
 

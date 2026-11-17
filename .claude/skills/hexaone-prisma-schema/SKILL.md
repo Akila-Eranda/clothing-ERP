@@ -34,7 +34,7 @@ ALTER TYPE "ProductKind" ADD VALUE IF NOT EXISTS 'BUNDLE';
 - Deploy applies with `docker compose exec api npx prisma migrate deploy` (see `deploy.sh`, `scripts/deploy_all.py`; CI also runs `migrate deploy`). The container entrypoint does **not** migrate. Never use `db push` against production.
 
 ## Seed
-- Source of truth: `prisma/seed.ts` (permissions, demo tenant, roles). `seed.js` is an esbuild bundle — regenerate with `pnpm seed:build` after editing `seed.ts`; don't edit `seed.js` by hand.
+- Source of truth: `prisma/seed.ts` (permissions, demo tenant, roles). `seed.js` is an esbuild bundle built by the Dockerfile / `pnpm seed:build` and is not tracked. The seed is for local setup and the initial setup of an EMPTY production database only, never part of deployments (`shared/security/seed-guard.ts`, docs/initial-setup-and-seeding.md).
 - Seeds must be idempotent (`upsert`).
 - Per-tenant defaults created at registration live in `modules/tenants/tenants.module.ts` and `roles/default-system-roles.ts`, not in seed.
 

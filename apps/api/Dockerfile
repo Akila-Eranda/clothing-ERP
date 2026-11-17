@@ -9,12 +9,12 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
 RUN npm install -g pnpm@9.15.9
 
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --node-linker=hoisted
 
 COPY . .
 
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
-RUN pnpm prisma generate
+RUN pnpm exec prisma generate
 RUN node scripts/fix-prisma-client.js
 RUN pnpm run build
 
@@ -24,7 +24,8 @@ RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
 RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Strip CR in case the build context comes from a Windows checkout (CRLF would make "#!/bin/sh\r" unresolvable).
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 EXPOSE 3001
 

@@ -17,6 +17,15 @@ import { Logger } from '@nestjs/common';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { canSwitchBranches } from '@/shared/branch-scope.helper';
+
+export function canJoinBranchRoom(
+  roles: readonly string[],
+  assignedBranchId: string | undefined,
+  requestedBranchId: string,
+): boolean {
+  return canSwitchBranches(roles) || assignedBranchId === requestedBranchId;
+}
 
 function resolveWsCorsOrigins(): string[] | boolean {
   const configured = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
@@ -38,7 +47,13 @@ export class AppGateway
   server: Server;
 
   private readonly logger = new Logger(AppGateway.name);
-  private readonly connectedClients = new Map<string, { socket: Socket; userId: string; tenantId: string; branchId?: string }>();
+  private readonly connectedClients = new Map<string, {
+    socket: Socket;
+    userId: string;
+    tenantId: string;
+    branchId?: string;
+    roles: string[];
+  }>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -55,19 +70,32 @@ export class AppGateway
     if (!token) { client.disconnect(); return; }
 
     try {
-      const payload = this.jwtService.verify<{ sub: string; tenantId: string; branchId?: string }>(token, {
+      const payload = this.jwtService.verify<{ sub: string; tenantId: string }>(token, {
         secret: this.configService.get('jwt.accessSecret'),
       });
+      const account = await this.prisma.user.findFirst({
+        where: { id: payload.sub, tenantId: payload.tenantId, status: 'ACTIVE' },
+        select: {
+          branchId: true,
+          roles: { select: { role: { select: { type: true } } } },
+        },
+      });
+      if (!account) {
+        client.disconnect();
+        return;
+      }
+      const roles = account.roles.map(({ role }) => role.type);
 
       this.connectedClients.set(client.id, {
         socket: client,
         userId: payload.sub,
         tenantId: payload.tenantId,
-        branchId: payload.branchId,
+        branchId: account.branchId ?? undefined,
+        roles,
       });
 
-      void client.join(`tenant:${payload.tenantId}`);
-      if (payload.branchId) void client.join(`branch:${payload.branchId}`);
+      if (canSwitchBranches(roles)) void client.join(`tenant:${payload.tenantId}`);
+      if (account.branchId) void client.join(`branch:${account.branchId}`);
       void client.join(`user:${payload.sub}`);
 
       this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
@@ -84,7 +112,11 @@ export class AppGateway
   @SubscribeMessage('join-branch')
   async handleJoinBranch(@ConnectedSocket() client: Socket, @MessageBody() branchId: string): Promise<void> {
     const clientInfo = this.connectedClients.get(client.id);
-    if (!clientInfo?.tenantId || !branchId) return;
+    if (!clientInfo?.tenantId || typeof branchId !== 'string' || !branchId.trim()) return;
+    if (!canJoinBranchRoom(clientInfo.roles, clientInfo.branchId, branchId)) {
+      this.logger.warn(`Rejected join-branch ${branchId} for client ${client.id}`);
+      return;
+    }
 
     const branch = await this.prisma.branch.findFirst({
       where: { id: branchId, tenantId: clientInfo.tenantId, isActive: true },
@@ -107,8 +139,13 @@ export class AppGateway
   }
 
   @OnEvent('inventory.low-stock')
-  handleLowStock(payload: { tenantId: string; variantId: string; quantity: number }): void {
-    this.server.to(`tenant:${payload.tenantId}`).emit('inventory:low-stock', payload);
+  handleLowStock(payload: { tenantId: string; branchId?: string; variantId: string; quantity: number }): void {
+    const room = this.server.to(`tenant:${payload.tenantId}`);
+    if (payload.branchId) {
+      room.to(`branch:${payload.branchId}`).emit('inventory:low-stock', payload);
+    } else {
+      room.emit('inventory:low-stock', payload);
+    }
   }
 
   @OnEvent('auth.login')

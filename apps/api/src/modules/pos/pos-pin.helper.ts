@@ -11,6 +11,8 @@ export type PosUnlockPayload = {
   typ: 'pos_unlock';
   tenantId: string;
   cashierId: string;
+  branchId?: string;
+  terminalUserId?: string;
   exp: number;
 };
 
@@ -34,11 +36,18 @@ export async function verifyPosPinHash(pin: string, hash: string | null | undefi
   return bcrypt.compare(pin, hash);
 }
 
-export function signPosUnlockToken(tenantId: string, cashierId: string) {
+export function signPosUnlockToken(
+  tenantId: string,
+  cashierId: string,
+  branchId?: string,
+  terminalUserId?: string,
+) {
   const payload: PosUnlockPayload = {
     typ: 'pos_unlock',
     tenantId,
     cashierId,
+    ...(branchId ? { branchId } : {}),
+    ...(terminalUserId ? { terminalUserId } : {}),
     exp: Date.now() + UNLOCK_TTL_MS,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -49,6 +58,8 @@ export function signPosUnlockToken(tenantId: string, cashierId: string) {
 export function verifyPosUnlockToken(
   token: string | undefined | null,
   tenantId: string,
+  branchId?: string,
+  terminalUserId?: string,
 ): string | null {
   if (!token || !token.includes('.')) return null;
   const [body, sig] = token.split('.');
@@ -63,6 +74,10 @@ export function verifyPosUnlockToken(
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as PosUnlockPayload;
     if (payload.typ !== 'pos_unlock') return null;
     if (payload.tenantId !== tenantId) return null;
+    // Tokens issued before branch/terminal binding remain valid only until their short
+    // expiry; newly issued tokens carry both bindings and are checked strictly.
+    if (branchId && payload.branchId && payload.branchId !== branchId) return null;
+    if (terminalUserId && payload.terminalUserId && payload.terminalUserId !== terminalUserId) return null;
     if (!payload.cashierId || payload.exp < Date.now()) return null;
     return payload.cashierId;
   } catch {
@@ -75,6 +90,7 @@ export function resolveActingCashierId(
   tenantId: string,
   loggedInUserId: string,
   unlockToken?: string | null,
+  branchId?: string,
 ): string {
-  return verifyPosUnlockToken(unlockToken, tenantId) ?? loggedInUserId;
+  return verifyPosUnlockToken(unlockToken, tenantId, branchId, loggedInUserId) ?? loggedInUserId;
 }

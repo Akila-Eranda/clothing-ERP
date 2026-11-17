@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { textSearch } from '@/shared/search.helper';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuthService } from '@/modules/auth/auth.service';
 import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
@@ -104,13 +105,7 @@ export class UsersService {
 
     const where = {
       ...(tenantId && { tenantId }),
-      ...(query.search && {
-        OR: [
-          { firstName: { contains: query.search, mode: 'insensitive' as const } },
-          { lastName: { contains: query.search, mode: 'insensitive' as const } },
-          { email: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['firstName', 'lastName', 'email']),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -135,13 +130,7 @@ export class UsersService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
-      ...(query.search && {
-        OR: [
-          { firstName: { contains: query.search, mode: 'insensitive' as const } },
-          { lastName: { contains: query.search, mode: 'insensitive' as const } },
-          { email: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['firstName', 'lastName', 'email']),
     };
 
     const [data, total] = await this.prisma.$transaction([
