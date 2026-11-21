@@ -627,7 +627,7 @@ export class PosService {
     }
 
     if (isPartial && !dto.allowPartialPayment) {
-      throw new BadRequestException(`Payment short by LKR ${(amountDue - settledPaid).toFixed(2)}. Enable partial payment or add more.`);
+      throw new BadRequestException(`Payment short by LKR ${(amountDue - totalPaid).toFixed(2)}. Enable partial payment or add more.`);
     }
 
     let changeDue = Math.max(0, totalPaid - amountDue);
@@ -910,7 +910,7 @@ export class PosService {
           roundOff,
           loyaltyDiscount,
           total: amountDue,
-          amountPaid: settledPaid,
+          amountPaid: totalPaid,
           changeDue,
           changeSavedToWallet,
           paymentMethod: dto.payments[0]?.method ?? PaymentMethod.CASH,
@@ -926,7 +926,7 @@ export class PosService {
             tierDiscount,
             ...(manualDiscountApprovedBy ? { manualDiscountApprovedBy } : {}),
             paymentSummary: buildPaymentsSummary(paymentMethods),
-            partialBalance: isPartial ? amountDue - settledPaid : 0,
+            partialBalance: isPartial ? amountDue - totalPaid : 0,
             helperCommission,
             ...(priceOverrides.length ? { priceOverrides: annotateOverrides(priceOverrides, cashierId, dto.priceOverrideReason) } : {}),
             ...(requestFingerprint ? { requestFingerprint } : {}),
@@ -958,13 +958,13 @@ export class PosService {
             }),
           },
           payments: {
-            create: salePayments.map((p) => ({
+            create: dto.payments.map((p) => ({
               method: p.method,
               amount: p.amount,
-              reference: 'reference' in p ? p.reference : undefined,
+              reference: p.reference,
               bankAccountId:
                 p.method === PaymentMethod.BANK_TRANSFER || p.method === PaymentMethod.QR
-                  ? ('bankAccountId' in p ? p.bankAccountId?.trim() || null : null)
+                  ? p.bankAccountId?.trim() || null
                   : null,
               qrCodeId: p.method === PaymentMethod.QR ? p.qrCodeId?.trim() || null : null,
               cardLast4: p.method === PaymentMethod.CARD ? p.cardLast4 ?? null : null,
