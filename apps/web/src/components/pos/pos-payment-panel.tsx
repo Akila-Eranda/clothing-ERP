@@ -392,7 +392,7 @@ export function buildCheckoutPayments(
       ? (numpad?.trim() || partialPayAmount?.trim() || "")
       : (partialPayAmount?.trim() || "")
   );
-  if (state.allowPartial) {
+  if (state.allowPartial && activePayment !== "CUSTOMER_CREDIT") {
     const payNow = parseFloat(cashTenderRaw);
     if (!Number.isNaN(payNow) && payNow > 0 && payNow + 0.01 < totalAmt) {
       const method = activePayment;
@@ -427,7 +427,7 @@ export function buildCheckoutPayments(
     return [{ method: activePayment, amount, bankAccountId: bankId }];
   }
   if (activePayment === "CUSTOMER_CREDIT") {
-    return [{ method: "CUSTOMER_CREDIT", amount }];
+    return [{ method: "CUSTOMER_CREDIT", amount: totalAmt }];
   }
   return [{ method: activePayment, amount }];
 }

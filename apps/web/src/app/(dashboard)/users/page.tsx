@@ -4,7 +4,7 @@ import { LoadingCenter } from "@/components/ui/loading";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield, Plus, MoreHorizontal, CheckCircle, XCircle,
-  User, RefreshCw, Trash2, Key, Eye,
+  User, RefreshCw, Trash2, Key, Eye, Pencil,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
@@ -106,6 +107,8 @@ export default function UsersPage() {
 
   const [userForm, setUserForm]       = useState({ ...EMPTY_USER });
   const [saving, setSaving]           = useState(false);
+  const [editUser, setEditUser] = useState<AppUser | null>(null);
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "", branchId: "", roleId: "" });
 
   const tenantId = tokenStorage.getTenant();
   const staffRoles = useMemo(() => inviteStaffRoles(roles, tenantId), [roles, tenantId]);
@@ -184,6 +187,61 @@ export default function UsersPage() {
     } catch { toast.error("Failed to delete user"); }
   };
 
+  const openEditUser = (u: AppUser) => {
+    setEditUser(u);
+    setEditForm({
+      firstName: u.firstName ?? "",
+      lastName: u.lastName ?? "",
+      phone: u.phone ?? "",
+      branchId: u.branch?.id ?? "",
+      roleId: u.roles?.[0]?.role?.id ?? "",
+    });
+  };
+
+  const handleSaveUser = async () => {
+    if (!editUser) return;
+    const firstName = editForm.firstName.trim();
+    const lastName = editForm.lastName.trim();
+    const phone = editForm.phone.trim();
+    if (!firstName) { toast.error("First name is required"); return; }
+    setSaving(true);
+    try {
+      await api.put(`/users/${editUser.id}`, {
+        firstName,
+        lastName,
+        phone,
+        branchId: editForm.branchId || "",
+      });
+      const prevRoleId = editUser.roles?.[0]?.role?.id ?? "";
+      if (editForm.roleId && editForm.roleId !== prevRoleId) {
+        await api.patch(`/users/${editUser.id}/roles`, { roleIds: [editForm.roleId] });
+      }
+      const branch = branches.find((b) => b.id === editForm.branchId) ?? null;
+      const role = roleById.get(editForm.roleId);
+      setUsers((prev) => prev.map((u) => {
+        if (u.id !== editUser.id) return u;
+        return {
+          ...u,
+          firstName,
+          lastName,
+          phone,
+          branch: branch ? { id: branch.id, name: branch.name } : null,
+          roles: role
+            ? [{ role }]
+            : u.roles,
+        };
+      }));
+      if (useAuthStore.getState().user?.id === editUser.id) {
+        useAuthStore.getState().updateUser({ name: `${firstName} ${lastName}`.trim() });
+      }
+      toast.success("User updated");
+      setEditUser(null);
+    } catch (e: unknown) {
+      const msg = (e as { data?: { message?: string } })?.data?.message;
+      toast.error(msg ?? (e instanceof Error ? e.message : "Failed to update user"));
+    } finally { setSaving(false); }
+  };
+
   const handleAssignRole = async () => {
     if (!roleAssignModal || !selectedRoleId) return;
     setSaving(true);
@@ -244,12 +302,9 @@ export default function UsersPage() {
               </div>
               <div>
                 <OpenRecordButton
-                  onClick={() => {
-                    setRoleAssignModal(u);
-                    setSelectedRoleId(u.roles?.[0]?.role?.id ?? "");
-                  }}
+                  onClick={() => openEditUser(u)}
                   className="text-sm"
-                  title="Change role"
+                  title="Edit user"
                 >
                   {u.firstName} {u.lastName}
                 </OpenRecordButton>
@@ -343,6 +398,9 @@ export default function UsersPage() {
                   }}
                 >
                   <Eye className="h-3.5 w-3.5 mr-2" /> View Permissions
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openEditUser(u)}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" /> Edit user
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
@@ -573,6 +631,90 @@ export default function UsersPage() {
                 disabled={saving || !userForm.roleId || staffRoles.length === 0}
               >
                 {saving ? "Creating…" : "Create User"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit user</DialogTitle>
+            <p className="text-sm text-muted-foreground">{editUser?.email}</p>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">First name *</Label>
+                <Input
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Last name</Label>
+                <Input
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Email</Label>
+              <Input value={editUser?.email ?? ""} disabled className="opacity-60" />
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Phone</Label>
+              <Input
+                value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">Role</Label>
+                <Select
+                  value={editForm.roleId}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, roleId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allAssignableRoles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {roleLabel(r)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Branch</Label>
+                <Select
+                  value={editForm.branchId || "__none__"}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, branchId: v === "__none__" ? "" : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No branch</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className={modalInlineFooterClass}>
+              <Button variant="outline" onClick={() => setEditUser(null)} disabled={saving}>Cancel</Button>
+              <Button onClick={() => void handleSaveUser()} disabled={saving || !editForm.firstName.trim()}>
+                {saving ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </div>

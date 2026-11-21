@@ -58,13 +58,14 @@ export class UpdateUserDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MinLength(2)
+  @MinLength(1)
+  @MaxLength(50)
   firstName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MinLength(2)
+  @MaxLength(50)
   lastName?: string;
 
   @ApiPropertyOptional()

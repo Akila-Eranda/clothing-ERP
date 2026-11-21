@@ -26,8 +26,7 @@ import { assertShopModule } from '@/shared/shop-module.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
 import { applyGiftVoucherRedeem, computeHelperCommission, computeReloadCommission, generateGiftVoucherCode, maskReloadPin, round2 } from './pos-phase6.helper';
-import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
-import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
+import { assertCreditAvailable, computeChargeDueDate, resolveSaleCreditCharge } from '@/modules/customers/customer-credit.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { nanoid } from 'nanoid';
 import { recordSaleCashMovement, findOpenRegister, ensureCashierWallet, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
@@ -288,9 +287,16 @@ export class PosService {
       throw new BadRequestException('Customer required for credit payment');
     }
 
-    const isPartial = totalPaid + 0.01 < amountDue;
-    const partialCredit = isPartial ? amountDue - totalPaid : 0;
-    const totalCreditCharge = creditPayTotal + partialCredit;
+    const creditCharge = resolveSaleCreditCharge(amountDue, dto.payments);
+    const isPartial = creditCharge.isPartial;
+    const totalCreditCharge = creditCharge.totalCreditCharge;
+    const nonCreditPaid = round2(Math.max(0, totalPaid - creditPayTotal));
+    // Credit-only checkout: record the full server total, not a short client tender.
+    const salePayments =
+      creditPayTotal > 0.009 && nonCreditPaid <= 0.009
+        ? [{ method: PaymentMethod.CUSTOMER_CREDIT, amount: amountDue }]
+        : dto.payments;
+    const settledPaid = round2(salePayments.reduce((s, p) => s + p.amount, 0));
 
     if (totalCreditCharge > 0 && customerRecord) {
       assertCreditAvailable(customerRecord.creditLimit, customerRecord.creditBalance, totalCreditCharge);
@@ -310,12 +316,12 @@ export class PosService {
     }
 
     if (isPartial && !dto.allowPartialPayment) {
-      throw new BadRequestException(`Payment short by LKR ${(amountDue - totalPaid).toFixed(2)}. Enable partial payment or add more.`);
+      throw new BadRequestException(`Payment short by LKR ${(amountDue - settledPaid).toFixed(2)}. Enable partial payment or add more.`);
     }
 
-    const changeDue = Math.max(0, totalPaid - amountDue);
+    const changeDue = Math.max(0, settledPaid - amountDue);
     const paymentStatus = isPartial ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
-    const paymentMethods = dto.payments.map((p) => p.method);
+    const paymentMethods = salePayments.map((p) => p.method);
 
     let helperEmployeeId: string | undefined;
     let helperName: string | undefined;
@@ -429,9 +435,9 @@ export class PosService {
           roundOff,
           loyaltyDiscount,
           total: amountDue,
-          amountPaid: totalPaid,
+          amountPaid: settledPaid,
           changeDue,
-          paymentMethod: dto.payments[0]?.method ?? PaymentMethod.CASH,
+          paymentMethod: salePayments[0]?.method ?? PaymentMethod.CASH,
           paymentStatus,
           pointsRedeemed,
           notes: dto.notes,
@@ -440,7 +446,7 @@ export class PosService {
           metadata: {
             tierDiscount,
             paymentSummary: buildPaymentsSummary(paymentMethods),
-            partialBalance: isPartial ? amountDue - totalPaid : 0,
+            partialBalance: isPartial ? amountDue - settledPaid : 0,
             helperCommission,
           },
           items: {
@@ -470,13 +476,13 @@ export class PosService {
             }),
           },
           payments: {
-            create: dto.payments.map((p) => ({
+            create: salePayments.map((p) => ({
               method: p.method,
               amount: p.amount,
-              reference: p.reference,
+              reference: 'reference' in p ? p.reference : undefined,
               bankAccountId:
                 p.method === PaymentMethod.BANK_TRANSFER || p.method === PaymentMethod.QR
-                  ? p.bankAccountId?.trim() || null
+                  ? ('bankAccountId' in p ? p.bankAccountId?.trim() || null : null)
                   : null,
               status: paymentStatus,
             })),
@@ -529,7 +535,7 @@ export class PosService {
       await this.recordReloadSalesFromItems(tx, tenantId, branchId, created.id, dto.items);
 
       if (dto.customerId && customerRecord) {
-        const creditIncrement = creditPayTotal + partialCredit;
+        const creditIncrement = totalCreditCharge;
         await tx.customer.update({
           where: { id: dto.customerId },
           data: {
@@ -653,7 +659,7 @@ export class PosService {
       cashierId,
       sale.id,
       sale.invoiceNumber,
-      dto.payments,
+      salePayments,
       changeDue,
       counterId,
     );

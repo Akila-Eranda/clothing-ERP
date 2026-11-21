@@ -34,6 +34,44 @@ export function assertCreditAvailable(
   }
 }
 
+export type SaleCreditTender = { method: string; amount: number };
+
+/**
+ * Credit posted to the customer account for one sale.
+ * Credit-only = full bill on account (client tender amount is ignored).
+ * Unpaid balance after cash/card is added only when other money was collected.
+ */
+export function resolveSaleCreditCharge(
+  amountDue: number,
+  payments: SaleCreditTender[],
+): { creditPayTotal: number; partialCredit: number; totalCreditCharge: number; isPartial: boolean } {
+  const due = round2(Math.max(0, amountDue));
+  const creditPayTotal = round2(
+    payments
+      .filter((p) => p.method === 'CUSTOMER_CREDIT')
+      .reduce((s, p) => s + (Number(p.amount) || 0), 0),
+  );
+  const totalPaid = round2(payments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
+  const nonCreditPaid = round2(Math.max(0, totalPaid - creditPayTotal));
+
+  // Credit button alone always means the whole bill goes on the customer account.
+  if (creditPayTotal > 0.009 && nonCreditPaid <= 0.009) {
+    return {
+      creditPayTotal: due,
+      partialCredit: 0,
+      totalCreditCharge: due,
+      isPartial: false,
+    };
+  }
+
+  const isPartial = totalPaid + 0.01 < due;
+  const shortfall = isPartial ? round2(due - totalPaid) : 0;
+  const room = round2(Math.max(0, due - nonCreditPaid));
+  const totalCreditCharge = round2(Math.min(room, creditPayTotal + shortfall));
+  const partialCredit = round2(Math.max(0, totalCreditCharge - creditPayTotal));
+  return { creditPayTotal, partialCredit, totalCreditCharge, isPartial };
+}
+
 export function computeChargeDueDate(chargeDate: Date, creditDays: number): Date {
   const days = Math.max(0, Math.floor(creditDays || 0));
   const d = new Date(Date.UTC(

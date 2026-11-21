@@ -6,6 +6,7 @@ import {
   computeChargeDueDate,
   creditAvailable,
   creditTxnSignedDelta,
+  resolveSaleCreditCharge,
   daysPastDue,
   generateInstallmentSchedule,
   round2,
@@ -18,6 +19,44 @@ describe('Phase 7 Customer Credit — workflows', () => {
       expect(creditAvailable(50000, 12000)).toBe(38000);
       expect(creditAvailable(0, 0)).toBe(0);
       expect(creditAvailable(1000, 1000)).toBe(0);
+    });
+
+    it('charges the full bill for credit-only even if the tender was short', () => {
+      expect(resolveSaleCreditCharge(10000, [{ method: 'CUSTOMER_CREDIT', amount: 5000 }])).toMatchObject({
+        creditPayTotal: 10000,
+        partialCredit: 0,
+        totalCreditCharge: 10000,
+        isPartial: false,
+      });
+    });
+
+    it('charges only the unpaid balance after a cash partial', () => {
+      expect(resolveSaleCreditCharge(10000, [{ method: 'CASH', amount: 4000 }])).toMatchObject({
+        creditPayTotal: 0,
+        partialCredit: 6000,
+        totalCreditCharge: 6000,
+        isPartial: true,
+      });
+    });
+
+    it('charges the full bill once when the credit tender covers it', () => {
+      expect(resolveSaleCreditCharge(10000, [{ method: 'CUSTOMER_CREDIT', amount: 10000 }])).toMatchObject({
+        creditPayTotal: 10000,
+        partialCredit: 0,
+        totalCreditCharge: 10000,
+        isPartial: false,
+      });
+    });
+
+    it('adds the unpaid gap once when cash and credit are both tendered', () => {
+      expect(resolveSaleCreditCharge(10000, [
+        { method: 'CASH', amount: 4000 },
+        { method: 'CUSTOMER_CREDIT', amount: 2000 },
+      ])).toMatchObject({
+        creditPayTotal: 2000,
+        partialCredit: 4000,
+        totalCreditCharge: 6000,
+      });
     });
 
     it('splits payment into AR + advance', () => {

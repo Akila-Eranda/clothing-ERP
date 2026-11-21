@@ -171,11 +171,22 @@ export class UsersService {
 
   async update(id: string, tenantId: string, dto: UpdateUserDto) {
     await this.findOne(id, tenantId);
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id },
-      data: dto,
+      data: {
+        ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
+        ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+        ...(dto.branchId !== undefined ? { branchId: dto.branchId || null } : {}),
+        ...(dto.avatar !== undefined ? { avatar: dto.avatar } : {}),
+      },
       include: { roles: { include: { role: true } }, branch: true },
     });
+    if (dto.firstName !== undefined || dto.lastName !== undefined) {
+      this.kcAdmin.updateKcUser(id, { firstName: user.firstName, lastName: user.lastName });
+    }
+    return user;
   }
 
   async updateStatus(id: string, tenantId: string, status: UserStatus) {

@@ -28,6 +28,7 @@ import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
@@ -542,13 +543,20 @@ export default function SettingsPage() {
 
   async function saveProfile() {
     if (!me) return;
+    const firstName = profileForm.firstName.trim();
+    const lastName = profileForm.lastName.trim();
+    const phone = profileForm.phone.trim();
+    if (!firstName) { toast.error("First name is required"); return; }
     setProfileSaving(true);
     try {
-      await api.patch(`/users/${me.id}`, profileForm);
-      setMe(prev => prev ? { ...prev, ...profileForm } : prev);
+      await api.put(`/users/${me.id}`, { firstName, lastName, phone });
+      setMe(prev => prev ? { ...prev, firstName, lastName, phone } : prev);
+      setProfileForm({ firstName, lastName, phone });
+      useAuthStore.getState().updateUser({ name: `${firstName} ${lastName}`.trim() });
       toast.success("Profile updated");
-    } catch { toast.error("Failed to update profile"); }
-    finally { setProfileSaving(false); }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to update profile");
+    } finally { setProfileSaving(false); }
   }
 
   async function changePassword() {

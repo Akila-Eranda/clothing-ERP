@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Patch, Delete,
-  Body, Param, Query, HttpCode, HttpStatus,
+  Body, Param, Query, HttpCode, HttpStatus, ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -51,9 +51,17 @@ export class UsersController {
   }
 
   @Put(':id')
-  @RequirePermissions('users:update')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update user' })
   update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateUserDto) {
+    const isSelf = user.id === id;
+    const canUpdateOthers =
+      user.roles.includes(RoleType.SUPER_ADMIN) ||
+      user.roles.includes(RoleType.TENANT_ADMIN) ||
+      user.permissions.includes('users:update');
+    if (!isSelf && !canUpdateOthers) {
+      throw new ForbiddenException('Insufficient permissions. Required: [users:update]');
+    }
     return this.usersService.update(id, user.tenantId, dto);
   }
 

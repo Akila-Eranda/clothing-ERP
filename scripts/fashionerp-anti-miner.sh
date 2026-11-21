@@ -26,7 +26,7 @@ done
 pkill -9 -f 'javae|xmrig|kdevtmpfsi|kinsing|\.ICEi-unix|Hkx5RL|grep1\.sh|entrypoint\.sh' 2>/dev/null || true
 rm -rf /tmp/.ICEi-unix /var/tmp/.unix /tmp/.unix /dev/shm/.unix 2>/dev/null || true
 
-IOC_RE='xmrig|javae|kdevtmpfsi|kinsing|\.ICEi-unix|grep\.tar\.gz|Hkx5RL|221\.156\.167\.200|busybox wget|base64 -d \|sh|npm start|\.pm2/javae'
+IOC_RE='xmrig|javae|kdevtmpfsi|kinsing|\.ICEi-unix|grep\.tar\.gz|Hkx5RL|221\.156\.167\.200|busybox wget|base64 -d \|sh|npm start|\.pm2/javae|RCE_RES|Command failed: top|Command failed: free|authorized_keys'
 
 recreate_web() {
   if [ -f "$LOCK" ]; then
@@ -59,9 +59,19 @@ if [ -n "$CID" ]; then
     recreate_web
   elif docker logs --since 3m "$CID" 2>&1 | grep -qiE "$IOC_RE"; then
     recreate_web
-  elif docker logs --since 5m "$CID" 2>&1 | grep -qiE 'authorized_keys|Command failed: free -h|ipstresser|rebirthstress|return\.st'; then
-    # Runtime HTML/SSR shell hijack leaves these fingerprints in Next logs
+  elif docker logs --since 5m "$CID" 2>&1 | grep -qiE 'authorized_keys|Command failed: free -h|Command failed: top|RCE_RES|ipstresser|rebirthstress|return\.st|booter|stresser\.rs'; then
+    # Runtime HTML/SSR shell hijack / RCE leaves these fingerprints in Next logs
     recreate_web
+  fi
+
+  # Web hung (504 cause): nginx upstream timeouts while container is "Up"
+  if docker logs --since 3m fashionerp_nginx 2>&1 | grep -qiE 'upstream timed out.*(web:3000|172\.[0-9.]+:3000)|connect\(\) failed.*(web:3000|172\.[0-9.]+:3000)'; then
+    # Only recreate if login also fails from host loopback
+    CODE=$(curl -sk --connect-timeout 4 --max-time 8 -o /dev/null -w '%{http_code}' -H 'Host: grocery.shop.hexalyte.com' https://127.0.0.1/login 2>/dev/null || echo 000)
+    if ! echo "$CODE" | grep -Eq '200|301|302|307|308'; then
+      log "web hung (login=$CODE) + nginx upstream timeout — recreating"
+      recreate_web
+    fi
   fi
 fi
 

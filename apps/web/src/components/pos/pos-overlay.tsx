@@ -1942,29 +1942,14 @@ ${receiptSoftwareCreditHtml()}
     if (payMethod === "CUSTOMER_CREDIT" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for credit payment"); return; }
       const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
-      const paidNow = payments.reduce((s, p) => s + p.amount, 0);
-      const isPartialNow = payState.allowPartial && paidNow > 0 && paidNow + 0.01 < totalAmt;
-      if (isPartialNow) {
-        const onCredit = totalAmt - paidNow;
-        if (onCredit > available + 0.01) {
-          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
-          return;
-        }
-      } else {
-        if (available <= 0) { toast.error("No credit available â€” set credit limit on customer profile"); return; }
-        const typed = numpad.trim() ? parseFloat(numpad) : totalAmt;
-        const creditAmt = Number.isFinite(typed) && typed > 0 ? Math.min(typed, totalAmt) : totalAmt;
-        if (creditAmt > available + 0.01) {
-          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
-          return;
-        }
-        if (creditAmt + 0.01 < totalAmt && !payState.allowPartial) {
-          toast.error("Credit amount is less than total â€” enable Partial pay or enter the full amount");
-          return;
-        }
-        payments.length = 0;
-        payments.push({ method: "CUSTOMER_CREDIT", amount: creditAmt });
+      if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
+      // Credit method always puts the full bill on account. Partial collect = Cash/Card + Partial pay.
+      if (totalAmt > available + 0.01) {
+        toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
+        return;
       }
+      payments.length = 0;
+      payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
     }
     if (payMethod === "CARD" && !payState.splitMode) {
       const digits = cardLast3.replace(/\D/g, "");
@@ -2054,14 +2039,23 @@ ${receiptSoftwareCreditHtml()}
       return;
     }
     const paidCheck = payments.reduce((s, p) => s + p.amount, 0);
+    const explicitCredit = payments
+      .filter((p) => p.method === "CUSTOMER_CREDIT")
+      .reduce((s, p) => s + p.amount, 0);
     const isPartialBill = paidCheck + 0.01 < totalAmt;
     if ((payState.allowPartial || isPartialBill) && isPartialBill) {
       if (!customer?.id) {
-        toast.error("Select a customer â€” unpaid balance goes on credit account");
+        toast.error("Select a customer — unpaid balance goes on credit account");
         return;
       }
       if ((customer.creditLimit ?? 0) <= 0) {
-        toast.error("Customer has no credit limit â€” set a limit or collect full payment");
+        toast.error("Customer has no credit limit — set a limit or collect full payment");
+        return;
+      }
+      const onCredit = Math.max(0, totalAmt - paidCheck) + explicitCredit;
+      const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
+      if (onCredit > available + 0.01) {
+        toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
         return;
       }
     }
@@ -4863,7 +4857,13 @@ ${rows}
                       key={value}
                       type="button"
                       title={`${label} (${idx + 1})`}
-                      onClick={()=>setActivePayment(value)}
+                      onClick={()=>{
+                        setActivePayment(value);
+                        if (value === "CUSTOMER_CREDIT") {
+                          setNumpad("");
+                          setPartialPayAmount("");
+                        }
+                      }}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
                         "pos-checkout-method-btn flex-1 min-w-[4.5rem] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-xs font-bold transition-all hover:opacity-95",
@@ -5021,20 +5021,14 @@ ${rows}
                         Enter cash received before confirming
                       </p>
                     )}
-                    {activePayment === "CUSTOMER_CREDIT" && !numpad && (
+                    {activePayment === "CUSTOMER_CREDIT" && (
                       <p className="text-[10px] mb-2 px-1" style={{ color: "var(--pos-muted)" }}>
-                        Empty = full bill LKR {formatNumber(totalAmt)} on credit
+                        Full bill LKR {formatNumber(totalAmt)} goes on customer credit. For part cash + part credit, use Cash with Partial pay.
                       </p>
                     )}
                     {activePayment === "CASH" && payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
-                        <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
-                      </div>
-                    )}
-                    {activePayment === "CUSTOMER_CREDIT" && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (
-                      <div className="flex justify-between text-xs mb-2 px-1">
-                        <span style={{color:"var(--pos-muted)"}}>Remaining due</span>
                         <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
