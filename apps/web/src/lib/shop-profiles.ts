@@ -262,3 +262,13 @@ export function getStoredShopType(): ShopType {
 export function setStoredShopType(type: ShopType | string) {
   if (typeof window !== 'undefined') localStorage.setItem(SHOP_TYPE_KEY, type);
 }
+
+/**
+ * Unit pre-selected for a NEW product (product form, POS / PO "add product" popups).
+ * PCS for every shop type; the shop's other units stay selectable. Existing products keep their saved unit.
+ */
+export const NEW_ITEM_DEFAULT_UNIT = 'pcs';
+
+export function newItemDefaultUnit(profile: Pick<ShopProfile, 'units' | 'defaultUnit'>): string {
+  return profile.units.includes(NEW_ITEM_DEFAULT_UNIT) ? NEW_ITEM_DEFAULT_UNIT : profile.defaultUnit;
+}

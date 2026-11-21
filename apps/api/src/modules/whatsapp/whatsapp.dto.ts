@@ -13,6 +13,18 @@ export class WhatsappSendDto {
   message!: string;
 }
 
+export class WhatsappSendSaleBillDto {
+  @ApiProperty({ description: 'The sale whose bill message (shop template) is sent' })
+  @IsString()
+  @IsNotEmpty()
+  saleId!: string;
+
+  @ApiPropertyOptional({ description: 'Defaults to the customer phone of the sale' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}
+
 export class WhatsappSendBillDto {
   @ApiProperty({ example: '0771234567' })
   @IsString()

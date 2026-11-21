@@ -73,13 +73,11 @@ export class AccountingSettingsService {
   // ── Preferences ──────────────────────────────────────────────────────
 
   async getPreferences(tenantId: string) {
-    let prefs = await this.prisma.accountingPreference.findUnique({ where: { tenantId } });
-    if (!prefs) {
-      prefs = await this.prisma.accountingPreference.create({
-        data: { tenantId, ...DEFAULT_ACCOUNTING_PREFERENCES },
-      });
-    }
-    return prefs;
+    await this.prisma.accountingPreference.createMany({
+      data: [{ tenantId, ...DEFAULT_ACCOUNTING_PREFERENCES }],
+      skipDuplicates: true,
+    });
+    return this.prisma.accountingPreference.findUniqueOrThrow({ where: { tenantId } });
   }
 
   async updatePreferences(tenantId: string, dto: UpdateAccountingPreferencesDto) {

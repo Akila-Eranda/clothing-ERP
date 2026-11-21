@@ -13,6 +13,7 @@ import {
   applyTableFilters,
   type AppTableFilterColumn,
   type AppTableSearchColumn,
+  withColumnAccessors,
 } from "./table-filter-bar";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -97,8 +98,10 @@ export function ClientSideTable<TData, TValue>({
   ...props
 }: AppClientSideTableProps<TData, TValue>) {
   const rows = React.useMemo(() => (Array.isArray(data) ? data : []) as TData[], [data]);
-  const searchCols = searchableColumns ?? [];
-  const filterCols = filterableColumns ?? [];
+  const columnDefs = (props as { columns?: unknown }).columns;
+  // Fall back to the column accessors when a search/filter id is not a raw field (see withColumnAccessors).
+  const searchCols = React.useMemo(() => withColumnAccessors<TData, AppTableSearchColumn<TData>>(searchableColumns ?? [], columnDefs, { search: true }), [searchableColumns, columnDefs]);
+  const filterCols = React.useMemo(() => withColumnAccessors<TData, AppTableFilterColumn<TData>>(filterableColumns ?? [], columnDefs), [filterableColumns, columnDefs]);
   const showFilterBar = searchCols.length > 0 || filterCols.length > 0;
 
   const [search, setSearch] = React.useState(defaultSearch);

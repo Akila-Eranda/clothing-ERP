@@ -26,6 +26,7 @@ import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { parseApiList } from "@/lib/parse-api-list";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
@@ -553,17 +554,18 @@ function PaymentPanel() {
     }
     setBusy(true);
     try {
-      const res = await api.post<{ appliedTotal: number }>(`/suppliers/${supplierId}/ap/payment`, {
-        amount: amt,
-        method,
-        notes,
-      });
+      const res = await withManagerApproval(`Approve supplier payment of LKR ${formatNumber(amt)}`, (headers) =>
+        api.post<{ appliedTotal: number }>(`/suppliers/${supplierId}/ap/payment`, {
+          amount: amt,
+          method,
+          notes,
+        }, headers ? { headers } : undefined));
       toast.success(`Applied LKR ${formatNumber(res.data?.appliedTotal ?? amt)}`);
       setAmount("");
       setPayOpen(false);
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Payment failed");
+      toast.error(e instanceof ManagerApprovalCancelled ? "Payment not approved — nothing was paid" : e instanceof Error ? e.message : "Payment failed");
     } finally {
       setBusy(false);
     }

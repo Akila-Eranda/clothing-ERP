@@ -1,5 +1,6 @@
 "use client";
 
+import { PosErrorBoundary } from "@/components/pos/pos-error-boundary";
 import { LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import dynamic from "next/dynamic";
@@ -79,7 +80,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="px-3 pt-2">
           <PlatformAnnouncementsBanner />
         </div>
-        <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} posOnly />
+        <PosErrorBoundary>
+          <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} posOnly />
+        </PosErrorBoundary>
         {!posOpen && (
           <PosOnlyLanding
             shopLabel={receiptSettings.shopName || undefined}
@@ -128,7 +131,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* POS full-screen overlay — remount when branch changes */}
-        <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} />
+        <PosErrorBoundary>
+          <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} />
+        </PosErrorBoundary>
         <ThemeCustomizer />
       </div>
     </BranchProvider>

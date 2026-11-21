@@ -68,6 +68,7 @@ export function TableFilterBar({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder.replace(/\.{3}$|…$/, "")}
               className="h-10 w-full rounded-xl border bg-background pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
             />
             {search ? (
@@ -137,6 +138,67 @@ export function TableFilterBar({
 
 function onChangeSafe(onChange: (value: string) => void, value: string) {
   onChange(value === "all" ? "" : value);
+}
+
+/**
+ * Search / filter columns are keyed by the table column id. Many columns have no raw field with
+ * that name (e.g. id "customer" is built by an accessorFn from first/last name, phone and email),
+ * so reading `row[id]` alone returned "" and the search never matched anything.
+ * This adds a getValue that falls back to the column definition's accessorFn / accessorKey,
+ * but only when the row has no usable raw field of that name, so existing behaviour is unchanged.
+ *
+ * With `{ search: true }` (search box only, never exact-match filters) the accessorFn text is also
+ * used when the row DOES have a raw field, as long as that text contains the raw value: columns like
+ * id "name" with accessorFn `${name} ${slug}` are meant to search every field they list, and the
+ * longer text only ever adds matches.
+ */
+type ColumnLike<TData> = { id?: string; accessorKey?: unknown; accessorFn?: (row: TData, index: number) => unknown };
+
+function readPath(row: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, k) => (acc != null && typeof acc === "object" ? (acc as Record<string, unknown>)[k] : undefined), row);
+}
+
+function toSearchText(v: unknown): string | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+  return undefined;
+}
+
+export function withColumnAccessors<TData, C extends { id: string; getValue?: (row: TData) => string | number | boolean | null | undefined }>(
+  cols: C[],
+  columnDefs: unknown,
+  opts: { search?: boolean } = {},
+): C[] {
+  const defs = (Array.isArray(columnDefs) ? columnDefs : []) as ColumnLike<TData>[];
+  return cols.map((col) => {
+    if (col.getValue) return col;
+    const def = defs.find((d) => d && (d.id === col.id || d.accessorKey === col.id));
+    if (!def) return col;
+    return {
+      ...col,
+      getValue: (row: TData) => {
+        const raw = toSearchText(row != null && typeof row === "object" ? (row as Record<string, unknown>)[col.id] : undefined);
+        if (raw !== undefined) {
+          if (opts.search && typeof def.accessorFn === "function") {
+            try {
+              const combined = toSearchText(def.accessorFn(row, 0));
+              if (combined !== undefined && combined.toLowerCase().includes(raw.toLowerCase())) return combined;
+            } catch {
+              /* fall back to the raw field */
+            }
+          }
+          return raw;
+        }
+        try {
+          if (typeof def.accessorFn === "function") return toSearchText(def.accessorFn(row, 0)) ?? "";
+          if (typeof def.accessorKey === "string") return toSearchText(readPath(row, def.accessorKey)) ?? "";
+        } catch {
+          return "";
+        }
+        return "";
+      },
+    };
+  });
 }
 
 export function resolveTableFieldValue<TData>(

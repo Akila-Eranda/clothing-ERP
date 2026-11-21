@@ -656,6 +656,7 @@ export default function QuotationsPage() {
             columns={columns}
             searchableColumns={[
               { id: "quoteNumber", title: "Quote #" },
+              { id: "customerSearch", title: "customer / phone / part", getValue: (r: Quotation) => `${r.customer ? `${r.customer.firstName} ${r.customer.lastName ?? ""} ${r.customer.phone}` : ""} ${r.items.map((i) => `${i.variant?.product?.name ?? ""} ${i.variant?.sku ?? ""}`).join(" ")}` },
             ]}
             filterableColumns={[
               {
@@ -713,7 +714,7 @@ export default function QuotationsPage() {
             <div className="space-y-2">
               <Label className="text-xs">Add parts</Label>
               <Input
-                placeholder="Search parts by name or SKU…"
+                placeholder="Search parts by name or SKU…" aria-label="Search parts by name or SKU"
                 value={partSearch}
                 onChange={(e) => setPartSearch(e.target.value)}
               />

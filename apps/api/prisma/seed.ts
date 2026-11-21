@@ -4,16 +4,48 @@ import {
   ServiceReminderStatus, ServiceReminderChannel, QuotationStatus,
   PaymentMethod, SaleStatus, PaymentStatus, WarrantyClaimStatus,
 } from '@prisma/client';
-import type { Permission } from '@prisma/client';
+import type { Permission, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { getShopProfile, slugifyCategory } from '../src/shared/shop-profiles';
+import { PERMISSION_CATALOGUE, splitPermissionKey } from '../src/shared/security/permission-catalogue';
+import { resolveSeedPassword, SEED_PASSWORD_ENV } from '../src/shared/security/seed-passwords';
+import { decideSeedRun } from '../src/shared/security/seed-guard';
 
 const prisma = new PrismaClient();
+/** Shop-profile objects are plain JSON; their interfaces lack the index signature Prisma's JSON type wants. */
+const asJson = (v: unknown) => v as Prisma.InputJsonValue;
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  // Owner decision 6 Nov 2026: never part of production deployments; initial setup of an empty DB only.
+  const decision = decideSeedRun(process.env, await prisma.tenant.count());
+  if (decision.action !== 'run') {
+    console.log(decision.reason);
+    process.exitCode = decision.exitCode;
+    return;
+  }
+  console.log(`🌱 Seeding database... (${decision.reason})`);
 
-  const passwordHash = await bcrypt.hash('Admin@123456', 12);
+  // Inventory rows need a warehouse (F-33b: seed failed with "warehouseId is missing").
+  // Same rule as ProductsService.ensureDefaultWarehouse: reuse the branch's default, else create one.
+  const defaultWarehouseId = async (tenantId: string, branchId: string): Promise<string> => {
+    const existing = await prisma.warehouse.findFirst({ where: { tenantId, branchId, isDefault: true, isActive: true }, select: { id: true } });
+    if (existing) return existing.id;
+    const branch = await prisma.branch.findFirstOrThrow({ where: { id: branchId, tenantId }, select: { code: true } });
+    const code = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+    const wh = await prisma.warehouse.upsert({
+      where: { tenantId_code: { tenantId, code } },
+      update: {},
+      create: { tenantId, branchId, name: 'Main Warehouse', code, isDefault: true },
+      select: { id: true },
+    });
+    return wh.id;
+  };
+
+  // F-11: no fixed passwords. Only used for accounts this run creates; existing users keep theirs.
+  const adminPw = resolveSeedPassword(SEED_PASSWORD_ENV.admin);
+  const cashierPw = resolveSeedPassword(SEED_PASSWORD_ENV.cashier);
+  const managerPw = resolveSeedPassword(SEED_PASSWORD_ENV.manager);
+  const passwordHash = await bcrypt.hash(adminPw.value, 12);
 
   // ── Platform tenant (company internal — admin3.hexalyte.com only) ──
   const platformTenant = await prisma.tenant.upsert({
@@ -75,7 +107,7 @@ async function main() {
       roles: { create: [{ roleId: platformSuperAdminRole.id }] },
     },
   });
-  console.log('✅ Platform admin: admin@hexalyte.com (password: Admin@123456) — admin3.hexalyte.com only');
+  console.log('✅ Platform admin: admin@hexalyte.com (password: admin seed password) — admin3.hexalyte.com only');
 
   // ── Demo shop tenant ────────────────────────────────────────
   const tenant = await prisma.tenant.upsert({
@@ -111,41 +143,8 @@ async function main() {
   console.log(`✅ Branch: ${branch.name} (${branch.id})`);
 
   // ── Permissions ───────────────────────────────────────────
-  const permissionDefs = [
-    // Products
-    { resource: 'products', action: 'create' }, { resource: 'products', action: 'read' },
-    { resource: 'products', action: 'update' }, { resource: 'products', action: 'delete' },
-    // Inventory
-    { resource: 'inventory', action: 'create' }, { resource: 'inventory', action: 'read' },
-    { resource: 'inventory', action: 'update' },
-    // Sales
-    { resource: 'sales', action: 'create' }, { resource: 'sales', action: 'read' },
-    { resource: 'sales', action: 'update' },
-    // Customers
-    { resource: 'customers', action: 'create' }, { resource: 'customers', action: 'read' },
-    { resource: 'customers', action: 'update' }, { resource: 'customers', action: 'delete' },
-    // Suppliers
-    { resource: 'suppliers', action: 'create' }, { resource: 'suppliers', action: 'read' },
-    // Purchases
-    { resource: 'purchases', action: 'create' }, { resource: 'purchases', action: 'read' },
-    { resource: 'purchases', action: 'update' },
-    // Reports
-    { resource: 'reports', action: 'read' },
-    // Accounting
-    { resource: 'accounting', action: 'create' }, { resource: 'accounting', action: 'read' },
-    // Cash management
-    { resource: 'cash', action: 'create' }, { resource: 'cash', action: 'read' },
-    { resource: 'cash', action: 'update' },
-    // HR
-    { resource: 'hr', action: 'create' }, { resource: 'hr', action: 'read' },
-    { resource: 'hr', action: 'update' },
-    // Users
-    { resource: 'users', action: 'create' }, { resource: 'users', action: 'read' },
-    { resource: 'users', action: 'update' }, { resource: 'users', action: 'delete' },
-    // Roles
-    { resource: 'roles', action: 'create' }, { resource: 'roles', action: 'read' },
-    { resource: 'roles', action: 'update' },
-  ];
+  // Single source of truth for permissions (see src/shared/security/permission-catalogue.ts).
+  const permissionDefs = PERMISSION_CATALOGUE.map(splitPermissionKey);
 
   const permissions = await Promise.all(
     permissionDefs.map((p) =>
@@ -319,10 +318,10 @@ async function main() {
     update: {},
     create: { userId: adminUser.id, roleId: tenantAdminRole.id },
   });
-  console.log(`✅ Shop admin: ${adminUser.email} (password: Admin@123456) — shop.hexalyte.com only`);
+  console.log(`✅ Shop admin: ${adminUser.email} (password: admin seed password) — shop.hexalyte.com only`);
 
   // ── Demo Cashiers (separate drawers / concurrent shifts) ──
-  const cashierPassword = await bcrypt.hash('Cashier@123456', 12);
+  const cashierPassword = await bcrypt.hash(cashierPw.value, 12);
   const cashierUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'cashier@demo.fashionerp.com' } },
     update: {},
@@ -338,7 +337,7 @@ async function main() {
       roles: { create: [{ roleId: cashierRole.id }] },
     },
   });
-  console.log(`✅ Cashier 1: ${cashierUser.email} (password: Cashier@123456)`);
+  console.log(`✅ Cashier 1: ${cashierUser.email} (password: cashier seed password)`);
 
   const cashier2User = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'cashier2@demo.fashionerp.com' } },
@@ -360,9 +359,9 @@ async function main() {
     update: {},
     create: { userId: cashier2User.id, roleId: cashierRole.id },
   });
-  console.log(`✅ Cashier 2: ${cashier2User.email} (password: Cashier@123456) — separate cash drawer`);
+  console.log(`✅ Cashier 2: ${cashier2User.email} (password: cashier seed password) — separate cash drawer`);
 
-  const managerPassword = await bcrypt.hash('Manager@123456', 12);
+  const managerPassword = await bcrypt.hash(managerPw.value, 12);
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'manager@demo.fashionerp.com' } },
     update: { status: UserStatus.ACTIVE, emailVerified: true },
@@ -423,7 +422,7 @@ async function main() {
       roles: { create: [{ roleId: purchasingStaffRole.id }] },
     },
   });
-  console.log('✅ Workflow users: manager@ / inventory@ / accountant@ / purchasing@demo.fashionerp.com (password: Manager@123456)');
+  console.log('✅ Workflow users: manager@ / inventory@ / accountant@ / purchasing@demo.fashionerp.com (password: manager seed password)');
 
   // ── Demo Categories (clothing) ─────────────────────────────
   const clothingCategories = getShopProfile(ShopType.CLOTHING).defaultCategories;
@@ -467,7 +466,11 @@ async function main() {
   const groceryAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: groceryTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: groceryTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: groceryTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: groceryTenant.id, email: 'admin@grocery.demo.fashionerp.com' } },
@@ -494,7 +497,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: groceryTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: groceryProfile.type,
           defaultUnit: groceryProfile.defaultUnit,
@@ -503,10 +506,10 @@ async function main() {
           labelTemplates: groceryProfile.labelTemplates,
           variantAttributes: groceryProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ Grocery demo: grocery.shop.hexalyte.com — admin@grocery.demo.fashionerp.com / Admin@123456');
+  console.log('✅ Grocery demo: grocery.shop.hexalyte.com — admin@grocery.demo.fashionerp.com / admin seed password');
 
   // ── Hardware demo tenant ────────────────────────────────────
   const hardwareProfile = getShopProfile(ShopType.HARDWARE);
@@ -539,7 +542,11 @@ async function main() {
   const hardwareAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: hardwareTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: hardwareTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: hardwareTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: hardwareTenant.id, email: 'admin@hardware.demo.fashionerp.com' } },
@@ -566,7 +573,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: hardwareTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: hardwareProfile.type,
           defaultUnit: hardwareProfile.defaultUnit,
@@ -575,10 +582,10 @@ async function main() {
           labelTemplates: hardwareProfile.labelTemplates,
           variantAttributes: hardwareProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ Hardware demo: hardware.shop.hexalyte.com — admin@hardware.demo.fashionerp.com / Admin@123456');
+  console.log('✅ Hardware demo: hardware.shop.hexalyte.com — admin@hardware.demo.fashionerp.com / admin seed password');
 
   // ── Agriculture demo tenant ─────────────────────────────────
   const agriProfile = getShopProfile(ShopType.AGRICULTURE);
@@ -611,7 +618,11 @@ async function main() {
   const agriAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: agriTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: agriTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: agriTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: agriTenant.id, email: 'admin@agri.demo.fashionerp.com' } },
@@ -638,7 +649,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: agriTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: agriProfile.type,
           defaultUnit: agriProfile.defaultUnit,
@@ -647,10 +658,10 @@ async function main() {
           labelTemplates: agriProfile.labelTemplates,
           variantAttributes: agriProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ Agriculture demo: agri.shop.hexalyte.com — admin@agri.demo.fashionerp.com / Admin@123456');
+  console.log('✅ Agriculture demo: agri.shop.hexalyte.com — admin@agri.demo.fashionerp.com / admin seed password');
 
   // ── Spare Parts demo tenant ─────────────────────────────────
   const spareProfile = getShopProfile(ShopType.SPARE_PARTS);
@@ -693,7 +704,11 @@ async function main() {
   const spareAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: spareTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: spareTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: spareTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: spareTenant.id, email: 'admin@spareparts.demo.fashionerp.com' } },
@@ -768,7 +783,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: spareTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: spareProfile.type,
           defaultUnit: spareProfile.defaultUnit,
@@ -777,10 +792,10 @@ async function main() {
           labelTemplates: spareProfile.labelTemplates,
           variantAttributes: spareProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ Spare Parts demo: spareparts.shop.hexalyte.com — admin@spareparts.demo.fashionerp.com / Admin@123456');
+  console.log('✅ Spare Parts demo: spareparts.shop.hexalyte.com — admin@spareparts.demo.fashionerp.com / admin seed password');
 
   // ── Tyre Shop demo tenant ───────────────────────────────────
   const tyreProfile = getShopProfile(ShopType.TIRE_SHOP);
@@ -813,7 +828,11 @@ async function main() {
   const tyreAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tyreTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: tyreTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: tyreTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tyreTenant.id, email: 'admin@tyres.demo.fashionerp.com' } },
@@ -933,10 +952,11 @@ async function main() {
           mrp: 41000,
         },
       });
+      const tyreWarehouseId = await defaultWarehouseId(tyreTenant.id, tyreBranch.id);
       await prisma.inventory.createMany({
         data: [
-          { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v205.id, quantity: 12 },
-          { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v195.id, quantity: 8 },
+          { tenantId: tyreTenant.id, branchId: tyreBranch.id, warehouseId: tyreWarehouseId, variantId: v205.id, quantity: 12 },
+          { tenantId: tyreTenant.id, branchId: tyreBranch.id, warehouseId: tyreWarehouseId, variantId: v195.id, quantity: 8 },
         ],
         skipDuplicates: true,
       });
@@ -989,7 +1009,7 @@ async function main() {
         },
       });
       await prisma.inventory.create({
-        data: { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v215.id, quantity: 6 },
+        data: { tenantId: tyreTenant.id, branchId: tyreBranch.id, warehouseId: await defaultWarehouseId(tyreTenant.id, tyreBranch.id), variantId: v215.id, quantity: 6 },
       });
       await prisma.partCompatibility.create({
         data: { tenantId: tyreTenant.id, vehicleModelId: vezelModel.id, variantId: v215.id, notes: 'Optional wider fit' },
@@ -1000,7 +1020,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: tyreTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: tyreProfile.type,
           defaultUnit: tyreProfile.defaultUnit,
@@ -1009,7 +1029,7 @@ async function main() {
           labelTemplates: tyreProfile.labelTemplates,
           variantAttributes: tyreProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
 
@@ -1546,7 +1566,7 @@ async function main() {
     console.log('✅ Tyre Shop demo data: customers, vehicles, job cards, appointments, quotes, sales, warranty');
   }
 
-  console.log('✅ Tyre Shop demo: tyres.shop.hexalyte.com — admin@tyres.demo.fashionerp.com / Admin@123456');
+  console.log('✅ Tyre Shop demo: tyres.shop.hexalyte.com — admin@tyres.demo.fashionerp.com / admin seed password');
 
   // ── General Shop demo tenant ────────────────────────────────
   const generalProfile = getShopProfile(ShopType.GENERAL);
@@ -1579,7 +1599,11 @@ async function main() {
   const generalAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: generalTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: generalTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: generalTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: generalTenant.id, email: 'admin@general.demo.fashionerp.com' } },
@@ -1606,7 +1630,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: generalTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: generalProfile.type,
           defaultUnit: generalProfile.defaultUnit,
@@ -1615,12 +1639,12 @@ async function main() {
           labelTemplates: generalProfile.labelTemplates,
           variantAttributes: generalProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ General Shop demo: general.shop.hexalyte.com — admin@general.demo.fashionerp.com / Admin@123456');
+  console.log('✅ General Shop demo: general.shop.hexalyte.com — admin@general.demo.fashionerp.com / admin seed password');
 
-  // ── Cake House / Bakery demo tenant (rich catalog seeded via scripts/_seed_cakehouse.js) ──
+  // ── Cake House / Bakery demo tenant ──
   const bakeryProfile = getShopProfile(ShopType.BAKERY);
   const bakeryTenant = await prisma.tenant.upsert({
     where: { subdomain: 'cake' },
@@ -1652,7 +1676,11 @@ async function main() {
   const bakeryAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: bakeryTenant.id, name: 'Tenant Admin' } },
     update: {},
-    create: { tenantId: bakeryTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+    create: {
+      tenantId: bakeryTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true,
+      // New roles only (update: {} leaves existing roles alone). Logins no longer fill empty roles (P1-1).
+      permissions: { create: permissions.map((p: Permission) => ({ permissionId: p.id })) },
+    },
   });
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: bakeryTenant.id, email: 'admin@cake.demo.fashionerp.com' } },
@@ -1679,7 +1707,7 @@ async function main() {
   await prisma.tenant.update({
     where: { id: bakeryTenant.id },
     data: {
-      settings: {
+      settings: asJson({
         shopProfile: {
           type: bakeryProfile.type,
           defaultUnit: bakeryProfile.defaultUnit,
@@ -1688,11 +1716,10 @@ async function main() {
           labelTemplates: bakeryProfile.labelTemplates,
           variantAttributes: bakeryProfile.variantAttributes,
         },
-      },
+      }),
     },
   });
-  console.log('✅ Cake House demo: cake.shop.hexalyte.com — admin@cake.demo.fashionerp.com / Admin@123456');
-  console.log('   (Run node scripts/_seed_cakehouse.js for full products+images+demo data)');
+  console.log('✅ Cake House demo: cake.shop.hexalyte.com — admin@cake.demo.fashionerp.com / admin seed password');
 
   await prisma.user.updateMany({
     where: { emailVerified: true, status: UserStatus.PENDING_VERIFICATION },
@@ -1701,21 +1728,21 @@ async function main() {
 
   console.log('\n🎉 Seeding completed successfully!\n');
   console.log('Company admin (admin3.hexalyte.com):');
-  console.log('  admin@hexalyte.com / Admin@123456');
+  console.log('  admin@hexalyte.com / admin seed password');
   console.log('Shop login (shop.hexalyte.com):');
-  console.log('  Clothing demo: admin@demo.fashionerp.com / Admin@123456');
-  console.log('  Grocery demo:  admin@grocery.demo.fashionerp.com / Admin@123456 (subdomain: grocery)');
-  console.log('  Hardware demo: admin@hardware.demo.fashionerp.com / Admin@123456 (subdomain: hardware)');
-  console.log('  Agri demo:     admin@agri.demo.fashionerp.com / Admin@123456 (subdomain: agri)');
-  console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)');
-  console.log('  Tyre Shop:     admin@tyres.demo.fashionerp.com / Admin@123456 (subdomain: tyres)');
-  console.log('  General Shop:  admin@general.demo.fashionerp.com / Admin@123456 (subdomain: general)');
-  console.log('  Cake House:    admin@cake.demo.fashionerp.com / Admin@123456 (subdomain: cake)');
-  console.log('  Cashier:       cashier@demo.fashionerp.com / Cashier@123456');
-  console.log('  Branch Mgr:    manager@demo.fashionerp.com / Manager@123456');
-  console.log('  Inv. Manager:  inventory@demo.fashionerp.com / Manager@123456');
-  console.log('  Accountant:    accountant@demo.fashionerp.com / Manager@123456');
-  console.log('  Purchasing:    purchasing@demo.fashionerp.com / Manager@123456');
+  console.log('  Clothing demo: admin@demo.fashionerp.com / admin seed password');
+  console.log('  Grocery demo:  admin@grocery.demo.fashionerp.com / admin seed password (subdomain: grocery)');
+  console.log('  Hardware demo: admin@hardware.demo.fashionerp.com / admin seed password (subdomain: hardware)');
+  console.log('  Agri demo:     admin@agri.demo.fashionerp.com / admin seed password (subdomain: agri)');
+  console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / admin seed password (subdomain: spareparts)');
+  console.log('  Tyre Shop:     admin@tyres.demo.fashionerp.com / admin seed password (subdomain: tyres)');
+  console.log('  General Shop:  admin@general.demo.fashionerp.com / admin seed password (subdomain: general)');
+  console.log('  Cake House:    admin@cake.demo.fashionerp.com / admin seed password (subdomain: cake)');
+  console.log('  Cashier:       cashier@demo.fashionerp.com / cashier seed password');
+  console.log('  Branch Mgr:    manager@demo.fashionerp.com / manager seed password');
+  console.log('  Inv. Manager:  inventory@demo.fashionerp.com / manager seed password');
+  console.log('  Accountant:    accountant@demo.fashionerp.com / manager seed password');
+  console.log('  Purchasing:    purchasing@demo.fashionerp.com / manager seed password');
 }
 
 main()

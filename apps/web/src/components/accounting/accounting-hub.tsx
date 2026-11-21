@@ -20,6 +20,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/compo
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { toast } from "sonner";
 import { api, type ApiResponse } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import Link from "next/link";
@@ -107,9 +108,14 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
         payload.chequeBankName = chequeBank.trim() || undefined;
       }
       if (edit) { await api.put(`/accounting/expenses/${edit.id}`, payload); toast.success("Expense updated"); }
-      else       { await api.post("/accounting/expenses", payload);           toast.success("Expense recorded"); }
+      else {
+        await withManagerApproval("Approve expense", (headers) => api.post("/accounting/expenses", payload, headers ? { headers } : undefined));
+        toast.success("Expense recorded");
+      }
       onSaved(); onClose();
-    } catch { toast.error("Failed to save expense"); }
+    } catch (e: unknown) {
+      toast.error(e instanceof ManagerApprovalCancelled ? "Expense not approved — nothing was recorded" : (e as Error).message || "Failed to save expense");
+    }
     finally { setSaving(false); }
   };
 

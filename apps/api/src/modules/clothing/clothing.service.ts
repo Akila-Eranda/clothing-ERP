@@ -1,3 +1,4 @@
+import { escapeLike, normalizeSearch } from '@/shared/search.helper';
 import {
   BadRequestException,
   Injectable,
@@ -1152,6 +1153,7 @@ export class ClothingService {
       Math.ceil((Date.now() - since.getTime()) / (24 * 60 * 60 * 1000)),
     );
 
+    const searchTerm = escapeLike(normalizeSearch(opts.search)); // search audit: trimmed, %/_ literal
     const inventory = await this.prisma.inventory.findMany({
       where: {
         tenantId,
@@ -1170,14 +1172,14 @@ export class ClothingService {
           ...(opts.color
             ? { color: { equals: opts.color, mode: 'insensitive' as const } }
             : {}),
-          ...(opts.search
+          ...(searchTerm
             ? {
                 OR: [
-                  { sku: { contains: opts.search, mode: 'insensitive' as const } },
-                  { name: { contains: opts.search, mode: 'insensitive' as const } },
+                  { sku: { contains: searchTerm, mode: 'insensitive' as const } },
+                  { name: { contains: searchTerm, mode: 'insensitive' as const } },
                   {
                     product: {
-                      name: { contains: opts.search, mode: 'insensitive' as const },
+                      name: { contains: searchTerm, mode: 'insensitive' as const },
                     },
                   },
                 ],

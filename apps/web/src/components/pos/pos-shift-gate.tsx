@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Banknote, Loader2, PlayCircle, X, AlertTriangle, CheckCircle2, Monitor, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import { useBranchStore } from "@/stores/branch-store";
 import { useBranchContext } from "@/components/branch/branch-provider";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
 import { readPosCounterId, writePosCounterId, clearPosCounterId } from "@/lib/pos-counter";
+import { openingFloatProblem } from "@/lib/opening-float";
 
 interface PosShiftGateProps {
   onShiftReady: () => void;
@@ -23,6 +25,14 @@ interface PosShiftGateProps {
 }
 
 type CounterRow = { id: string; name: string; code: string; sortOrder?: number };
+
+type HandoverPreview = {
+  required: boolean;
+  expectedCash: number;
+  pendingApproval: boolean;
+  approvalThreshold?: number;
+  wallets: { registerId: string; cashierName: string; status: string; amount: number }[];
+};
 
 type CounterCash = {
   counterId: string;
@@ -47,6 +57,11 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
   const [activeRegisterId, setActiveRegisterId] = React.useState<string | null>(null);
   const [switching, setSwitching] = React.useState(false);
   const [counterCash, setCounterCash] = React.useState<Record<string, CounterCash>>({});
+  const [handover, setHandover] = React.useState<HandoverPreview | null>(null);
+  const [countIt, setCountIt] = React.useState(false);
+  const [countedCash, setCountedCash] = React.useState("");
+  const [handoverReason, setHandoverReason] = React.useState("");
+  const [maxFloat, setMaxFloat] = React.useState<number | null>(null);
   const onShiftReadyRef = React.useRef(onShiftReady);
   onShiftReadyRef.current = onShiftReady;
   const canApprove =
@@ -58,12 +73,22 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
     setPendingRegisterId(null);
     setExistingOpen(false);
     setActiveRegisterId(null);
+    setHandover(null);
+    setCountIt(false);
+    setCountedCash("");
+    setHandoverReason("");
     const q = forCounterId ? `?counterId=${encodeURIComponent(forCounterId)}` : "";
-    const [activeRes, suggestRes] = await Promise.all([
+    const [activeRes, suggestRes, handoverRes] = await Promise.all([
       api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(`/cash/active${q}`),
-      api.get<{ suggestedOpening: number | null }>(`/cash/opening-suggestion${q}`).catch(() => ({ data: null })),
+      api.get<{ suggestedOpening: number | null; maxOpeningFloat?: number }>(`/cash/opening-suggestion${q}`).catch(() => ({ data: null })),
+      forCounterId
+        ? api.get<HandoverPreview>(`/cash/handover-preview${q}`).catch(() => ({ data: null }))
+        : Promise.resolve({ data: null }),
     ]);
+    // Another cashier's cash is still in this counter's drawer: the shift starts from that balance.
+    if (handoverRes.data?.required) setHandover(handoverRes.data);
     const suggestion = suggestRes.data?.suggestedOpening ?? null;
+    setMaxFloat(suggestRes.data?.maxOpeningFloat ?? null);
     setSuggested(suggestion);
     setOpeningCash(suggestion != null ? String(suggestion) : "");
     if (activeRes.data?.status === "OPEN") {
@@ -156,11 +181,50 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
       handleContinueExisting();
       return;
     }
-    const amount = parseFloat(openingCash);
-    if (!Number.isFinite(amount) || amount < 0) {
-      toast.error("Enter opening cash amount");
+    if (handover?.required) {
+      if (handover.pendingApproval) {
+        toast.error("The previous shift on this counter is waiting for variance approval");
+        return;
+      }
+      const counted = countIt ? parseFloat(countedCash) : undefined;
+      if (countIt && (counted === undefined || !Number.isFinite(counted) || counted < 0)) {
+        toast.error("Enter the cash you counted, or untick \"I counted the drawer\"");
+        return;
+      }
+      const hasDifference = countIt && Math.abs((counted ?? 0) - handover.expectedCash) > 0.004;
+      if (hasDifference && !handoverReason.trim()) {
+        toast.error("Enter a reason for the cash handover difference");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        if (counterId) writePosCounterId(counterId);
+        // A counted difference above the limit needs a manager's own PIN (never the terminal login).
+        const res = await withManagerApproval("Approve cash handover difference", (headers) =>
+          api.post<{ handover?: { countedCash: number; variance: number } }>("/cash/open", {
+            openingCash: handover.expectedCash,
+            counterId,
+            ...(countIt ? { countedCash: counted } : {}),
+            ...(handoverReason.trim() ? { reason: handoverReason.trim() } : {}),
+          }, headers ? { headers } : undefined));
+        const h = res.data?.handover;
+        const diff = h && Math.abs(h.variance) > 0.004 ? ` (difference LKR ${formatNumber(h.variance)})` : "";
+        toast.success(`Counter taken over with LKR ${formatNumber(h?.countedCash ?? handover.expectedCash)}${diff}`);
+        onShiftReady();
+      } catch (e: unknown) {
+        toast.error(e instanceof ManagerApprovalCancelled ? "Handover not approved — nothing was changed" : (e as Error).message || "Handover failed");
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
+    // Same rules as the API: number, not negative, max 2 decimals, not above the shop / branch maximum.
+    const problem = openingFloatProblem(openingCash, maxFloat);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    const amount = Number(openingCash.trim());
     setSubmitting(true);
     try {
       if (counterId) writePosCounterId(counterId);
@@ -398,6 +462,89 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
               </p>
               <p style={{ color: "var(--pos-muted)" }}>Continue selling — cash stays in this wallet until an admin clears it at day end.</p>
             </div>
+          ) : handover?.required ? (
+            <div
+              className="rounded-xl px-3 py-3 space-y-2"
+              style={{ background: "rgba(59,130,246,0.10)", border: "1px solid rgba(59,130,246,0.35)" }}
+            >
+              <p className="text-sm font-semibold text-white">
+                Take over {selectedCounter?.name ?? "this counter"}
+              </p>
+              <div className="space-y-1">
+                {handover.wallets.map((w) => (
+                  <div key={w.registerId} className="flex items-center justify-between gap-2 text-[11px] text-white/80">
+                    <span className="truncate">{w.cashierName}{w.status !== "OPEN" ? " · closed, not cleared" : ""}</span>
+                    <span className="tabular-nums">LKR {formatNumber(w.amount)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--pos-border)" }}>
+                <span className="text-xs" style={{ color: "var(--pos-muted)" }}>Drawer balance you take over</span>
+                <span className="text-lg font-bold tabular-nums text-white">LKR {formatNumber(handover.expectedCash)}</span>
+              </div>
+              <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                The balance carries over to your shift and is not reset to zero. The previous shift is closed and handed to main cash.
+              </p>
+              {handover.pendingApproval ? (
+                <p className="text-xs" style={{ color: "var(--pos-warn-soft)" }}>
+                  The previous shift on this counter is waiting for variance approval. A manager must approve it in Cash Management first.
+                </p>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 text-xs text-white/80">
+                    <input
+                      type="checkbox"
+                      checked={countIt}
+                      onChange={(e) => { setCountIt(e.target.checked); if (!e.target.checked) setCountedCash(""); }}
+                    />
+                    I counted the drawer
+                  </label>
+                  {countIt && (
+                    <div className="space-y-1">
+                      <Label htmlFor="handover-counted" className="text-white/70 text-xs">Counted cash (LKR)</Label>
+                      <Input
+                        id="handover-counted"
+                        type="text"
+                        inputMode="decimal"
+                        autoFocus
+                        value={countedCash}
+                        onChange={(e) => setCountedCash(e.target.value.replace(/[^\d.]/g, ""))}
+                        placeholder={formatNumber(handover.expectedCash)}
+                        className="h-11 text-lg font-bold bg-[var(--pos-input)] border-[var(--pos-border)]"
+                      />
+                      {countedCash !== "" && Number.isFinite(parseFloat(countedCash)) && (
+                        <p
+                          className="text-[11px]"
+                          style={{
+                            color: Math.abs(parseFloat(countedCash) - handover.expectedCash) > 0.004
+                              ? "var(--pos-warn-soft)"
+                              : "var(--pos-success-soft)",
+                          }}
+                        >
+                          Difference: LKR {formatNumber(parseFloat(countedCash) - handover.expectedCash)}
+                          {Math.abs(parseFloat(countedCash) - handover.expectedCash) > (handover.approvalThreshold ?? 500)
+                            ? " (a manager must authorise this)"
+                            : ""}
+                        </p>
+                      )}
+                      {Math.abs((parseFloat(countedCash) || 0) - handover.expectedCash) > 0.004 && (
+                        <div className="space-y-1">
+                          <Label htmlFor="handover-reason" className="text-white/70 text-xs">Reason for difference</Label>
+                          <Input
+                            id="handover-reason"
+                            value={handoverReason}
+                            onChange={(e) => setHandoverReason(e.target.value)}
+                            placeholder="Explain the cash difference"
+                            maxLength={200}
+                            className="h-10 bg-[var(--pos-input)] border-[var(--pos-border)]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           ) : (
             <>
               {suggested != null && (
@@ -451,6 +598,9 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
                 </div>
               </div>
               <p className="text-xs text-white/40">Count your drawer float before starting sales. Cash sales auto-track in drawer.</p>
+              {maxFloat != null && (
+                <p className="text-[10px] text-white/40" data-testid="max-opening-float">Maximum opening float: LKR {formatNumber(maxFloat)}</p>
+              )}
             </>
           )}
 
@@ -462,7 +612,7 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
             style={{ background: "var(--pos-success-grad)", color: "#ffffff" }}
           >
             {submitting || switching ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-            {existingOpen ? "Continue" : "Start"}
+            {existingOpen ? "Continue" : handover?.required ? "Take over counter" : "Start"}
           </Button>
         </div>
       </motion.div>

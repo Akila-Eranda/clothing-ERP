@@ -4,6 +4,9 @@ import * as React from "react";
 import { AlertTriangle, Banknote, Loader2, Minus, PackageCheck, Plus, RefreshCw, Scan, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval } from "@/lib/cash-approval";
+import { useSubmitKey } from "@/lib/submit-key";
+import { defaultGrnLineCost, grnLineCostPayload } from "@/lib/grn-line-cost";
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, isLikelyBarcodeScan } from "@/lib/pos-barcode";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
@@ -12,6 +15,9 @@ import { printGrnReceipt } from "@/lib/grn-receipt-print";
 import { useAuthStore } from "@/stores/auth-store";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 import { parseApiList } from "@/lib/parse-api-list";
+import { keepSelectedSupplier, parseSupplierPage, supplierBrowsePath, SUPPLIER_PRELOAD_LIMIT } from "@/lib/supplier-search";
+import { PosSupplierCombobox } from "@/components/pos/pos-supplier-combobox";
+import { withExactStock } from "@/lib/exact-stock";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[var(--pos-accent)] transition-colors";
@@ -45,6 +51,8 @@ type SupplierProduct = {
 type SupplierRow = {
   id: string;
   name: string;
+  phone?: string | null;
+  code?: string | null;
 };
 
 type OpenPo = {
@@ -74,9 +82,11 @@ export function PosQuickGrnPanel({
 
   const [suppliers, setSuppliers] = React.useState<SupplierRow[]>([]);
   const [supplierLoading, setSupplierLoading] = React.useState(true);
+  const [supplierTotal, setSupplierTotal] = React.useState<number | null>(null);
   const [supplierId, setSupplierId] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const submitKey = useSubmitKey();
   const [productsLoading, setProductsLoading] = React.useState(false);
   const [supplierProducts, setSupplierProducts] = React.useState<SupplierProduct[]>([]);
   const [productSearch, setProductSearch] = React.useState("");
@@ -120,7 +130,7 @@ export function PosQuickGrnPanel({
     });
     setLineCosts((prev) => ({
       ...prev,
-      [p.variantId]: prev[p.variantId] ?? String(p.lastBuyingPrice ?? p.costPrice ?? 0),
+      [p.variantId]: prev[p.variantId] ?? String(defaultGrnLineCost(p)),
     }));
   }, []);
 
@@ -160,7 +170,7 @@ export function PosQuickGrnPanel({
       .filter((i) => i.quantity > 0)
       .map((i) => {
         const p = supplierProducts.find((x) => x.variantId === i.variantId);
-        const unitCost = parseFloat(lineCosts[i.variantId] ?? "") || p?.lastBuyingPrice || p?.costPrice || 0;
+        const unitCost = parseFloat(lineCosts[i.variantId] ?? "") || (p ? defaultGrnLineCost(p) : 0);
         return { ...i, unitCost, lineTotal: unitCost * i.quantity, product: p };
       });
   }, [grnItems, supplierProducts, lineCosts]);
@@ -177,11 +187,19 @@ export function PosQuickGrnPanel({
     }
   }, [payNow, payAmountTouched, total]);
 
+  // read inside loadSuppliers without making it (and the initial-load effect) depend on the selection
+  const supplierIdRef = React.useRef(supplierId);
+  supplierIdRef.current = supplierId;
+
+  // Initial load + Refresh: lightweight lookup (first 100 by name + total) — no balance recalculation, no writes.
   const loadSuppliers = React.useCallback(async () => {
     setSupplierLoading(true);
     try {
-      const res = await api.get<{ data: SupplierRow[] }>("/suppliers?limit=100");
-      setSuppliers(parseApiList(res.data));
+      const res = await api.get<{ data: SupplierRow[] }>(supplierBrowsePath(SUPPLIER_PRELOAD_LIMIT));
+      const page = parseSupplierPage<SupplierRow>(res);
+      const rows = page.rows.length ? page.rows : parseApiList<SupplierRow>(res.data);
+      setSuppliers((prev) => keepSelectedSupplier(rows, prev, supplierIdRef.current));
+      setSupplierTotal(page.total);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load suppliers");
     } finally {
@@ -202,7 +220,8 @@ export function PosQuickGrnPanel({
         api.get<SupplierProduct[]>(`/pos/products?supplierId=${encodeURIComponent(sid)}&limit=500`),
         api.get<{ data: OpenPo[] }>("/purchases?limit=200"),
       ]);
-      const rows = Array.isArray(prodRes.data) ? prodRes.data : [];
+      // exact stock (negative included), not the clamped selling figure
+      const rows = (Array.isArray(prodRes.data) ? prodRes.data : []).map(withExactStock);
       setSupplierProducts(rows);
 
       const allPos = parseApiList<OpenPo>(poRes.data);
@@ -211,7 +230,7 @@ export function PosQuickGrnPanel({
 
       const costs: Record<string, string> = {};
       for (const p of rows) {
-        costs[p.variantId] = String(p.lastBuyingPrice ?? p.costPrice ?? 0);
+        costs[p.variantId] = String(defaultGrnLineCost(p));
       }
       setLineCosts(costs);
 
@@ -301,7 +320,7 @@ export function PosQuickGrnPanel({
           const r = await api.get<Lookup>(
             `/pos/barcode/${encodeURIComponent(key)}?supplierId=${encodeURIComponent(supplierId)}`,
           );
-          found = r.data;
+          found = r.data ? { ...withExactStock(r.data), variants: r.data.variants?.map(withExactStock) } : r.data;
           break;
         } catch {
           /* try next */
@@ -363,7 +382,7 @@ export function PosQuickGrnPanel({
       return;
     }
     if (grnLines.some((l) => l.unitCost <= 0)) {
-      toast.error("Enter buying price for all lines");
+      toast.error("A product has no buying price yet - ask a manager to set its cost");
       return;
     }
     if (payNow) {
@@ -391,13 +410,14 @@ export function PosQuickGrnPanel({
 
     setBusy(true);
     try {
-      const res = await api.post<{ grnNumber?: string; id?: string }>("/procurement/grn/quick", {
+      const res = await withManagerApproval("Approve supplier cash payment", (headers) => api.post<{ grnNumber?: string; id?: string }>("/procurement/grn/quick", {
         supplierId,
         notes: notes || undefined,
         lines: grnLines.map((l) => ({
           variantId: l.variantId,
           quantity: l.quantity,
-          unitCost: l.unitCost,
+          // Only a changed cost is sent (and only authorised roles may change it); otherwise the server uses the product's cost.
+          ...grnLineCostPayload(l.unitCost, l.product?.costPrice),
           ...(showExpiry && lineExpiries[l.variantId]
             ? { expiryDate: lineExpiries[l.variantId] }
             : {}),
@@ -422,7 +442,10 @@ export function PosQuickGrnPanel({
               },
             }
           : {}),
-      });
+        // same key on retry / approval re-send: the API returns the first GRN, stock is not added twice
+        clientRequestId: submitKey.current(),
+      }, headers ? { headers } : undefined));
+      submitKey.reset();
       const grnNo = res.data?.grnNumber ?? res.data?.id ?? "GRN";
       const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "Supplier";
       const payAmt = payNow ? parseFloat(payAmount) : 0;
@@ -519,18 +542,18 @@ export function PosQuickGrnPanel({
               />
             </div>
             <div className="flex gap-2">
-              <select
+              <PosSupplierCombobox
+                suppliers={suppliers}
+                totalSuppliers={supplierTotal}
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                disabled={supplierLoading || busy}
-                className="flex-1 h-10 rounded-xl text-sm px-3 text-white outline-none"
-                style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
-              >
-                <option value="">{supplierLoading ? "Loading..." : "Select supplier..."}</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                loading={supplierLoading}
+                disabled={busy}
+                onSelect={(s) => {
+                  // a supplier found by the server search may not be in the preloaded page yet
+                  setSuppliers((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+                  setSupplierId(s.id);
+                }}
+              />
               <button
                 type="button"
                 onClick={() => void loadSuppliers()}
@@ -599,7 +622,7 @@ export function PosQuickGrnPanel({
                     }
                   }}
                   disabled={!supplierId || productsLoading || busy || scanBusy}
-                  placeholder="Search name / SKU / barcode · Enter to add"
+                  placeholder="Search name / SKU / barcode · Enter to add" aria-label="Search name / SKU / barcode · Enter to add"
                   className="w-full h-10 pl-9 pr-16 rounded-xl text-sm text-white outline-none placeholder:text-white/30"
                   style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
                 />
@@ -763,6 +786,7 @@ export function PosQuickGrnPanel({
                             min={0}
                             step="0.01"
                             value={lineCosts[l.variantId] ?? ""}
+                            title="The product's existing cost. Only authorised roles (manager / inventory / finance) can change it."
                             onChange={(e) => setLineCosts((prev) => ({ ...prev, [l.variantId]: e.target.value }))}
                             className={INPUT_CLS}
                             style={INPUT_STYLE}

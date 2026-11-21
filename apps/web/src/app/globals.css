@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  .font-sans-local {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  .font-mono-local {
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+}
+
 :root {
   /* react-table-craft — DreamsPOS light canvas */
   --tc-background: 204 14% 96%;
@@ -1698,4 +1708,15 @@
 .dark .admin-app-shell .hex-segment-control button[type="button"].is-active {
   background: hsl(var(--btn-primary)) !important;
   color: #ffffff !important;
+}
+
+/* File input button. Kept as plain CSS: using Tailwind `file:` variants makes
+   Tailwind re-expand every custom rule that mentions .text-sm / .font-medium,
+   producing invalid pseudo-element selectors. */
+input[type="file"]::file-selector-button {
+  border-width: 0;
+  background-color: transparent;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
 }

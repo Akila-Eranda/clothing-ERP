@@ -973,7 +973,11 @@ export function HrHub({ section }: { section: HrSection }) {
               data={employeeList}
               columns={empColumns}
               pageCount={Math.ceil(employeeList.length / 10)}
-              searchableColumns={[{ id: "designation", title: "Role" }]}
+              searchableColumns={[
+                // Search audit: only "Role" was searchable, so employee names / codes / phones could not be found.
+                { id: "employeeText", title: "Name / code / phone", getValue: (e: Employee) => `${e.firstName} ${e.lastName} ${e.code ?? ""} ${e.phone ?? ""} ${e.email ?? ""}` },
+                { id: "designation", title: "Role" },
+              ]}
               filterableColumns={[{
                 id: "isActive", title: "Status",
                 options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],

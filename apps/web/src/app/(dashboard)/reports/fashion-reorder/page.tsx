@@ -1,4 +1,5 @@
 "use client";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -93,6 +94,17 @@ export default function FashionReorderPage() {
     })();
   }, [allowed]);
 
+  // Search audit: typed filters are debounced (each keystroke used to reload the report).
+
+  const searchQ = useDebouncedValue(search.trim(), 400);
+
+  const sizeQ = useDebouncedValue(size.trim(), 400);
+
+  const colorQ = useDebouncedValue(color.trim(), 400);
+
+  const seasonQ = useDebouncedValue(season.trim(), 400);
+
+
   const load = useCallback(async () => {
     if (!allowed) return;
     if (!branchId) {
@@ -104,10 +116,10 @@ export default function FashionReorderPage() {
     setLoading(true);
     try {
       const q = new URLSearchParams({ days: days || "30", branchId });
-      if (size.trim()) q.set("size", size.trim());
-      if (color.trim()) q.set("color", color.trim());
-      if (season.trim()) q.set("season", season.trim());
-      if (search.trim()) q.set("search", search.trim());
+      if (sizeQ) q.set("size", sizeQ);
+      if (colorQ) q.set("color", colorQ);
+      if (seasonQ) q.set("season", seasonQ);
+      if (searchQ) q.set("search", searchQ);
       if (brandId) q.set("brandId", brandId);
       if (categoryId) q.set("categoryId", categoryId);
       if (collectionId) q.set("collectionId", collectionId);
@@ -126,10 +138,10 @@ export default function FashionReorderPage() {
     allowed,
     branchId,
     days,
-    size,
-    color,
-    season,
-    search,
+    sizeQ,
+    colorQ,
+    seasonQ,
+    searchQ,
     brandId,
     categoryId,
     collectionId,
@@ -285,7 +297,7 @@ export default function FashionReorderPage() {
       />
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 rounded-xl border bg-card p-3">
-        <Input placeholder="Search product / SKU" value={search} onChange={(e) => setSearch(e.target.value)} className="h-9" />
+        <Input placeholder="Search product / SKU" aria-label="Search product / SKU" value={search} onChange={(e) => setSearch(e.target.value)} className="h-9" />
         <Input placeholder="Size" value={size} onChange={(e) => setSize(e.target.value)} className="h-9" />
         <Input placeholder="Color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9" />
         <Input placeholder="Season" value={season} onChange={(e) => setSeason(e.target.value)} className="h-9" />

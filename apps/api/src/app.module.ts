@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -29,6 +29,8 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { PosModule } from './modules/pos/pos.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { ReturnsModule } from './modules/returns/returns.module';
+import { SearchModule } from './modules/search/search.module';
+import { PaymentQrModule } from './modules/payment-qr/payment-qr.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
@@ -66,6 +68,7 @@ import { PlatformOpsModule } from './modules/platform-ops/platform-ops.module';
       isGlobal: true,
       load: [appConfig, jwtConfig, redisConfig, databaseConfig, storageConfig, mailConfig, keycloakConfig],
       envFilePath: ['.env.local', '.env'],
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
       expandVariables: true,
     }),
 
@@ -100,6 +103,8 @@ import { PlatformOpsModule } from './modules/platform-ops/platform-ops.module';
     PosModule,
     SalesModule,
     ReturnsModule,
+    SearchModule,
+    PaymentQrModule,
     CustomersModule,
     SuppliersModule,
     PurchasesModule,
@@ -142,18 +147,8 @@ import { PlatformOpsModule } from './modules/platform-ops/platform-ops.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(TenantMiddleware)
-      .exclude(
-        { path: 'api/v1/tenants/register', method: RequestMethod.POST },
-        { path: 'api/v1/tenants/shop-types', method: RequestMethod.GET },
-        { path: 'api/v1/tenants/resolve-email', method: RequestMethod.GET },
-        { path: 'api/v1/auth/login', method: RequestMethod.POST },
-        { path: 'api/v1/auth/platform-login', method: RequestMethod.POST },
-        { path: 'api/v1/auth/impersonate-exchange', method: RequestMethod.POST },
-        { path: 'api/v1/auth/refresh', method: RequestMethod.POST },
-        { path: 'api/v1/health', method: RequestMethod.GET },
-      )
-      .forRoutes('*');
+    // Public routes are recognised inside TenantMiddleware (common/middleware/public-routes.ts).
+    // The previous .exclude() list never matched (it used "api/v1/…"; routes are "api/…" + URI version).
+    consumer.apply(TenantMiddleware).forRoutes('*');
   }
 }

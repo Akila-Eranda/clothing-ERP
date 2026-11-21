@@ -1,16 +1,23 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 import {
   Controller, Get, Post, Put, Patch, Delete,
   Body, Param, Query, HttpCode, HttpStatus, ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, UpdateUserDto, UpdateUserStatusDto, AssignUserRolesDto } from './dto/create-user.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { RoleType, UserStatus } from '@prisma/client';
 import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles';
+
+export class PlatformUsersQueryDto extends PaginationDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantId?: string;
+  @ApiPropertyOptional({ description: 'Tenant id or subdomain' }) @IsOptional() @IsString() tenant?: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
@@ -29,11 +36,11 @@ export class UsersController {
   @Roles(...PLATFORM_ADMIN_ROLES)
   @ApiOperation({ summary: 'List all users across tenants (Platform Admin)' })
   findAllPlatform(
-    @Query() query: PaginationDto,
-    @Query('tenantId') tenantId?: string,
-    @Query('tenant') tenant?: string,
+    // Declared in a DTO: separate @Query('tenantId') params were rejected with 400 (forbidNonWhitelisted).
+    @Query() query: PlatformUsersQueryDto,
   ) {
-    return this.usersService.findAllPlatform(query, tenantId || tenant);
+    const { tenantId, tenant, ...page } = query;
+    return this.usersService.findAllPlatform(page, tenantId || tenant);
   }
 
   @Get()
@@ -71,12 +78,12 @@ export class UsersController {
   updateStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('status') status: UserStatus,
+    @Body() body: UpdateUserStatusDto,
   ) {
     if (user.roles.includes(RoleType.SUPER_ADMIN) || user.roles.includes(RoleType.PLATFORM_STAFF)) {
-      return this.usersService.updateStatusPlatform(id, status);
+      return this.usersService.updateStatusPlatform(id, body.status);
     }
-    return this.usersService.updateStatus(id, user.tenantId, status);
+    return this.usersService.updateStatus(id, user.tenantId, body.status);
   }
 
   @Patch(':id/roles')
@@ -85,9 +92,9 @@ export class UsersController {
   assignRoles(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('roleIds') roleIds: string[],
+    @Body() body: AssignUserRolesDto,
   ) {
-    return this.usersService.assignRoles(id, user.tenantId, roleIds);
+    return this.usersService.assignRoles(id, user.tenantId, body.roleIds);
   }
 
   @Get(':id/activity')

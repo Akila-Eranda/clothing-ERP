@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { HrMastersService } from './hr-masters.service';
@@ -41,6 +41,12 @@ class LeaveTypeDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
+class UpdateNameDto extends PartialType(NameDto) {}
+class UpdateDesignationDto extends PartialType(DesignationDto) {}
+class UpdateShiftDto extends PartialType(ShiftDto) {}
+class UpdateHolidayDto extends PartialType(HolidayDto) {}
+class UpdateLeaveTypeDto extends PartialType(LeaveTypeDto) {}
+
 class AssignShiftDto {
   @ApiProperty() @IsString() employeeId: string;
   @ApiProperty() @IsString() shiftId: string;
@@ -75,7 +81,7 @@ export class HrMastersController {
 
   @Put('departments/:id')
   @RequirePermissions('hr:update')
-  updateDepartment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<NameDto>) {
+  updateDepartment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateNameDto) {
     return this.masters.updateDepartment(id, user.tenantId, dto);
   }
 
@@ -100,7 +106,7 @@ export class HrMastersController {
 
   @Put('designations/:id')
   @RequirePermissions('hr:update')
-  updateDesignation(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<DesignationDto>) {
+  updateDesignation(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateDesignationDto) {
     return this.masters.updateDesignation(id, user.tenantId, dto);
   }
 
@@ -125,7 +131,7 @@ export class HrMastersController {
 
   @Put('shifts/:id')
   @RequirePermissions('hr:update')
-  updateShift(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<ShiftDto>) {
+  updateShift(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateShiftDto) {
     return this.masters.updateShift(id, user.tenantId, dto);
   }
 
@@ -156,7 +162,7 @@ export class HrMastersController {
 
   @Put('holidays/:id')
   @RequirePermissions('hr:update')
-  updateHoliday(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<HolidayDto>) {
+  updateHoliday(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateHolidayDto) {
     return this.masters.updateHoliday(id, user.tenantId, dto);
   }
 
@@ -181,7 +187,7 @@ export class HrMastersController {
 
   @Put('leave-types/:id')
   @RequirePermissions('hr:update')
-  updateLeaveType(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<LeaveTypeDto>) {
+  updateLeaveType(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateLeaveTypeDto) {
     return this.masters.updateLeaveType(id, user.tenantId, dto);
   }
 

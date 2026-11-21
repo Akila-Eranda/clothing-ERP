@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { textSearch } from '@/shared/search.helper';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import {
   BankAccountType,
   BankReconciliationStatus,
@@ -7,6 +8,7 @@ import {
   ChequeDirection,
   ChequeStatus,
   PaymentMethod,
+  Prisma,
   PurchaseOrderStatus,
   RoleType,
   SupplierInvoiceStatus,
@@ -16,6 +18,7 @@ import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
   assertDistinctTransferAccounts,
+  bankTransferRequestFingerprint,
   buildAgingReport,
   cashBookRunningBalance,
   chequeClearEffect,
@@ -29,6 +32,16 @@ import {
 } from './finance.helper';
 import { FinancialPeriodsService } from './financial-periods.service';
 import { JournalEntriesService } from './journal-entries.service';
+import { AuditLogService } from '@/modules/audit-log/audit-log.service';
+import {
+  auditBankSnapshot,
+  BANK_DETAIL_KEYS,
+  bankDetailErrors,
+  cleanBankDetails,
+  cleanText,
+  isSameBankAccount,
+  requiresBankDetails,
+} from './bank-account.helper';
 import * as dayjs from 'dayjs';
 
 const SYSTEM_ROLES = [RoleType.TENANT_ADMIN];
@@ -39,6 +52,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly journals: JournalEntriesService,
     private readonly periods: FinancialPeriodsService,
+    private readonly audit: AuditLogService,
   ) {}
 
   // ── AP / AR with aging ────────────────────────────────────────────
@@ -540,6 +554,12 @@ export class FinanceService {
   async listBankAccounts(tenantId: string, includeInactive = false) {
     return this.prisma.bankAccount.findMany({
       where: { tenantId, ...(includeInactive ? {} : { isActive: true }) },
+      include: {
+        paymentQrCodes: {
+          select: { id: true, label: true, bankAccountId: true, imageUrl: true, isActive: true, isDefault: true },
+          orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { label: 'asc' }],
+        },
+      },
       orderBy: { code: 'asc' },
     });
   }
@@ -548,6 +568,21 @@ export class FinanceService {
     const account = await this.prisma.bankAccount.findFirst({ where: { id, tenantId } });
     if (!account) throw new NotFoundException('Bank account not found');
     return account;
+  }
+
+  /** Rejects another account of the same shop with the same bank + account number (never silently overwrites). */
+  private async assertNoDuplicateBankAccount(
+    tenantId: string,
+    candidate: { bankName?: string | null; accountNumber?: string | null },
+    exceptId?: string,
+  ) {
+    if (!cleanText(candidate.accountNumber)) return;
+    const others = await this.prisma.bankAccount.findMany({
+      where: { tenantId, accountNumber: { not: null }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+      select: { id: true, code: true, bankName: true, accountNumber: true },
+    });
+    const dup = others.find((o) => isSameBankAccount(o, candidate));
+    if (dup) throw new ConflictException(`This bank account is already saved as ${dup.code}. Edit that account instead of adding it again.`);
   }
 
   async createBankAccount(
@@ -559,11 +594,15 @@ export class FinanceService {
       type?: BankAccountType;
       bankName?: string;
       accountNumber?: string;
+      accountHolderName?: string;
+      branchName?: string;
+      branchCode?: string;
       openingBalance?: number;
       currency?: string;
       notes?: string;
       glAccountId?: string;
     },
+    userId?: string,
   ) {
     if (dto.glAccountId) {
       const gl = await this.prisma.account.findFirst({
@@ -571,16 +610,25 @@ export class FinanceService {
       });
       if (!gl) throw new BadRequestException('GL account not found');
     }
+    const type = dto.type ?? BankAccountType.CURRENT;
+    const details = cleanBankDetails(dto);
+    const errors = bankDetailErrors(details, { requireAll: requiresBankDetails(type) });
+    if (errors.length) throw new BadRequestException(errors);
+    const code = cleanText(dto.code);
+    const name = cleanText(dto.name);
+    if (!code || !name) throw new BadRequestException('Code and name are required');
+    await this.assertNoDuplicateBankAccount(tenantId, details);
+    const taken = await this.prisma.bankAccount.findFirst({ where: { tenantId, code }, select: { id: true } });
+    if (taken) throw new ConflictException(`Code ${code} is already used by another account`);
     const opening = dto.openingBalance ?? 0;
-    return this.prisma.bankAccount.create({
+    const created = await this.prisma.bankAccount.create({
       data: {
         tenantId,
         branchId: branchId || undefined,
-        code: dto.code,
-        name: dto.name,
-        type: dto.type ?? BankAccountType.CURRENT,
-        bankName: dto.bankName,
-        accountNumber: dto.accountNumber,
+        code,
+        name,
+        type,
+        ...details,
         openingBalance: opening,
         currentBalance: opening,
         currency: dto.currency ?? 'LKR',
@@ -588,6 +636,11 @@ export class FinanceService {
         glAccountId: dto.glAccountId,
       },
     });
+    await this.audit.log({
+      tenantId, userId, action: 'CREATE', resource: 'bank_accounts', resourceId: created.id,
+      newData: auditBankSnapshot(created),
+    });
+    return created;
   }
 
   async updateBankAccount(
@@ -597,29 +650,61 @@ export class FinanceService {
       name?: string;
       bankName?: string;
       accountNumber?: string;
+      accountHolderName?: string;
+      branchName?: string;
+      branchCode?: string;
       notes?: string;
       glAccountId?: string | null;
       isActive?: boolean;
+      /** The updatedAt the editor loaded; a different value means someone else saved first. */
+      expectedUpdatedAt?: string;
     },
+    userId?: string,
   ) {
-    await this.getBankAccount(tenantId, id);
+    const existing = await this.getBankAccount(tenantId, id);
+    if (dto.expectedUpdatedAt) {
+      const expected = new Date(dto.expectedUpdatedAt).getTime();
+      if (!Number.isFinite(expected) || expected !== existing.updatedAt.getTime()) {
+        throw new ConflictException('This bank account was changed by someone else. Reload it and try again.');
+      }
+    }
     if (dto.glAccountId) {
       const gl = await this.prisma.account.findFirst({
         where: { id: dto.glAccountId, tenantId, isActive: true },
       });
       if (!gl) throw new BadRequestException('GL account not found');
     }
-    return this.prisma.bankAccount.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.bankName !== undefined && { bankName: dto.bankName }),
-        ...(dto.accountNumber !== undefined && { accountNumber: dto.accountNumber }),
-        ...(dto.notes !== undefined && { notes: dto.notes }),
-        ...(dto.glAccountId !== undefined && { glAccountId: dto.glAccountId }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
+    // Only when a bank detail is being changed must the resulting account be complete and valid
+    // (a legacy account can still be enabled / disabled or renamed without being forced to fill them in).
+    const touchesDetails = BANK_DETAIL_KEYS.some((k) => dto[k] !== undefined);
+    let details: ReturnType<typeof cleanBankDetails> | null = null;
+    if (touchesDetails) {
+      details = cleanBankDetails({
+        bankName: dto.bankName !== undefined ? dto.bankName : existing.bankName,
+        accountNumber: dto.accountNumber !== undefined ? dto.accountNumber : existing.accountNumber,
+        accountHolderName: dto.accountHolderName !== undefined ? dto.accountHolderName : existing.accountHolderName,
+        branchName: dto.branchName !== undefined ? dto.branchName : existing.branchName,
+        branchCode: dto.branchCode !== undefined ? dto.branchCode : existing.branchCode,
+      });
+      const errors = bankDetailErrors(details, { requireAll: requiresBankDetails(existing.type) });
+      if (errors.length) throw new BadRequestException(errors);
+      await this.assertNoDuplicateBankAccount(tenantId, details, id);
+    }
+    const name = dto.name !== undefined ? cleanText(dto.name) : undefined;
+    if (dto.name !== undefined && !name) throw new BadRequestException('Name cannot be empty');
+    const data: Prisma.BankAccountUncheckedUpdateInput = {};
+    if (name) data.name = name;
+    if (details) Object.assign(data, details);
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.glAccountId !== undefined) data.glAccountId = dto.glAccountId;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    const updated = await this.prisma.bankAccount.update({ where: { id }, data });
+    await this.audit.log({
+      tenantId, userId, action: 'UPDATE', resource: 'bank_accounts', resourceId: id,
+      oldData: auditBankSnapshot(existing),
+      newData: auditBankSnapshot(updated),
     });
+    return updated;
   }
 
   async getBankBook(
@@ -806,6 +891,7 @@ export class FinanceService {
       fromAccountId: string;
       toAccountId: string;
       amount: number;
+      clientRequestId: string;
       txnDate?: string;
       reference?: string;
       description?: string;
@@ -814,78 +900,222 @@ export class FinanceService {
   ) {
     assertDistinctTransferAccounts(dto.fromAccountId, dto.toAccountId);
     if (dto.amount <= 0) throw new BadRequestException('Amount must be positive');
-
-    const [from, to] = await Promise.all([
-      this.prisma.bankAccount.findFirst({ where: { id: dto.fromAccountId, tenantId, isActive: true } }),
-      this.prisma.bankAccount.findFirst({ where: { id: dto.toAccountId, tenantId, isActive: true } }),
-    ]);
-    if (!from || !to) throw new NotFoundException('Bank account not found');
-    if (from.currentBalance + 0.001 < dto.amount) {
-      throw new BadRequestException(
-        `Insufficient balance in ${from.code} (available LKR ${from.currentBalance.toFixed(2)})`,
-      );
+    const clientRequestId = dto.clientRequestId?.trim();
+    if (!clientRequestId || clientRequestId.length > 128) {
+      throw new BadRequestException('A valid transfer request ID is required');
     }
+    const requestFingerprint = bankTransferRequestFingerprint({
+      tenantId,
+      branchId,
+      userId,
+      fromAccountId: dto.fromAccountId,
+      toAccountId: dto.toAccountId,
+      amount: dto.amount,
+      txnDate: dto.txnDate,
+      reference: dto.reference,
+      description: dto.description,
+      postToGl: dto.postToGl,
+    });
+    const replay = await this.findBankTransferReplay(tenantId, clientRequestId, requestFingerprint);
+    if (replay) return replay;
 
+    const [fromAccount, toAccount] = await Promise.all([
+      this.prisma.bankAccount.findFirst({
+        where: { id: dto.fromAccountId, tenantId, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.bankAccount.findFirst({
+        where: { id: dto.toAccountId, tenantId, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+    if (!fromAccount || !toAccount) throw new NotFoundException('Bank account not found');
     const txnDate = dto.txnDate ? new Date(dto.txnDate) : new Date();
     await this.periods.assertDateInOpenPeriod(tenantId, txnDate);
-    const desc = dto.description || `Transfer ${from.code} → ${to.code}`;
-    const transferKey = `xfer-${Date.now().toString(36)}`;
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const outTxn = await tx.bankTransaction.create({
-        data: {
+    let result: {
+      outTxn: Awaited<ReturnType<typeof this.prisma.bankTransaction.create>>;
+      inTxn: Awaited<ReturnType<typeof this.prisma.bankTransaction.create>>;
+      transferKey: string;
+      journalEntry: Awaited<ReturnType<JournalEntriesService['create']>> | null;
+      journalEntryId: string | null;
+      replayed: boolean;
+    };
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "bank_accounts"
+          WHERE "tenantId" = ${tenantId}
+            AND "id" IN (${dto.fromAccountId}, ${dto.toAccountId})
+          ORDER BY "id"
+          FOR UPDATE
+        `;
+        const lockedReplay = await this.findBankTransferReplay(
           tenantId,
-          bankAccountId: from.id,
-          type: BankTxnType.TRANSFER_OUT,
-          status: BankTxnStatus.CLEARED,
-          amount: dto.amount,
-          txnDate,
-          reference: dto.reference || transferKey,
-          description: desc,
-          createdBy: userId,
-        },
+          clientRequestId,
+          requestFingerprint,
+          tx,
+        );
+        if (lockedReplay) {
+          return { ...lockedReplay, journalEntry: null, replayed: true };
+        }
+        const [from, to] = await Promise.all([
+          tx.bankAccount.findFirst({
+            where: { id: dto.fromAccountId, tenantId, isActive: true },
+          }),
+          tx.bankAccount.findFirst({
+            where: { id: dto.toAccountId, tenantId, isActive: true },
+          }),
+        ]);
+        if (!from || !to) throw new NotFoundException('Bank account not found');
+        if (from.currentBalance < dto.amount) {
+          throw new BadRequestException(
+            `Insufficient balance in ${from.code} (available LKR ${from.currentBalance.toFixed(2)})`,
+          );
+        }
+        const desc = dto.description || `Transfer ${from.code} → ${to.code}`;
+        const transferKey = clientRequestId;
+        const debit = await tx.bankAccount.updateMany({
+          where: {
+            id: from.id,
+            tenantId,
+            isActive: true,
+            currentBalance: { gte: dto.amount },
+          },
+          data: { currentBalance: { decrement: dto.amount } },
+        });
+        if (debit.count !== 1) {
+          throw new BadRequestException(
+            `Insufficient balance in ${from.code} (available LKR ${from.currentBalance.toFixed(2)})`,
+          );
+        }
+        const credit = await tx.bankAccount.updateMany({
+          where: { id: to.id, tenantId, isActive: true },
+          data: { currentBalance: { increment: dto.amount } },
+        });
+        if (credit.count !== 1) throw new NotFoundException('Bank account not found');
+        const outTxn = await tx.bankTransaction.create({
+          data: {
+            tenantId,
+            bankAccountId: from.id,
+            type: BankTxnType.TRANSFER_OUT,
+            status: BankTxnStatus.CLEARED,
+            amount: dto.amount,
+            txnDate,
+            reference: dto.reference || transferKey,
+            clientRequestId,
+            requestFingerprint,
+            description: desc,
+            createdBy: userId,
+          },
+        });
+        const inTxn = await tx.bankTransaction.create({
+          data: {
+            tenantId,
+            bankAccountId: to.id,
+            type: BankTxnType.TRANSFER_IN,
+            status: BankTxnStatus.CLEARED,
+            amount: dto.amount,
+            txnDate,
+            reference: dto.reference || transferKey,
+            clientRequestId,
+            requestFingerprint,
+            description: desc,
+            createdBy: userId,
+          },
+        });
+        const journalEntry =
+          dto.postToGl !== false &&
+          from.glAccountId &&
+          to.glAccountId &&
+          from.glAccountId !== to.glAccountId
+            ? await this.journals.create(
+                tenantId,
+                branchId,
+                userId,
+                SYSTEM_ROLES,
+                {
+                  description: desc,
+                  date: txnDate.toISOString().slice(0, 10),
+                  referenceType: 'BANK_TRANSFER',
+                  referenceId: transferKey,
+                  action: 'POST',
+                  glLines: [
+                    { accountId: to.glAccountId, side: 'DEBIT', amount: dto.amount },
+                    { accountId: from.glAccountId, side: 'CREDIT', amount: dto.amount },
+                  ],
+                },
+                tx,
+              )
+            : null;
+        return {
+          outTxn,
+          inTxn,
+          transferKey,
+          journalEntry,
+          journalEntryId: journalEntry?.id ?? null,
+          replayed: false,
+        };
       });
-      const inTxn = await tx.bankTransaction.create({
-        data: {
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const concurrentReplay = await this.findBankTransferReplay(
           tenantId,
-          bankAccountId: to.id,
-          type: BankTxnType.TRANSFER_IN,
-          status: BankTxnStatus.CLEARED,
-          amount: dto.amount,
-          txnDate,
-          reference: dto.reference || transferKey,
-          description: desc,
-          createdBy: userId,
-        },
-      });
-      await tx.bankAccount.update({
-        where: { id: from.id },
-        data: { currentBalance: { decrement: dto.amount } },
-      });
-      await tx.bankAccount.update({
-        where: { id: to.id },
-        data: { currentBalance: { increment: dto.amount } },
-      });
-      return { outTxn, inTxn, transferKey };
-    });
-
-    let journalEntryId: string | null = null;
-    if (dto.postToGl !== false && from.glAccountId && to.glAccountId && from.glAccountId !== to.glAccountId) {
-      const je = await this.journals.create(tenantId, branchId, userId, SYSTEM_ROLES, {
-        description: desc,
-        date: txnDate.toISOString().slice(0, 10),
-        referenceType: 'BANK_TRANSFER',
-        referenceId: result.transferKey,
-        action: 'POST',
-        glLines: [
-          { accountId: to.glAccountId, side: 'DEBIT', amount: dto.amount },
-          { accountId: from.glAccountId, side: 'CREDIT', amount: dto.amount },
-        ],
-      });
-      journalEntryId = je.id;
+          clientRequestId,
+          requestFingerprint,
+        );
+        if (concurrentReplay) return concurrentReplay;
+      }
+      throw error;
     }
 
-    return { ...result, journalEntryId };
+    if (!result.replayed && result.journalEntry) {
+      await this.journals.auditCreatedEntry(tenantId, userId, result.journalEntry, 'POST');
+    }
+    return {
+      outTxn: result.outTxn,
+      inTxn: result.inTxn,
+      transferKey: result.transferKey,
+      journalEntryId: result.journalEntryId,
+    };
+  }
+
+  private async findBankTransferReplay(
+    tenantId: string,
+    clientRequestId: string,
+    requestFingerprint: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const rows = await client.bankTransaction.findMany({
+      where: {
+        tenantId,
+        clientRequestId,
+        type: { in: [BankTxnType.TRANSFER_OUT, BankTxnType.TRANSFER_IN] },
+      },
+    });
+    if (!rows.length) return null;
+    const outTxn = rows.find((row) => row.type === BankTxnType.TRANSFER_OUT);
+    const inTxn = rows.find((row) => row.type === BankTxnType.TRANSFER_IN);
+    if (
+      rows.length !== 2 ||
+      !outTxn ||
+      !inTxn ||
+      rows.some((row) => row.requestFingerprint !== requestFingerprint)
+    ) {
+      throw new ConflictException(
+        'Transfer request ID was already used with a different or incomplete request',
+      );
+    }
+    const journalEntry = await client.journalEntry.findFirst({
+      where: { tenantId, referenceType: 'BANK_TRANSFER', referenceId: clientRequestId },
+      select: { id: true },
+    });
+    return {
+      outTxn,
+      inTxn,
+      transferKey: clientRequestId,
+      journalEntryId: journalEntry?.id ?? null,
+    };
   }
 
   async listBankTransactions(tenantId: string, bankAccountId: string, query: PaginationDto) {
@@ -959,13 +1189,7 @@ export class FinanceService {
       tenantId,
       ...(query.status && { status: query.status }),
       ...(query.direction && { direction: query.direction }),
-      ...(query.search && {
-        OR: [
-          { chequeNumber: { contains: query.search, mode: 'insensitive' as const } },
-          { partyName: { contains: query.search, mode: 'insensitive' as const } },
-          { bankName: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['chequeNumber', 'partyName', 'bankName']),
     };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.cheque.findMany({

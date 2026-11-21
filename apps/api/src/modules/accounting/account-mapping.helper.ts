@@ -29,6 +29,7 @@ export const ACCOUNT_MAPPING_KEYS = [
   'SALARY_PAYABLE',
   'EPF_PAYABLE',
   'ETF_PAYABLE',
+  'PAYMENT_CHARGES',
 ] as const;
 
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
@@ -62,6 +63,7 @@ export const ACCOUNT_MAPPING_LABELS: Record<AccountMappingKey, string> = {
   SALARY_PAYABLE: 'Salary Payable',
   EPF_PAYABLE: 'EPF Payable',
   ETF_PAYABLE: 'ETF Payable',
+  PAYMENT_CHARGES: 'Bank & QR Payment Charges',
 };
 
 /** Preferred codes first (report-style + legacy compatibility). */
@@ -94,6 +96,9 @@ export const ACCOUNT_MAPPING_CODE_FALLBACKS: Record<AccountMappingKey, string[]>
   SALARY_PAYABLE: ['2300'],
   EPF_PAYABLE: ['2310'],
   ETF_PAYABLE: ['2320', '2311'],
+  // QR fee deducted by the bank (expense). A shop can point this at its own bank-charges account in
+  // Settings → Accounting → Account mappings.
+  PAYMENT_CHARGES: ['5620', '5600', '5200', '5000'],
 };
 
 export type InventoryKind = 'mobile' | 'accessory' | 'spare' | 'service' | 'reload';

@@ -4,10 +4,12 @@ import * as React from "react";
 import { Banknote, Loader2, RefreshCw, TrendingDown, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
+import { PosSupplierCombobox } from "@/components/pos/pos-supplier-combobox";
 import { parseApiList } from "@/lib/parse-api-list";
 
 const INPUT_CLS =
@@ -42,6 +44,7 @@ type SupplierRow = {
   name: string;
   phone?: string | null;
   balance?: number;
+  advanceBalance?: number;
   code?: string;
 };
 
@@ -96,13 +99,18 @@ export function PosQuickExpensePanel({
   // Supplier payment fields
   const [suppliers, setSuppliers] = React.useState<SupplierRow[]>([]);
   const [supplierLoading, setSupplierLoading] = React.useState(false);
+  const [supplierTotal, setSupplierTotal] = React.useState<number | null>(null);
   const [supplierId, setSupplierId] = React.useState("");
+  const [supplierAdvance, setSupplierAdvance] = React.useState(0);
+  const [keepSupplierAdvance, setKeepSupplierAdvance] = React.useState(false);
   const [recentPayments, setRecentPayments] = React.useState<PaymentRow[]>([]);
 
   const selectedSupplier = React.useMemo(
     () => suppliers.find((s) => s.id === supplierId) ?? null,
     [suppliers, supplierId],
   );
+  const supplierOutstanding = selectedSupplier?.balance ?? 0;
+  const supplierWallet = supplierAdvance || selectedSupplier?.advanceBalance || 0;
 
   const selectableBanks = React.useMemo(
     () => bankAccounts.filter((b) => b.isActive !== false && BANK_ACCOUNT_TYPES.has(b.type)),
@@ -150,6 +158,7 @@ export function PosQuickExpensePanel({
       setSuppliers(
         [...list].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0) || a.name.localeCompare(b.name)),
       );
+      setSupplierTotal(null);
       setRecentPayments(payRes.data?.payments ?? []);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load suppliers");
@@ -167,12 +176,25 @@ export function PosQuickExpensePanel({
     if (mode === "supplier") void loadSuppliers();
   }, [mode, loadSuppliers]);
 
+  React.useEffect(() => {
+    if (!supplierId) {
+      setSupplierAdvance(0);
+      return;
+    }
+    let active = true;
+    api.get<{ advanceBalance?: number }>(`/suppliers/${supplierId}/ap/advance`)
+      .then((res) => { if (active) setSupplierAdvance(res.data?.advanceBalance ?? 0); })
+      .catch(() => { if (active) setSupplierAdvance(0); });
+    return () => { active = false; };
+  }, [supplierId]);
+
   const resetShared = () => {
     setAmount("");
     setReference("");
     setChequeDue("");
     setNotes("");
     setMethod("CASH");
+    setKeepSupplierAdvance(false);
   };
 
   const submitExpense = async () => {
@@ -190,7 +212,7 @@ export function PosQuickExpensePanel({
 
     setBusy(true);
     try {
-      await api.post("/accounting/expenses", {
+      const body = {
         amount: amt,
         description: description.trim(),
         date,
@@ -205,7 +227,9 @@ export function PosQuickExpensePanel({
               chequeBankName: selectedBank?.bankName || selectedBank?.name || undefined,
             }
           : {}),
-      });
+      };
+      await withManagerApproval(`Approve expense of LKR ${formatNumber(amt)}`, (headers) =>
+        api.post("/accounting/expenses", body, headers ? { headers } : undefined));
       toast.success(`Expense recorded: LKR ${formatNumber(amt)}`);
       onSaved?.();
       setDescription("");
@@ -214,7 +238,7 @@ export function PosQuickExpensePanel({
       resetShared();
       void loadRecent();
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Failed to record expense");
+      toast.error(e instanceof ManagerApprovalCancelled ? "Expense not approved — nothing was recorded" : (e as Error).message ?? "Failed to record expense");
     } finally {
       setBusy(false);
     }
@@ -236,19 +260,21 @@ export function PosQuickExpensePanel({
       toast.error("Select your bank account");
       return;
     }
-    const bal = selectedSupplier?.balance ?? 0;
-    if (bal > 0 && amt > bal + 0.01) {
-      toast.error(`Amount exceeds outstanding (LKR ${formatNumber(bal)})`);
+    const bal = supplierOutstanding;
+    const excess = Math.max(0, amt - bal);
+    if (excess > 0.01 && !keepSupplierAdvance && bal > 0.009) {
+      toast.error("Enable supplier wallet to keep the amount above the outstanding balance");
       return;
     }
 
     setBusy(true);
     try {
-      const res = await api.post<{ appliedTotal?: number }>(`/suppliers/${supplierId}/ap/payment`, {
+      const payBody = {
         amount: amt,
         method,
         reference: reference.trim() || undefined,
         notes: notes.trim() || undefined,
+        ...(excess > 0.01 && (keepSupplierAdvance || bal <= 0.009) ? { allowAdvance: true } : {}),
         ...(method === "CHEQUE" || method === "BANK_TRANSFER"
           ? {
               bankAccountId,
@@ -262,15 +288,17 @@ export function PosQuickExpensePanel({
               chequeDueDate: chequeDue.trim(),
             }
           : {}),
-      });
+      };
+      const res = await withManagerApproval(`Approve supplier payment of LKR ${formatNumber(amt)}`, (headers) =>
+        api.post<{ appliedTotal?: number }>(`/suppliers/${supplierId}/ap/payment`, payBody, headers ? { headers } : undefined));
       const applied = res.data?.appliedTotal ?? amt;
-      toast.success(`Supplier paid: LKR ${formatNumber(applied)} → ${selectedSupplier?.name ?? "supplier"}`);
+      toast.success(`Supplier paid: LKR ${formatNumber(applied)} → ${selectedSupplier?.name ?? "supplier"}${excess > 0.01 ? ` · Wallet +LKR ${formatNumber(excess)}` : ""}`);
       onSaved?.();
       resetShared();
       setNotes("");
       void loadSuppliers();
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Supplier payment failed");
+      toast.error(e instanceof ManagerApprovalCancelled ? "Supplier payment not approved — nothing was paid" : (e as Error).message ?? "Supplier payment failed");
     } finally {
       setBusy(false);
     }
@@ -353,27 +381,22 @@ export function PosQuickExpensePanel({
                 />
               </div>
               <div className="flex gap-2">
-                <select
+                <PosSupplierCombobox
+                  suppliers={suppliers}
+                  totalSuppliers={supplierTotal}
                   value={supplierId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setSupplierId(id);
-                    const s = suppliers.find((x) => x.id === id);
-                    if (s && (s.balance ?? 0) > 0 && !amount) {
+                  loading={supplierLoading}
+                  disabled={busy}
+                  onSelect={(s) => {
+                    setSuppliers((prev) =>
+                      prev.some((x) => x.id === s.id) ? prev : [...prev, s],
+                    );
+                    setSupplierId(s.id);
+                    if ((s.balance ?? 0) > 0 && !amount) {
                       setAmount(String(s.balance));
                     }
                   }}
-                  disabled={supplierLoading || busy}
-                  className={INPUT_CLS}
-                  style={INPUT_STYLE}
-                >
-                  <option value="">{supplierLoading ? "Loading…" : "Select supplier…"}</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{(s.balance ?? 0) > 0 ? ` — due LKR ${formatNumber(s.balance!)}` : ""}
-                    </option>
-                  ))}
-                </select>
+                />
                 <button
                   type="button"
                   onClick={() => void loadSuppliers()}
@@ -385,6 +408,7 @@ export function PosQuickExpensePanel({
                 </button>
               </div>
               {selectedSupplier && (
+                <>
                 <div
                   className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
                   style={{ background: "rgba(var(--pos-accent-rgb),0.1)", border: "1px solid rgba(var(--pos-accent-rgb),0.3)" }}
@@ -403,6 +427,40 @@ export function PosQuickExpensePanel({
                     </p>
                   </div>
                 </div>
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>Supplier wallet</p>
+                    <p className="text-sm font-bold tabular-nums" style={{ color: "var(--pos-success)" }}>LKR {formatNumber(supplierWallet)}</p>
+                  </div>
+                  {supplierWallet > 0.009 && supplierOutstanding > 0.009 && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        try {
+                          const applyAmount = Math.min(supplierWallet, supplierOutstanding);
+                          const result = await api.post<{ applied: number; advanceBalance: number }>(`/suppliers/${supplierId}/ap/advance/apply`, { amount: applyAmount });
+                          setSupplierAdvance(result.data.advanceBalance);
+                          await loadSuppliers();
+                          toast.success(`Supplier wallet applied: LKR ${formatNumber(result.data.applied)}`);
+                        } catch (e: unknown) {
+                          toast.error((e as Error).message ?? "Could not apply supplier wallet");
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50"
+                      style={{ background: "var(--pos-success)" }}
+                    >
+                      Apply wallet
+                    </button>
+                  )}
+                </div>
+                {(supplierOutstanding <= 0.009 || parseFloat(amount) > supplierOutstanding + 0.01) && (
+                  <label className="flex items-center gap-2 text-xs" style={{ color: "var(--pos-text-soft)" }}>
+                    <input type="checkbox" checked={keepSupplierAdvance} onChange={(e) => setKeepSupplierAdvance(e.target.checked)} />
+                    Keep excess in supplier wallet
+                  </label>
+                )}
+                </>
               )}
             </div>
           )}

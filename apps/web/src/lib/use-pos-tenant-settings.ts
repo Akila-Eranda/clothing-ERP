@@ -36,6 +36,7 @@ const DEFAULTS: PosTenantSettings = {
   roundOff: true,
   loyalty: true,
   reloadEnabled: true,
+  saveChangeToWalletEnabled: false,
   posLayout: POS_LAYOUT_DEFAULT,
 };
 
@@ -73,13 +74,10 @@ export function usePosTenantSettings(enabled = true) {
   }, [load]);
 
   React.useEffect(() => {
-    const onUpdated = () => {
-      const cached = fromCache();
-      if (cached) setSettings({ ...DEFAULTS, ...cached });
-    };
+    const onUpdated = () => { void load(); };
     window.addEventListener(POS_TENANT_SETTINGS_EVENT, onUpdated);
     return () => window.removeEventListener(POS_TENANT_SETTINGS_EVENT, onUpdated);
-  }, []);
+  }, [load]);
 
   const posLayout: PosLayoutId = normalizePosLayoutId(settings.posLayout);
 

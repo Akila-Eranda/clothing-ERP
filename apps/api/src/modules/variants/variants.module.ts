@@ -5,26 +5,41 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsBoolean, Min,
+  IsString, IsOptional, IsNumber, Min, IsArray, MaxLength, ValidateNested, ArrayMaxSize, IsNotEmpty,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { nanoid } from 'nanoid';
 
 export class CreateVariantDto {
-  @ApiProperty() @IsString() name: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() size?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() color?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(120) name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) size?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) color?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) material?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) style?: string;
   @ApiProperty() @IsNumber() @Min(0) sellingPrice: number;
   @ApiProperty() @IsNumber() @Min(0) costPrice: number;
   @ApiProperty() @IsNumber() @Min(0) mrp: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() images?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) barcode?: string;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) images?: string[];
 }
+
+export class UpdateVariantDto extends PartialType(CreateVariantDto) {}
+
+export class BulkCreateVariantsDto {
+  @ApiProperty({ type: [CreateVariantDto] })
+  @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
+  variants: CreateVariantDto[];
+}
+
+/** Fields a variant update may change (never productId, sku, sortOrder or ids). */
+const VARIANT_UPDATABLE_FIELDS = [
+  'name', 'size', 'color', 'material', 'style', 'sellingPrice', 'costPrice', 'mrp', 'barcode', 'images',
+] as const;
 
 @Injectable()
 export class VariantsService {
@@ -75,23 +90,28 @@ export class VariantsService {
     });
   }
 
-  async findOne(id: string) {
-    const variant = await this.prisma.productVariant.findUnique({
-      where: { id },
-      include: { product: true, inventory: true },
+  /** Tenant-scoped: the variant must belong to `productId`, and the product to `tenantId`. */
+  async findOne(productId: string, id: string, tenantId: string) {
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id, productId, product: { tenantId } },
+      include: { product: true, inventory: { where: { tenantId } } },
     });
     if (!variant) throw new NotFoundException('Variant not found');
     return variant;
   }
 
-  async update(id: string, dto: Partial<CreateVariantDto>) {
-    await this.findOne(id);
-    return this.prisma.productVariant.update({ where: { id }, data: dto as object });
+  async update(productId: string, id: string, tenantId: string, dto: UpdateVariantDto) {
+    const variant = await this.findOne(productId, id, tenantId);
+    const data: Record<string, unknown> = {};
+    for (const key of VARIANT_UPDATABLE_FIELDS) {
+      if (dto[key] !== undefined) data[key] = dto[key];
+    }
+    return this.prisma.productVariant.update({ where: { id: variant.id }, data });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
-    return this.prisma.productVariant.delete({ where: { id } });
+  async remove(productId: string, id: string, tenantId: string) {
+    const variant = await this.findOne(productId, id, tenantId);
+    return this.prisma.productVariant.delete({ where: { id: variant.id } });
   }
 
   async bulkCreate(productId: string, tenantId: string, variants: CreateVariantDto[]) {
@@ -143,7 +163,7 @@ export class VariantsController {
   @Post('bulk')
   @RequirePermissions('products:create')
   @ApiOperation({ summary: 'Bulk create variants' })
-  bulkCreate(@CurrentUser() user: IAuthUser, @Param('productId') productId: string, @Body() body: { variants: CreateVariantDto[] }) {
+  bulkCreate(@CurrentUser() user: IAuthUser, @Param('productId') productId: string, @Body() body: BulkCreateVariantsDto) {
     return this.variantsService.bulkCreate(productId, user.tenantId, body.variants);
   }
 
@@ -157,23 +177,28 @@ export class VariantsController {
   @Get(':id')
   @RequirePermissions('products:read')
   @ApiOperation({ summary: 'Get variant by ID' })
-  findOne(@Param('id') id: string) {
-    return this.variantsService.findOne(id);
+  findOne(@CurrentUser() user: IAuthUser, @Param('productId') productId: string, @Param('id') id: string) {
+    return this.variantsService.findOne(productId, id, user.tenantId);
   }
 
   @Put(':id')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Update variant' })
-  update(@Param('id') id: string, @Body() dto: Partial<CreateVariantDto>) {
-    return this.variantsService.update(id, dto);
+  update(
+    @CurrentUser() user: IAuthUser,
+    @Param('productId') productId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateVariantDto,
+  ) {
+    return this.variantsService.update(productId, id, user.tenantId, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('products:delete')
   @ApiOperation({ summary: 'Delete variant' })
-  remove(@Param('id') id: string) {
-    return this.variantsService.remove(id);
+  remove(@CurrentUser() user: IAuthUser, @Param('productId') productId: string, @Param('id') id: string) {
+    return this.variantsService.remove(productId, id, user.tenantId);
   }
 }
 

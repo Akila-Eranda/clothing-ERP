@@ -3,7 +3,12 @@ import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength, MaxLength, IsEnum, IsNumber, IsArray, IsBoolean, Min, Max, ValidateIf, IsIn } from 'class-validator';
+import { ABSOLUTE_MAX_CASH_AMOUNT, DEFAULT_MAX_OPENING_FLOAT, resolveMaxOpeningFloat } from '@/shared/opening-float.helper';
+import { resolveScaleBarcodeMode } from '@/modules/pos/pos-scale-barcode.helper';
+import { DEFAULT_QR_FEE_PERCENT, DEFAULT_QR_FEE_THRESHOLD, MAX_QR_FEE_PERCENT, MAX_QR_FEE_THRESHOLD, qrFeeSettingsError, resolveQrFeeSettings } from '@/shared/qr-fee.helper';
+import { resolveSaveChangeSettings } from '@/modules/pos/pos-save-change.helper';
+import { BILL_PLACEHOLDERS, BILL_TEMPLATE_MAX_LENGTH, DEFAULT_BILL_TEMPLATE, billTemplateError, renderBillMessage, resolveBillTemplate } from '@/shared/bill-message.helper';
 import {
   DEFAULT_SUBSCRIPTION_PLANS,
   PLATFORM_CONFIG_SUBDOMAIN,
@@ -70,7 +75,39 @@ export class PosSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() roundOff?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() loyalty?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() reloadEnabled?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() saveChangeToWalletEnabled?: boolean;
+  @ApiPropertyOptional({ description: 'Minimum change amount that may be saved to a wallet' })
+  @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0) @Max(ABSOLUTE_MAX_CASH_AMOUNT)
+  saveChangeMin?: number;
+  @ApiPropertyOptional({ description: 'Maximum change amount that may be saved to a wallet' })
+  @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0) @Max(ABSOLUTE_MAX_CASH_AMOUNT)
+  saveChangeMax?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() posLayout?: string;
+  @ApiPropertyOptional({ description: 'Maximum opening float for a new cash wallet (LKR), shop-wide' })
+  @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(1) @Max(ABSOLUTE_MAX_CASH_AMOUNT)
+  maxOpeningFloat?: number;
+  @ApiPropertyOptional({ description: 'QR payments ABOVE this amount (LKR) have the QR fee deducted by the bank. Default 5000.' })
+  @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0) @Max(MAX_QR_FEE_THRESHOLD)
+  qrFeeThreshold?: number;
+  @ApiPropertyOptional({ description: 'QR fee percentage of the whole QR amount, deducted from what the shop receives (not added to the bill). Default 1. 0 switches the fee off.' })
+  @IsOptional() @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(0) @Max(MAX_QR_FEE_PERCENT)
+  qrFeePercent?: number;
+  @ApiPropertyOptional({ description: 'How the shop label scale encodes digits 8-12 of its EAN-13 labels: AUTO (default, price when >= LKR 1.00 else weight), PRICE or WEIGHT.', enum: ['AUTO', 'PRICE', 'WEIGHT'] })
+  @IsOptional() @IsIn(['AUTO', 'PRICE', 'WEIGHT']) scaleBarcodeMode?: 'AUTO' | 'PRICE' | 'WEIGHT';
+}
+
+export class BillMessageTemplateDto {
+  @ApiPropertyOptional({ description: 'Template with {placeholders}. Empty / null restores the default.' })
+  @IsOptional() @IsString() @MaxLength(BILL_TEMPLATE_MAX_LENGTH)
+  template?: string | null;
+}
+
+export class BranchOpeningFloatDto {
+  @ApiProperty() @IsString() branchId: string;
+  @ApiPropertyOptional({ description: 'Branch maximum opening float (LKR); null removes the override (shop setting applies)', nullable: true })
+  @ValidateIf((o: { maxOpeningFloat?: unknown }) => o.maxOpeningFloat !== null)
+  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }) @Min(1) @Max(ABSOLUTE_MAX_CASH_AMOUNT)
+  maxOpeningFloat: number | null;
 }
 
 export class PayslipSettingsDto {
@@ -197,6 +234,15 @@ export class RegisterTenantDto {
   @IsOptional()
   @IsEnum(ShopType)
   shopType?: ShopType;
+}
+
+/** Shop owner's own profile (PUT /tenants/me). Plan, limits, status and subdomain are platform-only. */
+export class UpdateTenantProfileDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) companyName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) country?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) currency?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) timezone?: string;
 }
 
 export class UpdateTenantAdminDto {
@@ -970,7 +1016,7 @@ export class TenantsService {
     return { workspaces };
   }
 
-  async update(id: string, dto: Partial<RegisterTenantDto>) {
+  async update(id: string, dto: UpdateTenantProfileDto) {
     return this.prisma.tenant.update({
       where: { id },
       data: {
@@ -1199,9 +1245,9 @@ export class TenantsService {
     dto: ReceiptPrintDispatchDto,
   ) {
     const settings = await this.getReceiptSettings(tenantId);
-    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP', 'LABEL', 'GRN'].includes(dto.printType)
+    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP', 'LABEL', 'GRN', 'DAY_END'].includes(dto.printType)
       ? dto.printType
-      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN';
+      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN' | 'DAY_END';
     const mode = settings.printMode ?? 'auto';
     const useServer = settings.printServerEnabled && settings.printServerUrl;
 
@@ -1288,32 +1334,121 @@ export class TenantsService {
       roundOff: bool(pos['roundOff'] ?? s['roundOff'], true),
       loyalty: bool(pos['loyalty'] ?? s['loyalty'], true),
       reloadEnabled: bool(pos['reloadEnabled'], true),
+      saveChangeToWalletEnabled: resolveSaveChangeSettings(tenant.settings).enabled,
+      saveChangeMin: resolveSaveChangeSettings(tenant.settings).min,
+      saveChangeMax: resolveSaveChangeSettings(tenant.settings).max,
       posLayout,
+      maxOpeningFloat: resolveMaxOpeningFloat(s, null).max,
+      defaultMaxOpeningFloat: DEFAULT_MAX_OPENING_FLOAT,
+      qrFeeThreshold: resolveQrFeeSettings(s).threshold,
+      qrFeePercent: resolveQrFeeSettings(s).percent,
+      defaultQrFeeThreshold: DEFAULT_QR_FEE_THRESHOLD,
+      defaultQrFeePercent: DEFAULT_QR_FEE_PERCENT,
+      scaleBarcodeMode: resolveScaleBarcodeMode(s),
     };
   }
 
-  async savePosSettings(tenantId: string, dto: PosSettingsDto) {
+  /** The shop's bill message template (or the default) with the placeholders it may use. */
+  async getBillMessageTemplate(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
     if (!tenant) throw new NotFoundException('Tenant not found');
-    const existing = (tenant.settings as Record<string, unknown>) ?? {};
-    const current = (existing['pos'] as Record<string, unknown>) ?? {};
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...existing,
-          pos: {
-            ...current,
-            ...(dto.allowNegativeStock !== undefined ? { allowNegativeStock: dto.allowNegativeStock } : {}),
-            ...(dto.autoPrint !== undefined ? { autoPrint: dto.autoPrint } : {}),
-            ...(dto.roundOff !== undefined ? { roundOff: dto.roundOff } : {}),
-            ...(dto.loyalty !== undefined ? { loyalty: dto.loyalty } : {}),
-            ...(dto.reloadEnabled !== undefined ? { reloadEnabled: dto.reloadEnabled } : {}),
-            ...(dto.posLayout !== undefined ? { posLayout: dto.posLayout } : {}),
-          },
-        },
-      },
-    });
+    const template = resolveBillTemplate(tenant.settings);
+    return { template, isDefault: template === DEFAULT_BILL_TEMPLATE, defaultTemplate: DEFAULT_BILL_TEMPLATE, placeholders: BILL_PLACEHOLDERS, maxLength: BILL_TEMPLATE_MAX_LENGTH };
+  }
+
+  /** Renders a template with sample invoice data (nothing is saved): the settings screen's live preview. */
+  async previewBillMessageTemplate(tenantId: string, template: string | null | undefined) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true, name: true, phone: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const text = typeof template === 'string' && template.trim() ? template.replace(/\r\n?/g, '\n') : DEFAULT_BILL_TEMPLATE;
+    const problem = billTemplateError(text);
+    if (problem) throw new BadRequestException(problem);
+    const receipt = ((tenant.settings as Record<string, unknown> | null)?.['receipt'] ?? {}) as Record<string, unknown>;
+    const pick = (v: unknown, f: string | null) => (typeof v === 'string' && v.trim() ? v.trim() : f ?? '');
+    return {
+      message: renderBillMessage(text, {
+        customerName: 'Nimal Perera', customerPhone: '0771234567',
+        shopName: pick(receipt['shopName'], tenant.name), shopPhone: pick(receipt['phone'], tenant.phone),
+        invoiceNumber: 'INV-20261112-0001', date: new Date(),
+        items: [
+          { name: 'Basmati Rice', variant: '5kg', quantity: 2, unitPrice: 1250, total: 2500 },
+          { name: 'Tea', variant: 'Default', quantity: 1, unitPrice: 450, total: 450 },
+        ],
+        subtotal: 2950, discount: 0, total: 2950, amountPaid: 3000, change: 50,
+        paymentMethod: 'Cash', customerCreditBalance: 12500.5, customerWalletBalance: 0,
+      }),
+    };
+  }
+
+  /** Saves the template; an empty value restores the default. Unknown {placeholders} are refused. */
+  async saveBillMessageTemplate(tenantId: string, template: string | null | undefined) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const existing = { ...((tenant.settings as Record<string, unknown>) ?? {}) };
+    const text = typeof template === 'string' ? template.replace(/\r\n?/g, '\n') : '';
+    if (!text.trim()) {
+      delete existing['billMessageTemplate'];
+    } else {
+      const problem = billTemplateError(text);
+      if (problem) throw new BadRequestException(problem);
+      existing['billMessageTemplate'] = text;
+    }
+    await this.prisma.tenant.update({ where: { id: tenantId }, data: { settings: existing as Prisma.InputJsonValue } });
+    return this.getBillMessageTemplate(tenantId);
+  }
+
+  /** Per-branch override of the maximum opening float (stored in branch.settings). */
+  async saveBranchOpeningFloat(tenantId: string, dto: BranchOpeningFloatDto) {
+    const branch = await this.prisma.branch.findFirst({ where: { id: dto.branchId, tenantId }, select: { id: true, settings: true } });
+    if (!branch) throw new NotFoundException('Branch not found');
+    const current = { ...((branch.settings as Record<string, unknown>) ?? {}) };
+    if (dto.maxOpeningFloat === null) delete current['maxOpeningFloat'];
+    else current['maxOpeningFloat'] = dto.maxOpeningFloat;
+    await this.prisma.branch.update({ where: { id: branch.id }, data: { settings: current as Prisma.InputJsonValue } });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    return { branchId: branch.id, ...resolveMaxOpeningFloat(tenant?.settings, current) };
+  }
+
+  async savePosSettings(tenantId: string, dto: PosSettingsDto) {
+    const feeProblem = qrFeeSettingsError({ threshold: dto.qrFeeThreshold, percent: dto.qrFeePercent });
+    if (feeProblem) throw new BadRequestException(feeProblem);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+          if (!tenant) throw new NotFoundException('Tenant not found');
+          const existing = (tenant.settings as Record<string, unknown>) ?? {};
+          const current = (existing['pos'] as Record<string, unknown>) ?? {};
+          await tx.tenant.update({
+            where: { id: tenantId },
+            data: {
+              settings: {
+                ...existing,
+                pos: {
+                  ...current,
+                  ...(dto.allowNegativeStock !== undefined ? { allowNegativeStock: dto.allowNegativeStock } : {}),
+                  ...(dto.autoPrint !== undefined ? { autoPrint: dto.autoPrint } : {}),
+                  ...(dto.roundOff !== undefined ? { roundOff: dto.roundOff } : {}),
+                  ...(dto.loyalty !== undefined ? { loyalty: dto.loyalty } : {}),
+                  ...(dto.reloadEnabled !== undefined ? { reloadEnabled: dto.reloadEnabled } : {}),
+                  ...(dto.saveChangeToWalletEnabled !== undefined ? { saveChangeToWalletEnabled: dto.saveChangeToWalletEnabled } : {}),
+                  ...(dto.saveChangeMin !== undefined ? { saveChangeMin: dto.saveChangeMin } : {}),
+                  ...(dto.saveChangeMax !== undefined ? { saveChangeMax: dto.saveChangeMax } : {}),
+                  ...(dto.posLayout !== undefined ? { posLayout: dto.posLayout } : {}),
+                  ...(dto.maxOpeningFloat !== undefined ? { maxOpeningFloat: dto.maxOpeningFloat } : {}),
+                  ...(dto.qrFeeThreshold !== undefined ? { qrFeeThreshold: dto.qrFeeThreshold } : {}),
+                  ...(dto.qrFeePercent !== undefined ? { qrFeePercent: dto.qrFeePercent } : {}),
+                  ...(dto.scaleBarcodeMode !== undefined ? { scaleBarcodeMode: dto.scaleBarcodeMode } : {}),
+                },
+              },
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        break;
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2034' || attempt === 2) throw error;
+      }
+    }
     return this.getPosSettings(tenantId);
   }
 }
@@ -1375,7 +1510,7 @@ export class TenantsController {
   @ApiBearerAuth('access-token')
   @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update tenant settings' })
-  update(@CurrentUser() user: IAuthUser, @Body() dto: Partial<RegisterTenantDto>) {
+  update(@CurrentUser() user: IAuthUser, @Body() dto: UpdateTenantProfileDto) {
     return this.tenantsService.update(user.tenantId, dto);
   }
 
@@ -1407,6 +1542,37 @@ export class TenantsController {
   @ApiOperation({ summary: 'Save POS configuration' })
   savePosSettings(@CurrentUser() user: IAuthUser, @Body() dto: PosSettingsDto) {
     return this.tenantsService.savePosSettings(user.tenantId, dto);
+  }
+
+  @Get('bill-message-template')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Customer bill message template (shop edit or default)' })
+  getBillMessageTemplate(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.getBillMessageTemplate(user.tenantId);
+  }
+
+  @Post('bill-message-template/preview')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Preview a bill message template with sample data (not saved)' })
+  previewBillMessageTemplate(@CurrentUser() user: IAuthUser, @Body() dto: BillMessageTemplateDto) {
+    return this.tenantsService.previewBillMessageTemplate(user.tenantId, dto.template);
+  }
+
+  @Put('bill-message-template')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Save the customer bill message template (empty restores the default)' })
+  saveBillMessageTemplate(@CurrentUser() user: IAuthUser, @Body() dto: BillMessageTemplateDto) {
+    return this.tenantsService.saveBillMessageTemplate(user.tenantId, dto.template);
+  }
+
+  @Put('pos-settings/branch-opening-float')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Set or remove a branch maximum opening float' })
+  saveBranchOpeningFloat(@CurrentUser() user: IAuthUser, @Body() dto: BranchOpeningFloatDto) {
+    return this.tenantsService.saveBranchOpeningFloat(user.tenantId, dto);
   }
 
   @Get('payslip-settings')

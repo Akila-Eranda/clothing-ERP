@@ -20,8 +20,13 @@ import { assertShopModule } from '@/shared/shop-module.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { NotificationsService, NotificationsModule } from '@/modules/notifications/notifications.module';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 
 // ── DTOs ─────────────────────────────────────────────────────
+
+export class FleetFlagDto {
+  @ApiProperty() @IsBoolean() isFleet: boolean;
+}
 
 export class CreateServiceCatalogDto {
   @ApiProperty() @IsString() code: string;
@@ -396,10 +401,10 @@ export class WorkshopService {
 
   // ── Tyre serials ────────────────────────────────────────────
 
-  async listTyreSerials(tenantId: string, variantId?: string, status?: TyreSerialStatus) {
+  async listTyreSerials(tenantId: string, variantId?: string, status?: TyreSerialStatus, branchId?: string) {
     await assertShopModule(this.prisma, tenantId, 'workshop');
     return this.prisma.tyreSerial.findMany({
-      where: { tenantId, ...(variantId && { variantId }), ...(status && { status }) },
+      where: { tenantId, ...(branchId && { branchId }), ...(variantId && { variantId }), ...(status && { status }) },
       include: { variant: { include: { product: { include: { brand: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -566,13 +571,16 @@ export class WorkshopController {
   @Get('tyre-serials')
   @RequirePermissions('products:read')
   listSerials(@CurrentUser() user: IAuthUser, @Query('variantId') variantId?: string, @Query('status') status?: TyreSerialStatus) {
-    return this.service.listTyreSerials(user.tenantId, variantId, status);
+    return this.service.listTyreSerials(user.tenantId, variantId, status, resolveBranchScope(user));
   }
 
   @Post('tyre-serials')
   @RequirePermissions('products:create')
   createSerial(@CurrentUser() user: IAuthUser, @Body() dto: CreateTyreSerialDto) {
-    return this.service.createTyreSerial(user.tenantId, dto);
+    return this.service.createTyreSerial(user.tenantId, {
+      ...dto,
+      branchId: resolveBranchScope(user, dto.branchId),
+    });
   }
 
   @Get('reminders')
@@ -601,7 +609,7 @@ export class WorkshopController {
 
   @Put('fleet-customers/:id')
   @RequirePermissions('customers:update')
-  setFleet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { isFleet: boolean }) {
+  setFleet(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: FleetFlagDto) {
     return this.service.setFleetFlag(user.tenantId, id, body.isFleet);
   }
 }

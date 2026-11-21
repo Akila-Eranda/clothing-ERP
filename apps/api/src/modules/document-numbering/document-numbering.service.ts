@@ -162,14 +162,10 @@ export class DocumentNumberingService {
       this.logger.debug(`Allocating custom number series key: ${key}`);
     }
 
-    let series = await tx.documentNumberSeries.findUnique({
-      where: { tenantId_key: { tenantId, key } },
-    });
-
-    if (!series) {
-      const def = DEFAULT_NUMBER_SERIES.find((d) => d.key === key);
-      series = await tx.documentNumberSeries.create({
-        data: {
+    const def = DEFAULT_NUMBER_SERIES.find((d) => d.key === key);
+    await tx.documentNumberSeries.createMany({
+      data: [
+        {
           tenantId,
           key,
           name: def?.name ?? key,
@@ -181,8 +177,20 @@ export class DocumentNumberingService {
           description: def?.description,
           nextValue: 1,
         },
-      });
-    }
+      ],
+      skipDuplicates: true,
+    });
+
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "document_number_series"
+      WHERE "tenantId" = ${tenantId} AND "key" = ${key}
+      FOR UPDATE
+    `;
+    const series = await tx.documentNumberSeries.findUnique({
+      where: { tenantId_key: { tenantId, key } },
+    });
+    if (!series) throw new Error(`Number series "${key}" could not be initialized`);
 
     if (!series.isActive) {
       throw new BadRequestException(`Number series "${key}" is inactive`);
@@ -288,10 +296,7 @@ export class DocumentNumberingService {
     }
   }
 
-  /**
-   * Raise nextValue so we never re-issue numbers already present in legacy docs.
-   * Best-effort; safe to call repeatedly.
-   */
+  /** Raise nextValue so we never re-issue numbers already present in legacy docs. */
   async syncSequenceFloors(tenantId: string): Promise<void> {
     const now = new Date();
     for (const def of DEFAULT_NUMBER_SERIES) {
@@ -326,64 +331,59 @@ export class DocumentNumberingService {
     const dayStart = new Date(
       Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
     );
-    try {
-      switch (key) {
-        case 'INVOICE':
-          return (
-            (await db.sale.count({
-              where: { tenantId, invoiceDate: { gte: dayStart } },
-            })) + 1
-          );
-        case 'PURCHASE_ORDER':
-          return (
-            (await db.purchaseOrder.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'PURCHASE_REQUEST':
-          return (
-            (await db.purchaseRequest.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'GRN':
-          return (
-            (await db.goodsReceipt.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'SUPPLIER_RETURN':
-          return (
-            (await db.supplierReturn.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'SUPPLIER_INVOICE':
-          return (
-            (await db.supplierInvoice.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'RETURN':
-        case 'EXCHANGE':
-          return (
-            (await db.return.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        case 'JOURNAL':
-        case 'YEAR_END_JOURNAL':
-          return (
-            (await db.journalEntry.count({
-              where: { tenantId, createdAt: { gte: yearStart } },
-            })) + 1
-          );
-        default:
-          return 1;
-      }
-    } catch (e) {
-      this.logger.warn(`computeFloor(${key}) failed: ${(e as Error).message}`);
-      return 1;
+    switch (key) {
+      case 'INVOICE':
+        return (
+          (await db.sale.count({
+            where: { tenantId, invoiceDate: { gte: dayStart } },
+          })) + 1
+        );
+      case 'PURCHASE_ORDER':
+        return (
+          (await db.purchaseOrder.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'PURCHASE_REQUEST':
+        return (
+          (await db.purchaseRequest.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'GRN':
+        return (
+          (await db.goodsReceipt.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'SUPPLIER_RETURN':
+        return (
+          (await db.supplierReturn.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'SUPPLIER_INVOICE':
+        return (
+          (await db.supplierInvoice.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'RETURN':
+      case 'EXCHANGE':
+        return (
+          (await db.return.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      case 'JOURNAL':
+      case 'YEAR_END_JOURNAL':
+        return (
+          (await db.journalEntry.count({
+            where: { tenantId, createdAt: { gte: yearStart } },
+          })) + 1
+        );
+      default:
+        return 1;
     }
   }
 }

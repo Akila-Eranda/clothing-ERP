@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Package, ShoppingBag, Wifi, WifiOff, Smartphone, Delete } from "lucide-react";
+import { CheckCircle2, Loader2, Package, QrCode, ShoppingBag, Wifi, WifiOff, Smartphone, Delete } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import {
+  isDisplayConnected,
   readCustomerDisplayState,
+  sanitizeDisplayState,
   subscribeCustomerDisplayState,
   publishCustomerDisplayInput,
   type CustomerDisplayState,
@@ -80,13 +82,13 @@ function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?
       : "Discount";
   return (
     <div className={cn("space-y-2", compact ? "text-base" : "text-lg")}>
-      <div className="flex justify-between" style={{ color: "#94a3b8" }}>
-        <span>Subtotal</span>
-        <span>{currency} {formatNumber(state.subtotal)}</span>
+      <div className="flex justify-between gap-3" style={{ color: "#94a3b8" }}>
+        <span className="shrink-0">Subtotal</span>
+        <span className="text-right tabular-nums">{currency} {formatNumber(state.subtotal)}</span>
       </div>
       {state.discount > 0.001 && (
         <div
-          className="flex justify-between items-center rounded-xl px-3 py-2"
+          className="flex justify-between items-center gap-3 rounded-xl px-3 py-2"
           style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "var(--pos-success-soft, #047857)" }}
         >
           <span className="font-bold">{discLabel}</span>
@@ -94,17 +96,17 @@ function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?
         </div>
       )}
       {state.taxRate > 0 && (
-        <div className="flex justify-between" style={{ color: "#94a3b8" }}>
-          <span>Tax ({state.taxRate}%)</span>
-          <span>{currency} {formatNumber(state.tax)}</span>
+        <div className="flex justify-between gap-3" style={{ color: "#94a3b8" }}>
+          <span className="shrink-0">Tax ({state.taxRate}%)</span>
+          <span className="text-right tabular-nums">{currency} {formatNumber(state.tax)}</span>
         </div>
       )}
       <div
-        className="flex justify-between items-baseline pt-3 mt-1 border-t"
+        className="flex justify-between items-baseline gap-3 pt-3 mt-1 border-t"
         style={{ borderColor: "rgba(255,255,255,0.12)" }}
       >
-        <span className={cn("font-bold text-white", compact ? "text-xl" : "text-2xl")}>Total</span>
-        <span className={cn("font-black", compact ? "text-3xl" : "text-4xl")} style={{ color: "var(--pos-price)" }}>
+        <span className={cn("font-bold text-white shrink-0", compact ? "text-xl" : "text-2xl")}>Total</span>
+        <span className={cn("font-black text-right tabular-nums min-w-0 [overflow-wrap:anywhere]", compact ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl")} style={{ color: "var(--pos-price)" }}>
           {currency} {formatNumber(state.total)}
         </span>
       </div>
@@ -182,10 +184,119 @@ function CheckoutCashPanel({ state }: { state: CustomerDisplayState }) {
         </div>
       )}
 
-      {!isCash && (
-        <p className="text-center text-sm font-semibold animate-pulse" style={{ color: "var(--pos-accent)" }}>
-          Processing payment…
+      {!isCash && !state.qrPayment && !state.bankPayment && (
+        // Large, high-contrast light blue on the dark panel (readable from a distance); a spinner instead of fading text.
+        <p className="flex items-center justify-center gap-2 text-center text-lg sm:text-xl font-bold" style={{ color: "#bfdbfe" }} data-testid="customer-display-payment-pending">
+          {state.paymentMethod?.toLowerCase() === "qr"
+            ? "QR payment details are unavailable. Please ask the cashier to select a configured bank account."
+            : <><Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />Processing payment…</>}
         </p>
+      )}
+    </div>
+  );
+}
+
+function BankPaymentPanel({ state }: { state: CustomerDisplayState }) {
+  const payment = state.bankPayment;
+  if (!payment) return null;
+  const rows: [string, string, string | null | undefined][] = [
+    ["Bank", "bank", payment.bankName],
+    ["Account No", "account-number", payment.accountNumber],
+    ["Account Holder", "account-holder", payment.accountHolderName],
+    ["Branch", "branch", payment.branchName],
+    ["Branch Code", "branch-code", payment.branchCode],
+  ];
+  const shown = rows.filter(([, , value]) => value && String(value).trim());
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center gap-5 py-6" data-testid="customer-display-bank-payment" data-bank-account-id={payment.bankAccountId}>
+      <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "#6a8ab8" }}>Pay by bank transfer</p>
+      <p className="text-4xl font-black text-white tabular-nums" data-testid="customer-display-bank-amount">
+        {state.currency} {formatNumber(payment.amount)}
+      </p>
+      {payment.status === "unavailable" ? (
+        <p className="rounded-xl px-4 py-3 text-center text-base font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fcd34d" }}>
+          Bank details are unavailable. Please ask the cashier to select an enabled bank account.
+        </p>
+      ) : shown.length > 0 ? (
+        <dl className="grid w-full max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-3 rounded-2xl px-5 py-4 text-left" style={{ background: "#162338", border: "1px solid #1e3356" }}>
+          {shown.map(([label, field, value]) => (
+            <React.Fragment key={field}>
+              <dt className="text-sm font-semibold uppercase tracking-wide" style={{ color: "#8aa4c8" }}>{label}</dt>
+              <dd className="text-lg font-bold text-white [overflow-wrap:anywhere]" data-field={field}>{value}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-base font-semibold" style={{ color: "#fcd34d" }}>Bank details are not configured.</p>
+      )}
+    </div>
+  );
+}
+
+/** QR payment: the exact QR, amount and bank account the cashier selected (details are blank until the QR is ready). */
+export function QrPaymentPanel({ state }: { state: CustomerDisplayState }) {
+  const q = state.qrPayment;
+  // A QR image that fails to load is shown as "not available" (never an empty / broken image next to bank details).
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
+  if (!q) return null;
+  const imageFailed = !!q.src && failedSrc === q.src;
+  const showQr = q.status === "ready" && !!q.src && !imageFailed;
+  const rows: [string, string, string | null | undefined][] = [
+    ["Bank", "bank", q.bankName],
+    ["Account No", "account-number", q.accountNumber],
+    ["Account Holder", "account-holder", q.accountHolderName],
+    ["Branch", "branch", q.branchName],
+    ["Branch Code", "branch-code", q.branchCode],
+  ];
+  const shown = rows.filter(([, , v]) => v && String(v).trim());
+  return (
+    // The panel fills the payment area; the QR + amount column never shrinks and only the bank details box scrolls
+    // (if the names are unusually long). Wide (lg): details beside the QR so a 768px-high display fits.
+    // "safe center": centred when it fits, top-aligned (never cut off above the scroll area) when it does not.
+    <div
+      className="h-full flex flex-col lg:flex-row items-center [justify-content:safe_center] gap-3 sm:gap-4 lg:gap-6 py-2"
+      data-testid="customer-display-qr"
+      data-status={q.status}
+      data-image-error={imageFailed ? "true" : undefined}
+      data-qr-code-id={q.qrCodeId}
+      data-bank-account-id={q.bankAccountId}
+    >
+      <div className="flex flex-col items-center gap-3 shrink-0 max-w-full">
+        <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "#6a8ab8" }}>Scan to pay</p>
+        {/* Square, never cropped: shrinks on short / narrow screens (QR image keeps its own quiet zone + white padding). */}
+        <div
+          className="rounded-2xl bg-white p-3 shadow-xl shrink-0 max-w-full aspect-square w-[clamp(160px,calc(100vh_-_600px),300px)] sm:w-[clamp(200px,calc(100vh_-_505px),300px)]"
+        >
+          {showQr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={q.src} src={q.src} alt={`QR code for ${q.label}`} className="h-full w-full object-contain" data-testid="customer-display-qr-image" onError={() => setFailedSrc(q.src)} />
+          ) : (
+            <div className="h-full w-full flex flex-col items-center justify-center gap-2 text-center text-base font-semibold text-slate-600 px-4">
+              {q.status === "unavailable" || imageFailed ? (<><QrCode className="h-10 w-10" /><span>{q.message ?? "QR not available. Please ask the cashier."}</span></>) : (<><Loader2 className="h-10 w-10 animate-spin" /><span>Updating QR…</span></>)}
+            </div>
+          )}
+        </div>
+        <p className="text-3xl sm:text-4xl font-black text-white tabular-nums text-center max-w-full [overflow-wrap:anywhere]" data-testid="customer-display-qr-amount">
+          {state.currency} {formatNumber(q.amount)}
+        </p>
+        {showQr && q.mode === "STATIC" && (
+          <p className="text-sm text-center" style={{ color: "#93c5fd" }}>Enter this amount in your banking app after scanning</p>
+        )}
+      </div>
+      {showQr && shown.length > 0 && (
+        <dl
+          className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-2 lg:flex lg:flex-col lg:gap-2.5 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 w-full max-w-md lg:flex-1 min-w-0 min-h-0 max-h-full overflow-y-auto text-left"
+          style={{ background: "#162338", border: "1px solid #1e3356" }}
+          data-testid="customer-display-qr-details"
+        >
+          {/* Phone and beside the QR (lg): label above value so values get the full width. Tablet stacked (sm–lg): label | value rows. */}
+          {shown.map(([label, field, value]) => (
+            <div key={field} className="min-w-0 sm:contents lg:block">
+              <dt className="text-sm font-semibold uppercase tracking-wide sm:self-center" style={{ color: "#8aa4c8" }}>{label}</dt>
+              <dd className="text-lg font-bold text-white leading-snug [overflow-wrap:anywhere]" data-field={field}>{value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
     </div>
   );
@@ -397,9 +508,9 @@ function ThankYouScreen({ state }: { state: CustomerDisplayState }) {
 
 function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
   return (
-    <div className="flex flex-1 min-h-0 gap-6 p-6">
-      {/* Featured item */}
-      <div className="w-[38%] flex flex-col min-h-0">
+    <div className="flex flex-1 min-h-0 gap-6 p-3 sm:p-6">
+      {/* Featured item (hidden on phone-width screens, where the cart / payment panel needs the full width) */}
+      <div className="hidden sm:flex w-[38%] flex-col min-h-0">
         <AnimatePresence mode="wait">
           {state.lastAdded ? (
             <motion.div
@@ -474,12 +585,12 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
         className="flex-1 flex flex-col min-h-0 rounded-3xl overflow-hidden"
         style={{ background: "#0f1f3a", border: "1px solid #1e3356" }}
       >
-        <div className="px-6 py-4 border-b shrink-0 flex items-center justify-between" style={{ borderColor: "#1e3356" }}>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b shrink-0 flex items-center justify-between gap-3" style={{ borderColor: "#1e3356" }}>
           <h3 className="text-xl font-bold text-white">
             {state.phase === "checkout" ? "Payment" : "Your Items"}
           </h3>
           <span
-            className="text-sm font-bold px-3 py-1 rounded-full"
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0"
             style={{ background: "rgba(var(--pos-accent-rgb),0.2)", color: "#93c5fd" }}
           >
             {state.itemCount} {state.itemCount === 1 ? "item" : "items"}
@@ -487,6 +598,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          {state.phase === "checkout" && state.qrPayment ? <QrPaymentPanel state={state} /> : state.phase === "checkout" && state.bankPayment ? <BankPaymentPanel state={state} /> : (
           <AnimatePresence initial={false}>
             {state.items.map((item) => (
               <motion.div
@@ -530,9 +642,10 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
               </motion.div>
             ))}
           </AnimatePresence>
+          )}
         </div>
 
-        <div className="px-6 py-5 border-t shrink-0" style={{ borderColor: "#1e3356", background: "#0d1b2e" }}>
+        <div className="px-4 sm:px-6 py-3 sm:py-5 border-t shrink-0" style={{ borderColor: "#1e3356", background: "#0d1b2e" }}>
           {state.phase === "checkout" ? (
             <>
               <CheckoutCashPanel state={state} />
@@ -549,29 +662,42 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
 
 export function PosCustomerDisplayScreen() {
   const { settings: receiptSettings } = useReceiptSettings();
-  const [state, setState] = React.useState<CustomerDisplayState | null>(() => readCustomerDisplayState());
-  const [connected, setConnected] = React.useState(true);
+  // A cached checkout / QR from an old session is never shown (sanitizeDisplayState turns it into "waiting").
+  const [state, setState] = React.useState<CustomerDisplayState | null>(() => sanitizeDisplayState(readCustomerDisplayState(), Date.now()));
+  const [connected, setConnected] = React.useState(() => isDisplayConnected(readCustomerDisplayState(), Date.now()));
 
   React.useEffect(() => {
     const unsub = subscribeCustomerDisplayState((next) => {
-      setState(next);
-      setConnected(true);
+      setState(sanitizeDisplayState(next, Date.now()));
+      setConnected(isDisplayConnected(next, Date.now()));
     });
     return unsub;
   }, []);
 
+  // The cashier window sends a heartbeat every few seconds, so "Live" really means the cashier window is alive;
+  // when it stops, the badge changes and a payment screen is replaced by "waiting".
   React.useEffect(() => {
     const t = setInterval(() => {
-      if (!state?.updatedAt) return;
-      setConnected(Date.now() - state.updatedAt < 15_000);
+      const now = Date.now();
+      setState((prev) => sanitizeDisplayState(prev, now));
+      setConnected(isDisplayConnected(state, now));
     }, 2000);
     return () => clearInterval(t);
-  }, [state?.updatedAt]);
+  }, [state]);
 
   const branding = React.useMemo(
     () => mergeDisplayBranding(state, receiptSettings),
     [state, receiptSettings],
   );
+
+  // The display depends only on this browser (saved display state, cached shop branding/theme, local clock), none of
+  // which the server knows. Rendering it during SSR caused hydration mismatches (shop name, screen, clock seconds),
+  // so the server and the first client render show the same empty backdrop, and the display appears after mount.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return <div className="fixed inset-0" style={{ background: "linear-gradient(160deg,#070d1a 0%,#0d1b2e 45%,#0f1f3a 100%)" }} aria-busy="true" />;
+  }
 
   const displayState = state;
 

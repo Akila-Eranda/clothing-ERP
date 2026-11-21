@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseQty } from "@/lib/utils";
 
 type Supplier = { id: string; name: string };
 type VariantOpt = { id: string; sku: string; name: string; costPrice: number; product: { name: string } };
@@ -71,9 +72,9 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
   const submit = async () => {
     if (!supplierId) { toast.error("Select supplier"); return; }
     if (!variant) { toast.error("Lookup a product first"); return; }
-    const q = parseInt(qty, 10);
+    const q = parseQty(qty, NaN);
     const c = parseFloat(cost);
-    if (!q || q < 1 || isNaN(c)) { toast.error("Enter valid qty and cost"); return; }
+    if (!(q > 0) || isNaN(c)) { toast.error("Enter valid qty and cost"); return; }
     setBusy(true);
     try {
       const res = await api.post<{ grnNumber: string }>("/procurement/grn/quick", {
@@ -159,7 +160,7 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Quantity <span className="text-destructive">*</span></Label>
-              <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+              <Input type="number" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Unit Cost <span className="text-destructive">*</span></Label>

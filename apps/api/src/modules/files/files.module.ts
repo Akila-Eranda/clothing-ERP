@@ -4,7 +4,15 @@ import {
   UploadedFile, UseInterceptors, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, Matches } from 'class-validator';
+
+/** Multipart text fields of POST /files/upload (the file itself is handled by multer). */
+export class UploadFileDto {
+  @ApiPropertyOptional({ example: 'products' })
+  @IsOptional() @Matches(/^[A-Za-z0-9_-]{1,40}$/, { message: 'folder may only contain letters, digits, _ and -' })
+  folder?: string;
+}
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -115,6 +123,20 @@ export class FilesService {
     try { await fs.unlink(filepath); } catch {}
     return this.prisma.fileUpload.delete({ where: { id } });
   }
+
+  async readByUrl(tenantId: string, url: string): Promise<{ data: Buffer; mimeType: string } | null> {
+    const file = await this.prisma.fileUpload.findFirst({
+      where: { tenantId, url },
+      select: { filename: true, folder: true, mimeType: true },
+    });
+    if (!file) return null;
+    const filepath = path.join(this.uploadDir, tenantId, file.folder ?? '', file.filename);
+    try {
+      return { data: await fs.readFile(filepath), mimeType: file.mimeType };
+    } catch {
+      return null;
+    }
+  }
 }
 
 @ApiTags('Files')
@@ -133,9 +155,9 @@ export class FilesController {
   upload(
     @CurrentUser() user: IAuthUser,
     @UploadedFile() file: Express.Multer.File,
-    @Body('folder') folder?: string,
+    @Body() body: UploadFileDto,
   ) {
-    return this.filesService.uploadFile(user.tenantId, user.id, file, folder);
+    return this.filesService.uploadFile(user.tenantId, user.id, file, body.folder);
   }
 
   @Get()

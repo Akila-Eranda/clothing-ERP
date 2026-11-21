@@ -10,6 +10,7 @@ const config: Config = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^nanoid$': '<rootDir>/../test/shims/nanoid.ts',
     '^@prisma/client$': '<rootDir>/../node_modules/.prisma/client',
     '^@prisma/client/(.*)$': '<rootDir>/../node_modules/.prisma/client/$1',
   },

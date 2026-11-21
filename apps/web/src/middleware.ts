@@ -29,9 +29,10 @@ function isAdminHost(request: NextRequest): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Force HTTPS when proxied over HTTP (tenant subdomains must use TLS)
+  // Force HTTPS when proxied over HTTP (tenant subdomains must use TLS). Production builds only:
+  // `next dev` always sends x-forwarded-proto=http, which made local development impossible (F-33b).
   const proto = request.headers.get('x-forwarded-proto');
-  if (proto === 'http') {
+  if (process.env.NODE_ENV === 'production' && proto === 'http') {
     const httpsUrl = request.nextUrl.clone();
     httpsUrl.protocol = 'https';
     return NextResponse.redirect(httpsUrl, 301);

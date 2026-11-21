@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { useBranchStore } from "@/stores/branch-store";
-import { cn } from "@/lib/utils";
+import { cn, parseQty } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 
 interface Branch {
@@ -273,7 +273,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                   <Input
                     ref={searchRef}
                     className="pl-8 h-9 text-sm"
-                    placeholder="Search name or SKU..."
+                    placeholder="Search name or SKU..." aria-label="Search name or SKU"
                     value={pickerSearch}
                     onChange={(e) => setPickerSearch(e.target.value)}
                   />
@@ -378,11 +378,11 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                       <p className="text-[10px] text-muted-foreground">{item.sku} · max {item.available}</p>
                     </div>
                     <Input
-                      type="number"
-                      min={1}
+                      type="number" step="any"
+                      min={0.001}
                       max={item.available}
                       value={item.requestedQty}
-                      onChange={(e) => updateQty(idx, parseInt(e.target.value, 10) || 1)}
+                      onChange={(e) => updateQty(idx, parseQty(e.target.value, 1) || 1)}
                       className="w-20 h-8 text-center"
                     />
                     <button type="button" onClick={() => removeItem(idx)} className="p-1 rounded hover:bg-muted">

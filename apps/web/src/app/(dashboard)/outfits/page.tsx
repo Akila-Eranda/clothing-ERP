@@ -309,7 +309,7 @@ export default function OutfitsPage() {
                 <Label>Component variants</Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Scan / search product…"
+                    placeholder="Scan / search product…" aria-label="Scan / search product"
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void searchComponents(); }}

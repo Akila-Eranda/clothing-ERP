@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import {
   Injectable,
   NotFoundException,
@@ -606,6 +607,7 @@ export class PlatformOpsService {
       expiresIn: '30m',
       issuer: this.config.get('jwt.issuer'),
       audience: this.config.get('jwt.audience'),
+      jwtid: randomUUID(),
     })
 
     const code = await createImpersonationCode(accessToken)

@@ -56,11 +56,7 @@ export class AccountingBootstrapService {
     const mappingsCreated = await this.seedAccountMappings(tenantId, coa.codeToId);
     const fiscalYearCreated = await this.ensureCurrentFiscalYear(tenantId, userId, coa.codeToId);
     await this.settings.ensureNumberSeries(tenantId);
-    try {
-      await this.tax.seedDefaultTaxRates(tenantId);
-    } catch (err) {
-      this.logger.warn(`Tax seed skipped for ${tenantId}: ${(err as Error).message}`);
-    }
+    await this.tax.seedDefaultTaxRates(tenantId);
 
     this.logger.log(
       `Accounting bootstrap tenant=${tenantId} created=${coa.created} existing=${coa.existing} fy=${fiscalYearCreated} maps=${mappingsCreated}`,
@@ -96,9 +92,9 @@ export class AccountingBootstrapService {
           ? codeToId.get(normalizeAccountCode(row.parentCode)) ?? null
           : null;
         if (row.parentCode && !parentId) continue;
-        try {
-          const acc = await this.prisma.account.create({
-            data: {
+        const inserted = await this.prisma.account.createMany({
+          data: [
+            {
               tenantId,
               code,
               name: row.name,
@@ -109,17 +105,16 @@ export class AccountingBootstrapService {
               openingBalance: 0,
               balance: 0,
             },
-          });
-          codeToId.set(code, acc.id);
-          created++;
-        } catch (err) {
-          const again = await this.prisma.account.findFirst({
-            where: { tenantId, code },
-            select: { id: true },
-          });
-          if (again) codeToId.set(code, again.id);
-          else this.logger.warn(`COA create failed ${code}: ${(err as Error).message}`);
-        }
+          ],
+          skipDuplicates: true,
+        });
+        const acc = await this.prisma.account.findFirst({
+          where: { tenantId, code },
+          select: { id: true },
+        });
+        if (!acc) throw new Error(`Default account ${code} was not available after provisioning`);
+        codeToId.set(code, acc.id);
+        created += inserted.count;
       }
     }
 
@@ -153,27 +148,20 @@ export class AccountingBootstrapService {
       select: { key: true },
     });
     const have = new Set(existing.map((e) => e.key));
-    let created = 0;
+    const missing: Prisma.AccountMappingCreateManyInput[] = [];
 
     for (const key of ACCOUNT_MAPPING_KEYS) {
       if (have.has(key)) continue;
       const accountId = this.pickAccountId(map, key);
       if (!accountId) continue;
-      try {
-        await this.prisma.accountMapping.create({
-          data: {
-            tenantId,
-            key,
-            accountId,
-            label: ACCOUNT_MAPPING_LABELS[key],
-          },
-        });
-        created++;
-      } catch {
-        // unique race — ignore
-      }
+      missing.push({ tenantId, key, accountId, label: ACCOUNT_MAPPING_LABELS[key] });
     }
-    return created;
+    if (!missing.length) return 0;
+    const result = await this.prisma.accountMapping.createMany({
+      data: missing,
+      skipDuplicates: true,
+    });
+    return result.count;
   }
 
   private pickAccountId(codeToId: Map<string, string>, key: AccountMappingKey): string | null {
@@ -190,34 +178,30 @@ export class AccountingBootstrapService {
       { code: 'PETTY-01', name: 'Petty Cash', type: BankAccountType.PETTY_CASH, glCode: CODE.petty },
       { code: 'BANK-01', name: 'Bank — Main', type: BankAccountType.CURRENT, glCode: CODE.bank },
     ];
-    let created = 0;
-    for (const s of specs) {
-      const exists = await this.prisma.bankAccount.findFirst({
-        where: { tenantId, code: s.code },
-        select: { id: true },
-      });
-      if (exists) continue;
-      const glAccountId = codeToId.get(s.glCode) ?? null;
-      try {
-        await this.prisma.bankAccount.create({
-          data: {
-            tenantId,
-            code: s.code,
-            name: s.name,
-            type: s.type,
-            currency: 'LKR',
-            openingBalance: 0,
-            currentBalance: 0,
-            glAccountId: glAccountId ?? undefined,
-            isActive: true,
-          },
-        });
-        created++;
-      } catch (err) {
-        this.logger.warn(`Bank account ${s.code} skipped: ${(err as Error).message}`);
-      }
-    }
-    return created;
+    const existing = await this.prisma.bankAccount.findMany({
+      where: { tenantId, code: { in: specs.map((spec) => spec.code) } },
+      select: { code: true },
+    });
+    const have = new Set(existing.map((row) => row.code));
+    const missing = specs
+      .filter((spec) => !have.has(spec.code))
+      .map((spec) => ({
+        tenantId,
+        code: spec.code,
+        name: spec.name,
+        type: spec.type,
+        currency: 'LKR',
+        openingBalance: 0,
+        currentBalance: 0,
+        glAccountId: codeToId.get(spec.glCode) ?? undefined,
+        isActive: true,
+      }));
+    if (!missing.length) return 0;
+    const result = await this.prisma.bankAccount.createMany({
+      data: missing,
+      skipDuplicates: true,
+    });
+    return result.count;
   }
 
   private async linkPreferences(tenantId: string, codeToId: Map<string, string>) {
@@ -238,14 +222,14 @@ export class AccountingBootstrapService {
       defaultRetainedEarningsId: codeToId.get(CODE.retained) ?? null,
     };
 
-    await this.prisma.accountingPreference.upsert({
-      where: { tenantId },
-      create: data,
-      update: {},
+    await this.prisma.accountingPreference.createMany({
+      data: [data],
+      skipDuplicates: true,
     });
 
-    const prefs = await this.prisma.accountingPreference.findUnique({ where: { tenantId } });
-    if (!prefs) return;
+    const prefs = await this.prisma.accountingPreference.findUniqueOrThrow({
+      where: { tenantId },
+    });
 
     await this.prisma.accountingPreference.update({
       where: { tenantId },
@@ -286,8 +270,18 @@ export class AccountingBootstrapService {
       });
       return true;
     } catch (err) {
-      this.logger.warn(`Fiscal year create skipped: ${(err as Error).message}`);
-      return false;
+      const duplicateCreate =
+        (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') ||
+        (err instanceof Error &&
+          /already exists|overlaps existing fiscal year/i.test(err.message));
+      if (duplicateCreate) {
+        const createdConcurrently = await this.prisma.fiscalYear.findFirst({
+          where: { tenantId },
+          select: { id: true },
+        });
+        if (createdConcurrently) return false;
+      }
+      throw err;
     }
   }
 }

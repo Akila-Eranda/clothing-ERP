@@ -5,7 +5,7 @@ import { LoadingCenter } from "@/components/ui/loading";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Edit2, Package, Tag, BarChart2, Layers,
-  TrendingUp, Clock, Box, Warehouse, ChevronRight,
+  TrendingUp, Clock, Box, Warehouse,
   Image as ImageIcon, CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -139,43 +139,46 @@ export default function ProductDetailPage() {
   const branches = Array.from(branchMap.values());
 
   const images = product.images;
+  // Loose goods are sold by kg / l; "pcs" was hard-coded.
+  const stockUnit = (product as { unit?: string | null }).unit || "pcs";
 
   return (
     <div className="h-full flex flex-col bg-background">
 
       {/* ── Top bar ── */}
-      <div className="bg-card border-b px-6 py-3 flex items-center justify-between shrink-0">
+      {/* The header already shows the breadcrumb; this bar only carries the two actions. */}
+      <div className="bg-card border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
         <button onClick={() => router.push("/products")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-          <ArrowLeft className="h-4 w-4" /> Back to {workspace.productLabel}
+          className="flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="sm:hidden">Back</span>
+          <span className="hidden sm:inline">Back to {workspace.productLabel}</span>
         </button>
-        <div className="flex items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => router.push("/products")}>{workspace.productLabel}</span>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-semibold text-foreground truncate max-w-[220px]">{product.name}</span>
-        </div>
-        <Button size="sm" className="gap-1.5" onClick={() => router.push(`/products/${product.id}/edit`)}>
-          <Edit2 className="h-3.5 w-3.5" /> Edit Product
+        <Button size="sm" className="gap-1.5 whitespace-nowrap" onClick={() => router.push(`/products/${product.id}/edit`)}>
+          <Edit2 className="h-3.5 w-3.5" />
+          <span className="sm:hidden">Edit</span>
+          <span className="hidden sm:inline">Edit {workspace.productLabel.replace(/s$/, "")}</span>
         </Button>
       </div>
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto">
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+      {/* minmax(0,1fr): a wide variants table must not push the right column off screen */}
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px] gap-5 sm:gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══ */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
 
           {/* Hero card */}
-          <div className="panel-edge p-6 ">
-            <div className="flex gap-6 items-start flex-wrap">
+          <div className="panel-edge p-4 sm:p-6">
+            <div className="flex gap-4 sm:gap-6 items-start">
 
               {/* Image */}
               <div className="flex flex-col gap-2 items-center shrink-0">
-                <div className="h-36 w-36 rounded-xl border bg-muted/20 flex items-center justify-center overflow-hidden">
+                <div className="h-20 w-20 sm:h-32 sm:w-32 rounded-xl border bg-muted/20 flex items-center justify-center overflow-hidden">
                   {images[imgIdx]
                     ? <img src={images[imgIdx]} alt={product.name} className="h-full w-full object-cover" />
-                    : <ImageIcon className="h-10 w-10 text-muted-foreground/30" />}
+                    : <ImageIcon className="h-7 w-7 sm:h-9 sm:w-9 text-muted-foreground/30" aria-label="No image" />}
                 </div>
                 {images.length > 1 && (
                   <div className="flex gap-1">
@@ -192,7 +195,7 @@ export default function ProductDetailPage() {
               {/* Meta */}
               <div className="flex-1 min-w-0 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold">{product.name}</h1>
+                  <h1 className="text-lg sm:text-2xl font-bold leading-tight break-words">{product.name}</h1>
                   <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                     product.status === "ACTIVE"   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" :
                     product.status === "DRAFT"    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
@@ -205,8 +208,9 @@ export default function ProductDetailPage() {
                   )}
                 </div>
 
-                <p className="text-sm font-mono text-muted-foreground">SKU: <strong className="text-foreground">{product.sku}</strong>
-                  {product.barcode && <span className="ml-4">Barcode: <strong className="text-foreground">{product.barcode}</strong></span>}
+                <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span>SKU <strong className="font-mono text-foreground">{product.sku}</strong></span>
+                  {product.barcode && <span>Barcode <strong className="font-mono text-foreground">{product.barcode}</strong></span>}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
@@ -239,7 +243,7 @@ export default function ProductDetailPage() {
                   </div>
                 )}
 
-                <div className="flex gap-5 pt-2 border-t text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-x-5 gap-y-1 pt-2 border-t text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Created: {new Date(product.createdAt).toLocaleDateString()}</span>
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Updated: {new Date(product.updatedAt).toLocaleDateString()}</span>
                   {product.hsn && <span>HSN: <strong className="text-foreground">{product.hsn}</strong></span>}
@@ -251,9 +255,9 @@ export default function ProductDetailPage() {
           {/* Quick stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Stock",    value: `${totalStock} pcs`,     icon: Package,      color: "text-blue-600 dark:text-blue-400",       iconBg: "bg-blue-500/10" },
-              { label: "Available",      value: `${availStock} pcs`,     icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
-              { label: "Reserved",       value: `${reservedStock} pcs`,  icon: Box,          color: "text-violet-600 dark:text-violet-400",   iconBg: "bg-violet-500/10" },
+              { label: "Total Stock",    value: `${totalStock} ${stockUnit}`,     icon: Package,      color: "text-blue-600 dark:text-blue-400",       iconBg: "bg-blue-500/10" },
+              { label: "Available",      value: `${availStock} ${stockUnit}`,     icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
+              { label: "Reserved",       value: `${reservedStock} ${stockUnit}`,  icon: Box,          color: "text-violet-600 dark:text-violet-400",   iconBg: "bg-violet-500/10" },
               { label: "Gross Margin",   value: `${margin.toFixed(1)}%`, icon: TrendingUp,   color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-border bg-background p-4 flex items-center gap-3 ">
@@ -295,8 +299,8 @@ export default function ProductDetailPage() {
                       return (
                         <tr key={v.id} className={`hover:bg-muted/10 transition-colors ${!v.isActive ? "opacity-50" : ""}`}>
                           <td className="px-3 py-3 font-medium whitespace-nowrap">{v.name}</td>
-                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{v.sku}</td>
-                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{v.barcode ?? "—"}</td>
+                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{v.sku}</td>
+                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{v.barcode ?? "—"}</td>
                           {variantCols.map((col) => {
                             const val = v[col.field as keyof Variant] as string | null | undefined;
                             return (
@@ -408,7 +412,7 @@ export default function ProductDetailPage() {
             {product.hsn    && <InfoRow label="HSN/SAC" value={product.hsn} />}
             <InfoRow label="Category"  value={product.category?.name ?? "—"} />
             <InfoRow label="Brand"     value={product.brand?.name ?? "—"} />
-            <InfoRow label="Variants"  value={`${product.variants.length} variants`} />
+            <InfoRow label="Variants"  value={`${product.variants.length} variant${product.variants.length === 1 ? "" : "s"}`} />
           </div>
 
           {/* Status */}

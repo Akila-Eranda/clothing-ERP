@@ -2,7 +2,7 @@
 
 import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
-import { Loader2, Monitor, Pencil, Plus, Power, PowerOff } from "lucide-react";
+import { History, Loader2, Monitor, Pencil, Plus, Power, PowerOff, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CounterHistoryDialog } from "@/components/cash/counter-history-dialog";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printDayEndReport } from "@/lib/day-end-print";
 
 export type PosCounterRow = {
   id: string;
@@ -21,6 +24,21 @@ export type PosCounterRow = {
 };
 
 export function PosCountersPanel() {
+  const [historyId, setHistoryId] = React.useState<string | null>(null);
+  const [printingId, setPrintingId] = React.useState<string | null>(null);
+  const { settings: receiptSettings } = useReceiptSettings();
+  const printToday = async (counterId: string) => {
+    setPrintingId(counterId);
+    try {
+      const d = new Date();
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      await printDayEndReport({ date, counterId }, receiptSettings);
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Could not print the day-end report");
+    } finally {
+      setPrintingId(null);
+    }
+  };
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [rows, setRows] = React.useState<PosCounterRow[]>([]);
@@ -218,6 +236,27 @@ export function PosCountersPanel() {
                         size="icon-sm"
                         variant="secondary"
                         className="shrink-0 !bg-transparent !shadow-none border-0 text-muted-foreground hover:!bg-muted hover:text-foreground dark:!bg-transparent"
+                        onClick={() => setHistoryId(row.id)}
+                        title="Shift and handover history"
+                        aria-label={`${row.name} history`}
+                      >
+                        <History className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="secondary"
+                        className="shrink-0 !bg-transparent !shadow-none border-0 text-muted-foreground hover:!bg-muted hover:text-foreground dark:!bg-transparent"
+                        onClick={() => void printToday(row.id)}
+                        disabled={printingId === row.id}
+                        title="Print today's day-end report (thermal)"
+                        aria-label={`Print today's day-end report for ${row.name}`}
+                      >
+                        {printingId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="secondary"
+                        className="shrink-0 !bg-transparent !shadow-none border-0 text-muted-foreground hover:!bg-muted hover:text-foreground dark:!bg-transparent"
                         onClick={() => startEdit(row)}
                         title="Edit"
                       >
@@ -245,6 +284,7 @@ export function PosCountersPanel() {
           )}
         </CardContent>
       </Card>
+      <CounterHistoryDialog counterId={historyId} onClose={() => setHistoryId(null)} />
     </div>
   );
 }

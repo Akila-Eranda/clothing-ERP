@@ -1,5 +1,6 @@
 "use client";
 
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
@@ -557,19 +558,26 @@ export function JournalsHub() {
   const [viewEntry, setViewEntry] = useState<JournalEntry | null>(null);
   const autoGenTried = useRef(false);
 
+  // Search audit: server search is debounced (each keystroke used to reload journals and accounts).
+  const qDebounced = useDebouncedValue(q.trim(), 300);
+  // True only when an UNFILTERED load returned no entries (decides the one-time auto-generation).
+  const [ledgerEmpty, setLedgerEmpty] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: "50" });
       if (status !== "ALL") qs.set("status", status);
-      if (q.trim()) qs.set("q", q.trim());
+      if (qDebounced) qs.set("q", qDebounced);
       const [jRes, aRes] = await Promise.all([
         api.get<{ data: JournalEntry[] }>(`/accounting/journal-entries?${qs}`),
         api.get<{ flat?: Account[]; data?: Account[] } | Account[]>(
           "/accounting/accounts?flat=true&includeInactive=false",
         ),
       ]);
-      setEntries(parseApiList<JournalEntry>(jRes.data));
+      const loaded = parseApiList<JournalEntry>(jRes.data);
+      setEntries(loaded);
+      setLedgerEmpty(status === "ALL" && !qDebounced && loaded.length === 0);
       const raw = aRes.data as { flat?: Account[] } | Account[] | { data?: Account[] };
       const list =
         Array.isArray(raw)
@@ -583,7 +591,7 @@ export function JournalsHub() {
     } finally {
       setLoading(false);
     }
-  }, [status, q]);
+  }, [status, qDebounced]);
 
   useEffect(() => {
     void load();
@@ -614,15 +622,15 @@ export function JournalsHub() {
     }
   };
 
-  // First visit with empty ledger — auto-generate once
+  // First visit with an empty ledger: auto-generate once.
+  // Search audit: this used to look at the list and the raw search text, so clearing a search that
+  // had found nothing triggered journal generation (a write). It now depends only on an unfiltered load.
   useEffect(() => {
-    if (loading || generating || autoGenTried.current) return;
-    if (entries.length > 0) return;
-    if (status !== "ALL" || q.trim()) return;
+    if (!ledgerEmpty || generating || autoGenTried.current) return;
     autoGenTried.current = true;
     void generateFromTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, entries.length, status, q]);
+  }, [ledgerEmpty, generating]);
 
   const openView = async (id: string) => {
     try {
@@ -770,6 +778,7 @@ export function JournalsHub() {
         <Input
           className="max-w-xs h-9"
           placeholder="Search number or description…"
+          aria-label="Search journal entries by number or description"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void load()}
@@ -808,10 +817,7 @@ export function JournalsHub() {
           data={entries}
           columns={columns}
           pageCount={Math.max(1, Math.ceil(entries.length / 10))}
-          searchableColumns={[
-            { id: "entryNumber", title: "Number" },
-            { id: "description", title: "Description" },
-          ]}
+          // No table-level search: it only covered the 50 loaded entries; the search box above queries all of them.
           filterableColumns={[
             {
               id: "status",

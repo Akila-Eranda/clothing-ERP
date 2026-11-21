@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { parseApiList } from "@/lib/parse-api-list";
+import { paymentReferenceText } from "@/lib/card-last4";
+import { copyText, whatsappShareUrl } from "@/lib/bill-message";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
@@ -34,7 +36,12 @@ interface Sale {
   cashier?: { firstName: string; lastName: string } | null;
   _count?: { items: number };
   items?: SaleItem[];
-  payments?: { id?: string; method: string; amount: number; reference?: string | null; processedAt?: string }[];
+  payments?: {
+    id?: string; method: string; amount: number; reference?: string | null; processedAt?: string;
+    cardLast4?: string | null;
+    bankAccount?: { name: string; bankName?: string | null } | null;
+    qrCode?: { label: string } | null;
+  }[];
 }
 interface SaleItem {
   id: string; productName: string; variantName: string;
@@ -193,6 +200,39 @@ function SaleDetailModal({
               </span>
             )}
             {sale && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="sale-copy-bill-message"
+                  onClick={async () => {
+                    try {
+                      const r = await api.get<{ message: string }>(`/sales/${saleId}/bill-message`);
+                      if (await copyText(r.data.message)) toast.success("Bill message copied");
+                      else toast.error("Could not copy the bill message");
+                    } catch (e) { toast.error((e as Error).message ?? "Could not build the bill message"); }
+                  }}
+                >
+                  Copy bill message
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="sale-share-bill-whatsapp"
+                  onClick={async () => {
+                    try {
+                      const r = await api.get<{ message: string; phone: string | null }>(`/sales/${saleId}/bill-message`);
+                      window.open(whatsappShareUrl(r.data.phone, r.data.message), "_blank", "noopener");
+                    } catch (e) { toast.error((e as Error).message ?? "Could not build the bill message"); }
+                  }}
+                >
+                  Share on WhatsApp
+                </Button>
+              </>
+            )}
+            {sale && (
               <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(sale.status)}`}>
                 {sale.status?.toLowerCase()}
               </span>
@@ -305,7 +345,7 @@ function SaleDetailModal({
                             <tr key={p.id ?? `${p.method}-${i}`} className="border-b last:border-0">
                               <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
                               <td className="px-3 py-2.5 font-medium">{methodLabel(p.method)}</td>
-                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{p.reference || "—"}</td>
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{paymentReferenceText(p)}</td>
                               <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(p.amount)}</td>
                             </tr>
                           ))}
@@ -410,6 +450,12 @@ function TotRow({
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function SalesPage() {
+  // Search audit: header global search links here with ?search=<term> (read after mount).
+  const [urlSearch, setUrlSearch] = useState("");
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("search");
+    if (v) setUrlSearch(v);
+  }, []);
   const router = useRouter();
   const today = isoDay(new Date());
   const [sales, setSales] = useState<Sale[]>([]);
@@ -633,6 +679,7 @@ export default function SalesPage() {
 
       {/* Table */}
       <ClientSideTable
+        defaultSearch={urlSearch}
         data={sales}
         columns={columns}
         searchableColumns={[{

@@ -25,6 +25,41 @@ export interface CustomerDisplayItem {
   lineDiscount?: number;
 }
 
+/**
+ * QR payment shown to the customer. Built by the cashier's QR panel from the SAME API response the cashier sees
+ * (POST /payment-qr/:id/render), so the customer always sees the exact QR, amount and bank account selected.
+ */
+export interface CustomerDisplayQrPayment {
+  /** ready: QR shown · updating: the account / amount just changed, a new QR is being prepared · unavailable: could not be shown */
+  status: "ready" | "updating" | "unavailable";
+  qrCodeId: string;
+  bankAccountId: string;
+  /** QR image: data URL (dynamic / payload QR) or absolute image URL (uploaded QR). Empty unless status is ready. */
+  src: string;
+  mode: "STATIC" | "DYNAMIC";
+  label: string;
+  message?: string;
+  merchantName?: string | null;
+  /** Exact gross amount the customer pays by QR (the QR fee is a shop cost and is never shown here). */
+  amount: number;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolderName?: string | null;
+  branchName?: string | null;
+  branchCode?: string | null;
+}
+
+export interface CustomerDisplayBankPayment {
+  status: "ready" | "unavailable";
+  bankAccountId: string;
+  amount: number;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolderName?: string | null;
+  branchName?: string | null;
+  branchCode?: string | null;
+}
+
 export interface CustomerDisplayState {
   updatedAt: number;
   phase: CustomerDisplayPhase;
@@ -54,6 +89,11 @@ export interface CustomerDisplayState {
   paymentMethod?: string;
   /** Digital reload — phone shown / typed on customer display. */
   reloadPhone?: string;
+  /** Present only while the cashier is on the QR tender of an open checkout. */
+  qrPayment?: CustomerDisplayQrPayment;
+  bankPayment?: CustomerDisplayBankPayment;
+  /** Changes every time a checkout is opened; lets the display tell one payment from the next. */
+  paymentSessionId?: string;
 }
 
 /** Customer display → cashier (e.g. typed reload phone). */
@@ -102,6 +142,9 @@ export function buildCustomerDisplayState(input: {
   paymentMethod?: string;
   saleTotal?: number;
   reloadPhone?: string;
+  qrPayment?: CustomerDisplayQrPayment | null;
+  bankPayment?: CustomerDisplayBankPayment | null;
+  paymentSessionId?: string | null;
 }): CustomerDisplayState {
   const posLines = input.items as PosLineInput[];
   const netSub = calcPosSubtotal(posLines);
@@ -173,8 +216,21 @@ export function buildCustomerDisplayState(input: {
     cashTendered: input.cashTendered,
     paymentMethod: input.paymentMethod,
     reloadPhone: input.reloadPhone,
+    ...(input.qrPayment ? { qrPayment: input.qrPayment } : {}),
+    ...(input.bankPayment ? { bankPayment: input.bankPayment } : {}),
+    ...(input.paymentSessionId ? { paymentSessionId: input.paymentSessionId } : {}),
   };
 }
+
+export {
+  CUSTOMER_DISPLAY_HEARTBEAT_MS,
+  CUSTOMER_DISPLAY_LIVE_MS,
+  CUSTOMER_DISPLAY_PAYMENT_TTL_MS,
+  isDisplayConnected,
+  newPaymentSessionId,
+  sanitizeDisplayState,
+  shouldAcceptDisplayState,
+} from "./customer-display-core";
 
 export function publishCustomerDisplayState(state: CustomerDisplayState) {
   if (typeof window === "undefined") return;
@@ -211,14 +267,19 @@ export function subscribeCustomerDisplayState(
   const ch =
     typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANNEL) : null;
 
-  const onMessage = (event: MessageEvent<CustomerDisplayState>) => {
-    if (event.data?.updatedAt) onState(event.data);
+  let latest = cached?.updatedAt ?? 0;
+  const accept = (next: CustomerDisplayState | undefined | null) => {
+    if (!next?.updatedAt || next.updatedAt < latest) return;     // out-of-order: a newer message was already shown
+    latest = next.updatedAt;
+    onState(next);
   };
+
+  const onMessage = (event: MessageEvent<CustomerDisplayState>) => accept(event.data);
 
   const onStorage = (event: StorageEvent) => {
     if (event.key !== LS_KEY || !event.newValue) return;
     try {
-      onState(JSON.parse(event.newValue) as CustomerDisplayState);
+      accept(JSON.parse(event.newValue) as CustomerDisplayState);
     } catch {
       /* ignore */
     }

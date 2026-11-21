@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
+import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants, newItemDefaultUnit } from "@/lib/shop-profiles";
 import { useShopProfile, hasMultiUnit, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
 import {
   variantVariantHint, applyVariantCombo, getProductFormCopy,
@@ -82,7 +82,7 @@ const buildInitialForm = (): Form => {
     sellingPrice: "", costPrice: "", mrp: "", taxRate: copy.defaultTaxRate,
     hasVariants: defaultHasVariants(profile.type),
     attributes: variantAttrsFromProfile(profile.type),
-    unit: profile.defaultUnit,
+    unit: newItemDefaultUnit(profile),
     batchNumber: "",
     trackInventory: true, inventory: { ...EMPTY_INVENTORY }, seoTitle: "", seoDescription: "",
     images: [],

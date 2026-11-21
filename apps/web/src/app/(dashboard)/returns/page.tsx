@@ -17,7 +17,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatNumber, cn } from "@/lib/utils";
+import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
+import { formatNumber, cn, parseQty } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
@@ -25,6 +26,7 @@ import { ShopType } from "@/lib/shop-profiles";
 import { ModuleGate } from "@/components/shop/module-gate";
 import { SizeSwapPicker } from "@/components/clothing/size-swap-picker";
 import { ViewReturnModal, printReturnBill, type ReturnRecord } from "@/components/returns/view-return-modal";
+import { useSubmitKey } from "@/lib/submit-key";
 type ReasonOption = { value: string; label: string };
 
 function buildReasons(type: string | null | undefined): ReasonOption[] {
@@ -72,6 +74,24 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
   const [notes, setNotes]                 = useState("");
   const [restock, setRestock]             = useState(true);
   const [submitting, setSubmitting]       = useState(false);
+  // Exchange settlement: how a balance is paid; refund or store credit for an excess
+  const [payMethod, setPayMethod]         = useState<"CASH" | "CARD" | "QR" | "BANK_TRANSFER">("CASH");
+  const [payAmount, setPayAmount]         = useState("");
+  const [payLast4, setPayLast4]           = useState("");
+  const [payBank, setPayBank]             = useState("");
+  const [banks, setBanks]                 = useState<{ id: string; name: string }[]>([]);
+  const [excessAs, setExcessAs]           = useState<"REFUND" | "STORE_CREDIT">("REFUND");
+  const returnSubmitKey = useSubmitKey();
+  useEffect(() => {
+    if (mode !== "EXCHANGE" || banks.length) return;
+    api.get<{ id: string; name: string; isActive?: boolean }[] | { data: { id: string; name: string; isActive?: boolean }[] }>("/accounting/bank-accounts")
+      .then((r) => {
+        const d = r.data as unknown;
+        const list = (Array.isArray(d) ? d : ((d as { data?: unknown[] })?.data ?? [])) as { id: string; name: string; isActive?: boolean }[];
+        setBanks(list.filter((b) => b.isActive !== false));
+      })
+      .catch(() => setBanks([]));
+  }, [mode, banks.length]);
 
   const searchInvoice = async (override?: string) => {
     const query = override ?? invoiceSearch;
@@ -162,14 +182,25 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
       .map((i) => ({ variantId: i.variantId, quantity: selectedItems[i.id].quantity, unitPrice: i.unitPrice }));
     setSubmitting(true);
     try {
-      await api.post("/returns", {
+      await withManagerApproval("Approve refund", (headers) => api.post("/returns", {
+        clientRequestId: returnSubmitKey.current(),
         originalSaleId: foundSale.id, reason, notes: notes || undefined,
         restockItems: restock, items, returnType: mode,
         ...(mode === "EXCHANGE" ? { exchangeItems } : {}),
-      });
+        ...(mode === "EXCHANGE" && balanceDue > 0 ? {
+          exchangePayments: [{
+            method: payMethod,
+            amount: parseFloat(payAmount) || balanceDue,
+            ...(payMethod === "CARD" ? { cardLast4: payLast4 } : {}),
+            ...(payMethod === "QR" || payMethod === "BANK_TRANSFER" ? { bankAccountId: payBank } : {}),
+          }],
+        } : {}),
+        ...(mode === "EXCHANGE" && refundDue > 0 ? { exchangeExcessAs: excessAs } : {}),
+      }, headers ? { headers } : undefined));
       toast.success(mode === "EXCHANGE" ? "Exchange created successfully" : "Return created successfully");
+      returnSubmitKey.reset();
       onSaved(); onClose();
-    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
+    } catch (e: unknown) { toast.error(e instanceof ManagerApprovalCancelled ? "Refund not approved — nothing was refunded" : (e as Error).message ?? "Failed"); }
     finally { setSubmitting(false); }
   };
 
@@ -294,8 +325,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                           <p className="text-[10px] text-muted-foreground font-mono">{item.variantName} · {item.sku}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <Input type="number" min={1} max={item.quantity} value={sel.quantity}
-                            onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, quantity: Math.min(item.quantity, parseInt(e.target.value) || 1) } }))}
+                          <Input type="number" step="any" min={0.001} max={item.quantity} value={sel.quantity}
+                            onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, quantity: Math.min(item.quantity, parseQty(e.target.value, 1) || 1) } }))}
                             className="w-14 h-7 text-xs text-center px-1" disabled={!sel.selected} />
                           <span className="text-[10px] text-muted-foreground">/{item.quantity}</span>
                         </div>
@@ -393,8 +424,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                             <p className="text-xs font-semibold text-violet-800">{item.productName}</p>
                             <p className="text-[10px] text-muted-foreground font-mono">{item.variantName ? `${item.variantName} · ` : ""}{item.sku}</p>
                           </div>
-                          <Input type="number" min={1} value={item.quantity}
-                            onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
+                          <Input type="number" step="any" min={0.001} value={item.quantity}
+                            onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseQty(e.target.value, 1) || 1 } : x))}
                             className="w-14 h-7 text-xs text-center px-1 shrink-0" />
                           <span className="text-xs font-bold text-violet-700 w-20 text-right shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
                           <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500 shrink-0">
@@ -443,6 +474,37 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                     <span>{balanceDue > 0 ? "Collect from customer" : "Refund to customer"}</span>
                     <span>LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}</span>
                   </div>
+                  {balanceDue > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <select aria-label="Balance paid by" value={payMethod} onChange={(e) => setPayMethod(e.target.value as typeof payMethod)}
+                        className="h-8 rounded-lg border border-input bg-card px-2 text-xs">
+                        <option value="CASH">Cash</option><option value="CARD">Card</option><option value="QR">QR</option><option value="BANK_TRANSFER">Bank transfer</option>
+                      </select>
+                      <Input aria-label="Amount received" type="number" min={0} step="0.01" className="h-8 w-28 text-xs" placeholder={formatNumber(balanceDue)}
+                        value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+                      {payMethod === "CARD" && (
+                        <Input aria-label="Card last 4 digits" inputMode="numeric" maxLength={4} className="h-8 w-20 text-xs" placeholder="Last 4"
+                          value={payLast4} onChange={(e) => setPayLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} />
+                      )}
+                      {(payMethod === "QR" || payMethod === "BANK_TRANSFER") && (
+                        <select aria-label="Bank account" value={payBank} onChange={(e) => setPayBank(e.target.value)}
+                          className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-card px-2 text-xs">
+                          <option value="">{banks.length ? "Paid into…" : "No bank accounts"}</option>
+                          {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                  {balanceDue === 0 && refundDue > 0 && (
+                    <div className="flex gap-2 pt-1" role="radiogroup" aria-label="Excess value">
+                      {(["REFUND", "STORE_CREDIT"] as const).map((v) => (
+                        <Button key={v} type="button" size="sm" role="radio" aria-checked={excessAs === v}
+                          variant={excessAs === v ? "success" : "chip"} onClick={() => setExcessAs(v)}>
+                          {v === "REFUND" ? "Refund the difference" : "Store credit"}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </>}
                 {!isExchange && (
                   <div className="flex justify-between font-bold border-t pt-2 text-emerald-600">

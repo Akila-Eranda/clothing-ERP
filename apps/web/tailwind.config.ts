@@ -11,6 +11,10 @@ const config: Config = {
   ],
   // TableCraft responsive toolbars — keep these utilities even if scan misses the package
   safelist: ["md:hidden", "max-md:hidden"],
+  // `file:` variants (used by input.tsx and react-table-craft) make Tailwind re-expand
+  // globals.css rules that mention .text-sm/.font-medium into invalid selectors such as
+  // `::file-selector-buttontable`. File-input styling is plain CSS in globals.css instead.
+  blocklist: ["file:border-0", "file:bg-transparent", "file:text-sm", "file:font-medium"],
   theme: {
     container: {
       center: true,

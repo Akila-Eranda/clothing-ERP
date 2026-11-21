@@ -271,7 +271,7 @@ function SupportPageInner() {
             />
             <input
               className={`${ADMIN_INPUT} pl-8`}
-              placeholder="Search name, subdomain, email…"
+              placeholder="Search name, subdomain, email…" aria-label="Search name, subdomain, email"
               value={tenantQuery}
               onChange={(e) => setTenantQuery(e.target.value)}
             />

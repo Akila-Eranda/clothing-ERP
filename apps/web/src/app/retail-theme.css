@@ -930,15 +930,11 @@ html.dark .hex-header {
   padding: 0 var(--hex-header-pad);
 }
 
-@media (min-width: 768px) {
+/* F-32: three columns only where the search box fits. With the 272px sidebar and the ~700px action
+   group, narrower screens made the search box slide over the POS / branch buttons. */
+@media (min-width: 1536px) {
   .hex-header__inner {
-    grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem) auto;
-  }
-}
-
-@media (min-width: 1280px) {
-  .hex-header__inner {
-    grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem) auto;
+    grid-template-columns: minmax(9rem, 1fr) minmax(14rem, 22rem) auto;
   }
 }
 
@@ -954,6 +950,8 @@ html.dark .hex-header {
   min-width: 0;
   display: flex;
   align-items: center;
+  /* F-32: when the column is narrow, clip the breadcrumb instead of letting it run under the search box */
+  overflow: hidden;
 }
 
 .hex-header__crumbs {
@@ -1018,8 +1016,9 @@ html.dark .hex-header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0; /* F-32: allow shrinking so the ellipsis shows instead of a hard clip ("Product") */
   max-width: min(20rem, 42vw);
-  flex-shrink: 0;
+  flex-shrink: 1;
 }
 
 .hex-header__title {
@@ -1040,7 +1039,7 @@ html.dark .hex-header {
   justify-self: stretch;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1536px) {
   .hex-header__search-wrap {
     display: block;
   }
@@ -1436,6 +1435,40 @@ html.dark .hex-header__live {
   .hex-header__pos span {
     display: none;
   }
+}
+
+/* Responsive visibility (F-32). This file loads after Tailwind's utilities, so the component rules above
+   that set `display` (live, profile-meta, desktop, icon-btn, crumbs, ...) overrode the markup's
+   hidden / sm: / md: / lg: utilities: phone headers showed every desktop item and overflowed, and desktop
+   showed the phone-only search button. Re-apply the utilities inside the header with higher specificity. */
+.hex-header .hidden { display: none; }
+@media (min-width: 640px) {
+  .hex-header .sm\:flex { display: flex; }
+  .hex-header .sm\:inline-flex { display: inline-flex; }
+  .hex-header .sm\:block { display: block; }
+  .hex-header .sm\:inline { display: inline; }
+  .hex-header .sm\:hidden { display: none; }
+}
+@media (min-width: 768px) {
+  .hex-header .md\:flex { display: flex; }
+  .hex-header .md\:inline { display: inline; }
+  .hex-header .md\:hidden { display: none; }
+}
+@media (min-width: 1024px) {
+  .hex-header .lg\:flex { display: flex; }
+  .hex-header .lg\:block { display: block; }
+}
+
+/* Space-dependent items (F-32): the search icon replaces the search box below 1536px; the Live pill
+   (below 1536px) and the profile name (below 1280px) hide where they would squeeze the breadcrumb out. */
+@media (min-width: 1536px) {
+  .hex-header .hex-header__search-btn { display: none; }
+}
+@media (max-width: 1535px) {
+  .hex-header .hex-header__live { display: none; }
+}
+@media (max-width: 1279px) {
+  .hex-header .hex-header__profile-meta { display: none; }
 }
 
 /* Legacy class aliases */

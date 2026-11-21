@@ -17,7 +17,9 @@ import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { isValidCardLast4, sanitizeCardLast4Input } from "@/lib/card-last4";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { checkoutRequestKey, clearCheckoutRequestKey } from "@/lib/pos-checkout-key";
 
 type CreditCustomer = {
   id: string; code?: string | null; firstName: string; lastName?: string | null;
@@ -79,6 +81,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("CASH");
   const [payChequeNumber, setPayChequeNumber] = useState("");
+  const [payCardLast4, setPayCardLast4] = useState("");
   const [payChequeBank, setPayChequeBank] = useState("");
   const [payChequeDue, setPayChequeDue] = useState("");
   const [payFromWallet, setPayFromWallet] = useState(false);
@@ -151,6 +154,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
     setPayAmount(c.creditBalance > 0 ? String(c.creditBalance) : "");
     setPayMethod("CASH");
     setPayChequeNumber("");
+    setPayCardLast4("");
     setPayChequeBank("");
     setPayChequeDue("");
     setPayFromWallet(false);
@@ -168,14 +172,13 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       toast.error("Cheque number is required");
       return;
     }
+    if (!payFromWallet && payMethod === "CARD" && !isValidCardLast4(payCardLast4)) {
+      toast.error("Enter the last 4 digits of the card");
+      return;
+    }
     setPayBusy(true);
     try {
-      const res = await api.post<{
-        appliedToCredit?: number;
-        advanceToWallet?: number;
-        creditBalance?: number;
-        walletBalance?: number;
-      }>(`/customers/${payCustomer.id}/credit/payment`, {
+      const request = {
         amount: amt,
         description: payFromWallet ? "Credit settled from wallet advance" : "Credit payment received",
         paymentMethod: payFromWallet ? "WALLET" : payMethod,
@@ -187,7 +190,20 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
               chequeDueDate: payChequeDue || undefined,
             }
           : {}),
+        ...(!payFromWallet && payMethod === "CARD" ? { cardLast4: payCardLast4.trim() } : {}),
+      };
+      const requestSlot = `customer-payment:${payCustomer.id}` as const;
+      const clientRequestId = checkoutRequestKey(JSON.stringify(request), requestSlot);
+      const res = await api.post<{
+        appliedToCredit?: number;
+        advanceToWallet?: number;
+        creditBalance?: number;
+        walletBalance?: number;
+      }>(`/customers/${payCustomer.id}/credit/payment`, {
+        ...request,
+        clientRequestId,
       });
+      clearCheckoutRequestKey(requestSlot);
       const applied = res.data?.appliedToCredit ?? amt;
       const advance = res.data?.advanceToWallet ?? 0;
       if (advance > 0) {
@@ -693,6 +709,23 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                     <option value="UPI">UPI</option>
                     <option value="CHEQUE">Cheque</option>
                   </select>
+                </div>
+              )}
+              {!payFromWallet && payMethod === "CARD" && (
+                <div className="space-y-1">
+                  <label htmlFor="credit-card-last4" className="text-xs font-semibold">Card last 4 digits *</label>
+                  <Input
+                    id="credit-card-last4"
+                    className="h-9 font-mono tracking-widest"
+                    value={payCardLast4}
+                    onChange={(e) => setPayCardLast4(sanitizeCardLast4Input(e.target.value))}
+                    inputMode="numeric"
+                    maxLength={4}
+                    required
+                    autoComplete="off"
+                    placeholder="1234"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Only the last 4 digits are kept. Never enter the full card number or CVV.</p>
                 </div>
               )}
               {!payFromWallet && payMethod === "CHEQUE" && (

@@ -60,7 +60,7 @@ export function receiptThemeStyleBlock(opts: {
     opts.fontSize === "small" ? "11px" : opts.fontSize === "large" ? "14px" : "12.5px";
   return `*{margin:0;padding:0;box-sizing:border-box}
 html,body{background:${c.bg}!important;color:${c.fg}!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'Courier New',Courier,monospace;font-size:${fs};line-height:1.35;padding:4mm 3.5mm;max-width:${pw};margin:0 auto;letter-spacing:0}
+body{font-family:'Nirmala UI','Noto Sans Sinhala','Courier New',Courier,monospace;font-size:${fs};line-height:1.35;padding:4mm 3.5mm;max-width:${pw};margin:0 auto;letter-spacing:0}
 .hdr{text-align:center;margin-bottom:2px}
 .logo{max-width:72px;max-height:48px;display:block;margin:0 auto 6px;object-fit:contain}
 .shop,.hdr h1,h1{font-size:1.35em;font-weight:900;text-align:center;letter-spacing:0.04em;text-transform:uppercase;color:${c.fg};line-height:1.2;margin:0}

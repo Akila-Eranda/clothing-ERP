@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { hasCustomerWhatsappConsent } from "@/lib/customer-whatsapp-consent";
 
 export interface Customer {
   id: string; code: string;
@@ -22,6 +23,7 @@ export interface Customer {
   creditLimit: number; creditBalance: number; creditDays?: number;
   totalSpent: number; totalOrders: number;
   isActive: boolean; referralCode?: string | null;
+  metadata?: unknown;
   notes?: string | null; tags: string[];
   createdAt: string; updatedAt: string;
   lastPurchaseAt?: string | null;
@@ -34,6 +36,7 @@ interface Form {
   gender: string; dateOfBirth: string; anniversary: string;
   address: string; city: string; notes: string;
   tags: string[]; tagInput: string; creditLimit: string;
+  whatsappConsent: boolean;
   payMode: PayMode; customDays: string; salaryDate: string;
 }
 
@@ -41,6 +44,7 @@ const INIT: Form = {
   firstName: "", lastName: "", phone: "", email: "",
   gender: "", dateOfBirth: "", anniversary: "",
   address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "",
+  whatsappConsent: false,
   payMode: "7", customDays: "", salaryDate: "",
 };
 
@@ -104,6 +108,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         address: editCustomer.address ?? "", city: editCustomer.city ?? "",
         notes: editCustomer.notes ?? "", tags: editCustomer.tags ?? [], tagInput: "",
         creditLimit: editCustomer.creditLimit > 0 ? String(editCustomer.creditLimit) : "",
+        whatsappConsent: hasCustomerWhatsappConsent(editCustomer.metadata),
         payMode: pay.payMode, customDays: pay.customDays, salaryDate: "",
       });
     } else { setForm(INIT); }
@@ -143,6 +148,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         city: form.city || undefined,
         notes: form.notes || undefined,
         tags: form.tags,
+        whatsappConsent: form.whatsappConsent,
         creditDays,
         ...(creditLimit !== undefined ? { creditLimit } : { creditLimit: 0 }),
       };
@@ -197,6 +203,20 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
               <Input type="email" placeholder="akila@email.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
             </Field>
           </div>
+          <label className="flex items-start gap-2.5 rounded-lg border p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={form.whatsappConsent}
+              onChange={(e) => set("whatsappConsent", e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>
+              <span className="font-medium">WhatsApp payment notifications</span>
+              <span className="block text-xs text-muted-foreground">
+                Enable only after the customer explicitly opts in. Turn this off to revoke consent.
+              </span>
+            </span>
+          </label>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Gender">
               <Select value={form.gender} onValueChange={(v) => set("gender", v)}>

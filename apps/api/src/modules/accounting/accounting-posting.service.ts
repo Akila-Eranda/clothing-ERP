@@ -1,5 +1,6 @@
 /** Idempotent GL posting for commerce events (sales, GRN, AR/AP, expenses, returns, repairs). */
 
+import { allocateRefundByTender, refundTenders, splitProportional } from '@/shared/refund-allocation.helper';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   CashMovementType,
@@ -49,6 +50,12 @@ export type ResolvedAccounts = {
   vatInput: string;
   wallet: string;
   gift: string;
+  /** 5610 Customer Goodwill Credits (falls back to operating expenses). */
+  goodwill: string;
+  /** QR fee deducted by the bank: mapping PAYMENT_CHARGES → 5620 Bank & QR Payment Charges (EXPENSE; falls back to operating expenses). */
+  paymentCharges: string;
+  /** 1250 Supplier Advances (falls back to accounts payable, i.e. netted). */
+  supplierAdvance: string;
   cogs: string;
   cogsAccessory: string;
   cogsRepair: string;
@@ -150,6 +157,9 @@ export class AccountingPostingService {
       vatInput: mapOr('VAT_INPUT') ?? inventory,
       wallet: pickCodes('2400') ?? ar,
       gift: pickCodes('2410', '2400') ?? sales,
+      goodwill: pickCodes('5610') ?? expense,
+      paymentCharges: mapOr('PAYMENT_CHARGES') ?? expense,
+      supplierAdvance: pickCodes('1250') ?? ap,
       cogs,
       cogsAccessory: mapOr('COGS_ACCESSORY') ?? cogs,
       cogsRepair: mapOr('COGS_REPAIR') ?? cogs,
@@ -298,8 +308,11 @@ export class AccountingPostingService {
       case 'CARD':
         return accounts.card;
       case 'UPI':
-      case 'WALLET':
         return accounts.upi;
+      // WALLET is the customer's prepaid wallet: it is redeemed from (and refunded to) the customer
+      // advance liability that receiving an advance credits, not a payment-clearing account.
+      case 'WALLET':
+        return accounts.wallet;
       case 'BANK_TRANSFER':
       case 'QR':
         return accounts.bank;
@@ -401,7 +414,8 @@ export class AccountingPostingService {
       tenderTotals.set(key, round2((tenderTotals.get(key) ?? 0) + p.amount));
     }
 
-    let changeLeft = round2(sale.changeDue ?? 0);
+    const changeSavedToWallet = round2(Math.max(0, sale.changeSavedToWallet ?? 0));
+    let changeLeft = round2(Math.max(0, (sale.changeDue ?? 0) - changeSavedToWallet));
     if (changeLeft > 0.009) {
       const order = [accounts.cash, accounts.card, accounts.upi, accounts.bank, accounts.chequeRecv, accounts.wallet, accounts.gift];
       for (const acct of order) {
@@ -422,8 +436,9 @@ export class AccountingPostingService {
 
     let debitTotal = round2([...tenderTotals.values()].reduce((s, n) => s + n, 0));
     const target = round2(sale.total);
-    if (debitTotal > target + 0.05) {
-      const excess = round2(debitTotal - target);
+    const targetWithSavedChange = round2(target + Math.max(0, sale.changeSavedToWallet ?? 0));
+    if (debitTotal > targetWithSavedChange + 0.05) {
+      const excess = round2(debitTotal - targetWithSavedChange);
       let biggestKey = accounts.cash;
       let biggestAmt = 0;
       for (const [k, v] of tenderTotals) {
@@ -433,7 +448,16 @@ export class AccountingPostingService {
         }
       }
       tenderTotals.set(biggestKey, round2(Math.max(0, biggestAmt - excess)));
-      debitTotal = target;
+      debitTotal = targetWithSavedChange;
+    }
+
+    if (changeSavedToWallet > 0.009) {
+      lines.push({
+        accountId: accounts.wallet,
+        side: 'CREDIT',
+        amount: changeSavedToWallet,
+        description: 'Change saved to customer wallet',
+      });
     }
 
     for (const [accountId, amount] of tenderTotals) {
@@ -463,8 +487,8 @@ export class AccountingPostingService {
       goodsNet = round2(goodsNet + Math.max(0, lineNet));
     }
 
-    const tax = round2(Math.min(sale.taxAmount ?? 0, debitTotal));
-    const netSales = round2(Math.max(0, debitTotal - tax));
+    const tax = round2(Math.min(sale.taxAmount ?? 0, Math.max(0, debitTotal - changeSavedToWallet)));
+    const netSales = round2(Math.max(0, debitTotal - changeSavedToWallet - tax));
     if (goodsNet > 0.009 && Math.abs(goodsNet - netSales) > 0.05) {
       // Scale revenue lines to match tender net
       const scale = netSales / goodsNet;
@@ -510,6 +534,18 @@ export class AccountingPostingService {
       lines.push({ accountId: row.inv, side: 'CREDIT', amount: row.amount, description: 'Inventory' });
     }
 
+    // QR fee deducted by the bank (Option A): the tender above debited the bank with the gross QR amount; the bank
+    // keeps the fee, so it receives only the net. Booked as its own balanced pair (Dr payment charges / Cr bank)
+    // using the fee STORED on the payment, so revenue, AR and every line above (and sales without a fee) are
+    // exactly as before, and a settings change never alters it.
+    for (const p of sale.payments) {
+      const fee = round2(p.feeAmount ?? 0);
+      if (String(p.method).toUpperCase() !== 'QR' || fee <= 0.009) continue;
+      const bankAcct = (p.bankAccountId && bankGlById.get(p.bankAccountId)) || this.tenderAccount(accounts, p.method);
+      lines.push({ accountId: accounts.paymentCharges, side: 'DEBIT', amount: fee, description: 'QR fee deducted by the bank' });
+      lines.push({ accountId: bankAcct, side: 'CREDIT', amount: fee, description: 'QR fee deducted by the bank' });
+    }
+
     return this.post(tenantId, sale.branchId, userId, {
       description: `POS sale ${sale.invoiceNumber}`,
       date: sale.createdAt,
@@ -543,26 +579,131 @@ export class AccountingPostingService {
     if (!baseAccounts) return null;
     const accounts = this.withCashAccount(baseAccounts, await this.cashInCashierWallet(tenantId, ret.id));
 
-    const total = round2(ret.refundAmount > 0 ? ret.refundAmount : ret.totalAmount);
-    if (total <= 0.009) return null;
-
-    // Estimate tax portion ~18% inclusive if original sale had tax
+    const lines: GlLine[] = [];
+    // Tax portion estimated from the original sale's tax ratio (returned and exchanged goods alike).
     const saleTax = ret.originalSale?.taxAmount ?? 0;
-    const saleTotal = ret.originalSale?.total ?? total;
-    const taxRatio = saleTotal > 0 ? Math.min(1, saleTax / saleTotal) : 0;
-    const tax = round2(total * taxRatio);
-    const net = round2(total - tax);
+    const saleTotalForTax = ret.originalSale?.total ?? 0;
+    const taxRatio = saleTotalForTax > 0 ? Math.min(1, saleTax / saleTotalForTax) : 0;
+    const splitTax = (gross: number) => {
+      let tax = round2(gross * taxRatio);
+      let net = round2(gross - tax);
+      if (net <= 0.009) {
+        net = round2(gross);
+        tax = 0;
+      }
+      return { net, tax };
+    };
 
-    const refundMethod = ret.originalSale?.payments?.[0]?.method ?? PaymentMethod.CASH;
-    const refundAcct = this.tenderAccount(accounts, refundMethod);
+    // QR / bank shares go back to the bank GL the sale was paid into (as postSale debited it).
+    const payments = ret.originalSale?.payments ?? [];
+    const bankIds = [...new Set(payments.map((p) => p.bankAccountId).filter((id): id is string => Boolean(id)))];
+    const bankGl = new Map<string, string>();
+    const loadBankGl = async (ids: string[]) => {
+      const need = ids.filter((id) => !bankGl.has(id));
+      if (!need.length) return;
+      for (const b of await this.prisma.bankAccount.findMany({ where: { tenantId, id: { in: need } }, select: { id: true, glAccountId: true } })) {
+        if (b.glAccountId) bankGl.set(b.id, b.glAccountId);
+      }
+    };
+    await loadBankGl(bankIds);
 
-    const lines: GlLine[] = [
-      { accountId: accounts.salesReturns, side: 'DEBIT', amount: net > 0.009 ? net : total, description: 'Sales return' },
-    ];
-    if (tax > 0.009) {
-      lines.push({ accountId: accounts.vatPayable, side: 'DEBIT', amount: tax, description: 'VAT reverse' });
+    /** Credits a refund back to the tenders of the original sale (same split as the till used). */
+    const pushRefundCredits = async (amount: number) => {
+      const refundParts = ret.originalSale
+        ? allocateRefundByTender(refundTenders(ret.originalSale), ret.originalSale.changeDue ?? 0, amount)
+        : [{ method: PaymentMethod.CASH, amount }];
+      // Paid-off customer credit was returned as store credit in the customer's wallet (returns module).
+      const storeCredit = round2(
+        (await this.prisma.walletTransaction.aggregate({
+          where: { tenantId, referenceId: ret.id, type: 'RETURN_CREDIT' },
+          _sum: { amount: true },
+        }))._sum.amount ?? 0,
+      );
+      for (const part of refundParts) {
+        const method = String(part.method).toUpperCase();
+        const fallback = this.tenderAccount(accounts, part.method);
+        if (method === 'QR' || method === 'BANK_TRANSFER') {
+          const split = splitProportional(
+            part.amount,
+            payments
+              .filter((p) => String(p.method).toUpperCase() === method && p.amount > 0)
+              .map((p) => ({ key: (p.bankAccountId && bankGl.get(p.bankAccountId)) || fallback, weight: p.amount })),
+          );
+          for (const x of split.length ? split : [{ key: fallback, amount: part.amount }]) {
+            lines.push({ accountId: x.key, side: 'CREDIT', amount: x.amount, description: `Refund · ${method}` });
+          }
+        } else if (method === 'CUSTOMER_CREDIT' && storeCredit > 0.009) {
+          const toWallet = round2(Math.min(storeCredit, part.amount));
+          lines.push({ accountId: accounts.wallet, side: 'CREDIT', amount: toWallet, description: 'Refund · store credit' });
+          lines.push({ accountId: fallback, side: 'CREDIT', amount: round2(part.amount - toWallet), description: `Refund · ${method}` });
+        } else {
+          lines.push({ accountId: fallback, side: 'CREDIT', amount: part.amount, description: `Refund · ${method}` });
+        }
+      }
+    };
+
+    const settlement = (ret.returnType === 'EXCHANGE' ? ret.exchangeSettlement : null) as
+      | { returned: number; issued: number; due: number; excess: number; excessAs: 'REFUND' | 'STORE_CREDIT' | null;
+          collected: { method: string; amount: number; bankAccountId?: string }[] }
+      | null;
+
+    if (settlement) {
+      // Exchange = return + new sale. Dr returns for the goods taken back, Cr sales for the goods issued;
+      // the difference is money in (collected tenders) or money out (refund / store credit). An equal
+      // exchange has no money line at all. Goods issued also post COGS / inventory (below).
+      const back = splitTax(settlement.returned);
+      lines.push({ accountId: accounts.salesReturns, side: 'DEBIT', amount: back.net, description: 'Exchange · goods returned' });
+      if (back.tax > 0.009) lines.push({ accountId: accounts.vatPayable, side: 'DEBIT', amount: back.tax, description: 'VAT reverse' });
+      const out = splitTax(settlement.issued);
+      lines.push({ accountId: accounts.sales, side: 'CREDIT', amount: out.net, description: 'Exchange · goods issued' });
+      if (out.tax > 0.009) lines.push({ accountId: accounts.vatPayable, side: 'CREDIT', amount: out.tax, description: 'Output VAT' });
+      if (settlement.due > 0.009) {
+        await loadBankGl(settlement.collected.map((c) => c.bankAccountId).filter((id): id is string => Boolean(id)));
+        for (const c of settlement.collected) {
+          const acct = (c.bankAccountId && bankGl.get(c.bankAccountId)) || this.tenderAccount(accounts, c.method);
+          lines.push({ accountId: acct, side: 'DEBIT', amount: round2(c.amount), description: `Exchange difference · ${c.method}` });
+        }
+      }
+      if (settlement.excess > 0.009) {
+        if (settlement.excessAs === 'STORE_CREDIT') {
+          lines.push({ accountId: accounts.wallet, side: 'CREDIT', amount: round2(settlement.excess), description: 'Exchange · store credit' });
+        } else {
+          await pushRefundCredits(round2(settlement.excess));
+        }
+      }
+      // Goods issued leave inventory at cost.
+      const issuedItems = Array.isArray(ret.exchangeData) ? (ret.exchangeData as { variantId?: string; quantity?: number }[]) : [];
+      const ids = issuedItems.map((i) => i.variantId).filter((id): id is string => Boolean(id));
+      if (ids.length) {
+        const variants = await this.prisma.productVariant.findMany({
+          where: { id: { in: ids }, product: { tenantId } },
+          select: { id: true, costPrice: true, product: { select: { name: true, tags: true, costPrice: true, category: { select: { name: true } } } } },
+        });
+        const byId = new Map(variants.map((v) => [v.id, v]));
+        for (const it of issuedItems) {
+          const v = it.variantId ? byId.get(it.variantId) : undefined;
+          if (!v || !(Number(it.quantity) > 0)) continue;
+          const kind = classifyInventoryKind({ categoryName: v.product?.category?.name, productName: v.product?.name, tags: v.product?.tags });
+          if (kind === 'service' || kind === 'reload') continue;
+          const amt = round2((v.costPrice ?? v.product?.costPrice ?? 0) * Number(it.quantity));
+          if (amt <= 0.009) continue;
+          lines.push({ accountId: this.cogsAccount(accounts, kind), side: 'DEBIT', amount: amt, description: 'COGS · exchange goods' });
+          lines.push({ accountId: this.inventoryAccount(accounts, kind), side: 'CREDIT', amount: amt, description: 'Inventory · exchange goods' });
+        }
+      }
+    } else {
+      // Plain return; an exchange recorded before settlements existed is posted net as it always was
+      // (only the refunded difference; an even exchange moves no money).
+      const total = round2(
+        ret.returnType === 'EXCHANGE' ? Math.max(0, ret.refundAmount) : ret.refundAmount > 0 ? ret.refundAmount : ret.totalAmount,
+      );
+      if (total > 0.009) {
+        const { net, tax } = splitTax(total);
+        lines.push({ accountId: accounts.salesReturns, side: 'DEBIT', amount: net, description: 'Sales return' });
+        if (tax > 0.009) lines.push({ accountId: accounts.vatPayable, side: 'DEBIT', amount: tax, description: 'VAT reverse' });
+        await pushRefundCredits(total);
+      }
     }
-    lines.push({ accountId: refundAcct, side: 'CREDIT', amount: total, description: 'Refund' });
 
     // Restore inventory / reverse COGS when restocking
     if (ret.restockItems) {
@@ -675,12 +816,29 @@ export class AccountingPostingService {
       return null;
     }
 
-    // If GRN already posted GL for this receipt, skip duplicate AP
+    // A linked invoice must never win a race against the GRN journal. Serialize on the
+    // GRN source reference, then defer invoice posting when the GRN has not posted yet.
+    // The GRN outbox event remains the sole accounting source for received stock.
     if (inv.goodsReceiptId) {
-      const grnJe = await this.alreadyPosted(tenantId, 'GRN', inv.goodsReceiptId);
+      const grnJe = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(
+            hashtextextended(${`${tenantId}:GRN:${inv.goodsReceiptId}`}, 0)
+          )`;
+        return tx.journalEntry.findFirst({
+          where: {
+            tenantId,
+            referenceType: 'GRN',
+            referenceId: inv.goodsReceiptId,
+            status: { not: 'VOID' },
+          },
+          select: { id: true, entryNumber: true },
+        });
+      });
       if (grnJe) {
         return { skipped: true as const, journalId: grnJe.id, entryNumber: grnJe.entryNumber };
       }
+      return { skipped: true as const };
     }
 
     const accounts = await this.resolveAccounts(tenantId);
@@ -900,6 +1058,7 @@ export class AccountingPostingService {
 
     const amount = round2(payment.amount);
     if (amount <= 0.009) return null;
+    const advance = Math.min(amount, round2(payment.advanceAmount ?? 0));
 
     const creditAcct = this.paymentCreditAccount(accounts, payment.method);
 
@@ -909,8 +1068,79 @@ export class AccountingPostingService {
       referenceType: 'SUPPLIER_PAYMENT',
       referenceId: payment.id,
       lines: [
-        { accountId: accounts.ap, side: 'DEBIT', amount, description: 'Clear AP' },
+        // Part of the payment that exceeded what was payable is kept as a supplier advance (asset 1250).
+        ...(advance > 0.009
+          ? [{ accountId: accounts.supplierAdvance, side: 'DEBIT' as const, amount: advance, description: 'Supplier advance' }]
+          : []),
+        ...(amount - advance > 0.009
+          ? [{ accountId: accounts.ap, side: 'DEBIT' as const, amount: round2(amount - advance), description: 'Clear AP' }]
+          : []),
         { accountId: creditAcct, side: 'CREDIT', amount, description: 'Payment' },
+      ],
+    });
+  }
+
+  /**
+   * An advance applied to bills: Dr Accounts Payable / Cr Supplier Advances. No cash or bank moves.
+   * One journal per application request (batch); posting twice for the same batch is a no-op (see `post`).
+   */
+  async postSupplierAdvanceApplied(batchId: string, tenantId: string, userId = 'system') {
+    const rows = await this.prisma.supplierAdvanceEntry.findMany({ where: { tenantId, batchId, type: 'APPLIED' }, orderBy: { createdAt: 'asc' } });
+    if (!rows.length) return null;
+    const accounts = await this.resolveAccounts(tenantId);
+    if (!accounts) return null;
+    const amount = round2(rows.reduce((s, r) => s + Math.abs(r.amount), 0));
+    if (amount <= 0.009) return null;
+    return this.post(tenantId, null, userId, {
+      description: `Supplier advance applied (${rows.length} bill${rows.length > 1 ? 's' : ''})`,
+      date: rows[0].createdAt,
+      referenceType: 'SUPPLIER_ADVANCE_APPLIED',
+      referenceId: batchId,
+      lines: [
+        { accountId: accounts.ap, side: 'DEBIT', amount, description: 'Clear AP from advance' },
+        { accountId: accounts.supplierAdvance, side: 'CREDIT', amount, description: 'Use supplier advance' },
+      ],
+    });
+  }
+
+  // ── Manual wallet top-up / goodwill credit ───────────────────────────
+
+  /**
+   * TOPUP (funded): Dr the tender actually received (cash — the cashier wallet when it went into a drawer —
+   * card clearing, or the bank the QR / transfer was paid into) / Cr 2400 Customer Wallet Advances.
+   * GOODWILL_CREDIT: Dr 5610 Customer Goodwill Credits / Cr 2400 — a cost to the shop, never cash.
+   * Top-ups recorded before the payment method existed (paymentMethod NULL) are not posted: they belong to
+   * the reconciliation (docs/ops-sql/wallet-2400-reconciliation.sql).
+   */
+  async postWalletTopUp(walletTxnId: string, tenantId: string, userId = 'system') {
+    const txn = await this.prisma.walletTransaction.findFirst({ where: { id: walletTxnId, tenantId } });
+    if (!txn || !(txn.amount > 0)) return null;
+    if (txn.type !== 'TOPUP' && txn.type !== 'GOODWILL_CREDIT') return null;
+    if (txn.type === 'TOPUP' && !txn.paymentMethod) return null;
+
+    const base = await this.resolveAccounts(tenantId);
+    if (!base) return null;
+    const amount = round2(txn.amount);
+    let debit: string;
+    if (txn.type === 'GOODWILL_CREDIT') {
+      debit = base.goodwill;
+    } else {
+      const method = String(txn.paymentMethod).toUpperCase();
+      const accounts = method === 'CASH' ? this.withCashAccount(base, await this.cashInCashierWallet(tenantId, txn.id)) : base;
+      debit = this.tenderAccount(accounts, method);
+      if ((method === 'QR' || method === 'BANK_TRANSFER') && txn.referenceId) {
+        const bank = await this.prisma.bankAccount.findFirst({ where: { tenantId, id: txn.referenceId }, select: { glAccountId: true } });
+        if (bank?.glAccountId) debit = bank.glAccountId;
+      }
+    }
+    return this.post(tenantId, null, userId, {
+      description: txn.type === 'GOODWILL_CREDIT' ? 'Goodwill wallet credit' : `Wallet top-up · ${txn.paymentMethod}`,
+      date: txn.createdAt,
+      referenceType: 'WALLET_TOPUP',
+      referenceId: txn.id,
+      lines: [
+        { accountId: debit, side: 'DEBIT', amount, description: txn.type === 'GOODWILL_CREDIT' ? 'Goodwill credit' : 'Top-up received' },
+        { accountId: base.wallet, side: 'CREDIT', amount, description: 'Customer wallet advance' },
       ],
     });
   }

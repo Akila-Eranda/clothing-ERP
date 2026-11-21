@@ -15,7 +15,9 @@ export type OutboxSourceType =
   | 'CUSTOMER_CREDIT_PAYMENT'
   | 'EXPENSE'
   | 'REPAIR'
-  | 'CASH_WALLET_CLEAR';
+  | 'CASH_WALLET_CLEAR'
+  | 'WALLET_TOPUP'
+  | 'SUPPLIER_ADVANCE_APPLIED';
 
 @Injectable()
 export class AccountingOutboxService {
@@ -148,13 +150,23 @@ export class AccountingOutboxService {
     if (!ev) throw new NotFoundException('Outbox event not found');
     if (ev.status === AccountingOutboxStatus.POSTED) return ev;
 
-    await this.prisma.accountingOutboxEvent.update({
-      where: { id: eventId },
+    // Claim atomically so concurrent workers cannot dispatch the same event twice.
+    const claimed = await this.prisma.accountingOutboxEvent.updateMany({
+      where: {
+        id: eventId,
+        tenantId,
+        status: { in: [AccountingOutboxStatus.PENDING, AccountingOutboxStatus.FAILED] },
+      },
       data: {
         status: AccountingOutboxStatus.PROCESSING,
         attempts: { increment: 1 },
       },
     });
+    if (claimed.count !== 1) {
+      return this.prisma.accountingOutboxEvent.findFirstOrThrow({
+        where: { id: eventId, tenantId },
+      });
+    }
 
     try {
       const result = await this.dispatch(ev.sourceType as OutboxSourceType, ev.sourceId, tenantId, ev.payload);
@@ -218,6 +230,10 @@ export class AccountingOutboxService {
         return this.posting.postExpense(sourceId, tenantId, String(p.userId ?? 'system'));
       case 'REPAIR':
         return this.posting.postRepair(sourceId, tenantId, String(p.userId ?? 'system'));
+      case 'WALLET_TOPUP':
+        return this.posting.postWalletTopUp(sourceId, tenantId, String(p.userId ?? 'system'));
+      case 'SUPPLIER_ADVANCE_APPLIED':
+        return this.posting.postSupplierAdvanceApplied(sourceId, tenantId, String(p.userId ?? 'system'));
       case 'CASH_WALLET_CLEAR':
         return this.posting.postCashierWalletClear(sourceId, tenantId, String(p.userId ?? 'system'));
       case 'CUSTOMER_CREDIT_PAYMENT':

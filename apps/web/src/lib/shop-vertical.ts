@@ -1,6 +1,6 @@
 /** Per-vertical config — labels, reasons, routes (design stays the same) */
 
-import { ShopType, getShopProfile, variantAttrsFromProfile, defaultHasVariants, type ShopProfile } from '@/lib/shop-profiles';
+import { ShopType, getShopProfile, variantAttrsFromProfile, defaultHasVariants, newItemDefaultUnit, type ShopProfile } from '@/lib/shop-profiles';
 import { getWorkspace, type WorkspaceConfig } from '@/lib/shop-workspace';
 
 export function hasShopModule(profile: ShopProfile, mod: keyof ShopProfile['modules']): boolean {
@@ -285,7 +285,7 @@ export function buildProductFormDefaults(type: ShopType | string | null | undefi
   return {
     hasVariants: defaultHasVariants(profile.type),
     attributes: variantAttrsFromProfile(profile.type),
-    unit: profile.defaultUnit,
+    unit: newItemDefaultUnit(profile),
   };
 }
 

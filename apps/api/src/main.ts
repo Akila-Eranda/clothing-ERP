@@ -51,6 +51,7 @@ async function bootstrap(): Promise<void> {
       'x-branch-id',
       'x-request-id',
       'x-pos-cashier-token',
+      'x-cash-approval-token',
       'x-pos-counter-id',
     ],
   });

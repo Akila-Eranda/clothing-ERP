@@ -1,3 +1,4 @@
+import { textSearch } from '@/shared/search.helper';
 import {
   BadRequestException,
   Injectable,
@@ -157,6 +158,7 @@ export class JournalEntriesService {
       limit?: number;
       status?: JournalEntryStatus;
       q?: string;
+      search?: string;
       startDate?: string;
       endDate?: string;
     },
@@ -165,15 +167,7 @@ export class JournalEntriesService {
     const where: Prisma.JournalEntryWhereInput = {
       tenantId,
       ...(query.status ? { status: query.status } : {}),
-      ...(query.q?.trim()
-        ? {
-            OR: [
-              { entryNumber: { contains: query.q.trim(), mode: 'insensitive' } },
-              { description: { contains: query.q.trim(), mode: 'insensitive' } },
-              { referenceId: { contains: query.q.trim(), mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...textSearch(query.q ?? query.search, ['entryNumber', 'description', 'referenceId']),
       ...(query.startDate || query.endDate
         ? {
             date: {
@@ -224,6 +218,7 @@ export class JournalEntriesService {
     userId: string,
     roles: string[],
     dto: CreateJournalPayload,
+    transaction?: Prisma.TransactionClient,
   ) {
     const glLines = normalizeJournalLines(dto);
     assertDebitEqualsCredit(glLines);
@@ -268,7 +263,24 @@ export class JournalEntriesService {
 
     const date = new Date(dto.date);
 
-    const entry = await this.prisma.$transaction(async (tx) => {
+    const createEntry = async (tx: Prisma.TransactionClient) => {
+      // Serialize source-reference creation so concurrent outbox retries cannot create two journals.
+      if (dto.referenceType && dto.referenceId) {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(
+            hashtextextended(${`${tenantId}:${dto.referenceType}:${dto.referenceId}`}, 0)
+          )`;
+        const existing = await tx.journalEntry.findFirst({
+          where: {
+            tenantId,
+            referenceType: dto.referenceType,
+            referenceId: dto.referenceId,
+            status: { not: JournalEntryStatus.VOID },
+          },
+          include: { lines: { include: this.lineInclude } },
+        });
+        if (existing) return existing;
+      }
       await this.assertAccountsActive(tx, tenantId, glLines);
       const entryNumber = await this.allocateEntryNumber(tx, tenantId, date);
 
@@ -297,15 +309,29 @@ export class JournalEntriesService {
       }
 
       return created;
-    });
+    };
+    const entry = transaction
+      ? await createEntry(transaction)
+      : await this.prisma.$transaction(createEntry);
 
+    if (!transaction) {
+      await this.auditCreatedEntry(tenantId, userId, entry, action);
+    }
+
+    return entry;
+  }
+
+  async auditCreatedEntry(
+    tenantId: string,
+    userId: string,
+    entry: { id: string; entryNumber: string; status: JournalEntryStatus; description: string },
+    action: CreateJournalPayload['action'] = 'POST',
+  ) {
     await this.auditJournal(tenantId, userId, `journal.${action.toLowerCase()}`, entry.id, {
       entryNumber: entry.entryNumber,
       status: entry.status,
       description: entry.description,
     });
-
-    return entry;
   }
 
   async update(tenantId: string, userId: string, id: string, dto: UpdateJournalPayload) {

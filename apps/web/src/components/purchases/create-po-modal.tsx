@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useSubmitKey } from "@/lib/submit-key";
+import { parseQty } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
+import { withExactStock } from "@/lib/exact-stock";
 
 interface Supplier { id: string; name: string; contactPerson?: string | null; phone: string; }
 interface VariantOpt {
@@ -49,13 +52,15 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
   const [chequeDueDate, setChequeDueDate]     = useState("");
   const [chequeBankName, setChequeBankName]   = useState("");
 
+  const submitKey = useSubmitKey();
   useEffect(() => {
     if (!open) return;
+    submitKey.reset(); // a new purchase order
     api.get<{ data: Supplier[] }>("/suppliers?limit=200")
       .then((r) => setSuppliers(parseApiList<Supplier>(r.data)))
       .catch(() => {});
     api.get<VariantOpt[]>("/pos/products?limit=2000")
-      .then((r) => setAllVariants(parsePosProducts<VariantOpt>(r)))
+      .then((r) => setAllVariants(parsePosProducts<VariantOpt>(r).map(withExactStock))) // exact stock, negative included
       .catch(() => {});
   }, [open]);
 
@@ -160,7 +165,9 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
               },
             }
           : {}),
+        clientRequestId: submitKey.current(), // same key on retry: no second PO
       });
+      submitKey.reset();
       toast.success(payNow ? "Purchase order created · supplier paid" : "Purchase order created");
       onCreated(); onClose();
     } catch (e: unknown) {
@@ -230,7 +237,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
               <div className="p-3 border-b shrink-0">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input placeholder="Search products…" className="pl-8 h-8 text-xs"
+                  <Input placeholder="Search products…" aria-label="Search products" className="pl-8 h-8 text-xs"
                     value={productSearch} onChange={(e) => { setProductSearch(e.target.value); setSelectedProduct(null); }} />
                 </div>
               </div>
@@ -339,8 +346,8 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                           </td>
                           <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">{item.sku}</td>
                           <td className="px-2 py-1.5">
-                            <Input type="number" min={1} value={item.orderedQty} className="h-6 text-xs px-1.5 w-14"
-                              onChange={(e) => updateItem(idx, "orderedQty", parseInt(e.target.value) || 1)} />
+                            <Input type="number" step="any" min={0.001} value={item.orderedQty} className="h-6 text-xs px-1.5 w-14"
+                              onChange={(e) => updateItem(idx, "orderedQty", parseQty(e.target.value, 1) || 1)} />
                           </td>
                           <td className="px-2 py-1.5">
                             <Input type="number" min={0} step={0.01} value={item.unitCost} className="h-6 text-xs px-1.5 w-20"

@@ -33,6 +33,7 @@ import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
 import { ReloadSettingsTab } from "@/components/settings/reload-settings-tab";
+import { BillMessageSettingsTab } from "@/components/settings/bill-message-settings-tab";
 import { parseApiList } from "@/lib/parse-api-list";
 import { PageHeader } from "@/components/ui/page-kpi";
 import { ERP_SELECT_CLASS, ERP_TOGGLE_ROW_CLASS } from "@/lib/design-tokens";
@@ -63,7 +64,7 @@ const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 const SETTINGS_TAB_VALUES = [
-  "general", "receipt", "whatsapp", "payslip", "reload", "profile", "security", "branches",
+  "general", "receipt", "whatsapp", "payslip", "reload", "bill-message", "profile", "security", "branches",
   "notifications", "appearance", "billing", "audit-log",
 ] as const;
 
@@ -426,9 +427,14 @@ export default function SettingsPage() {
     autoPrint: false,
     roundOff: true,
     loyalty: true,
+    saveChangeToWalletEnabled: false,
     posLayout: "classic" as PosLayoutId,
   });
   const [posSaving, setPosSaving] = React.useState(false);
+  const [maxFloatInput, setMaxFloatInput] = React.useState("");
+  const [qrFeeThresholdInput, setQrFeeThresholdInput] = React.useState("");
+  const [qrFeePercentInput, setQrFeePercentInput] = React.useState("");
+  const [scaleModeInput, setScaleModeInput] = React.useState<"AUTO" | "PRICE" | "WEIGHT">("AUTO");
 
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = React.useState(false);
@@ -458,13 +464,23 @@ export default function SettingsPage() {
       autoPrint?: boolean;
       roundOff?: boolean;
       loyalty?: boolean;
+      saveChangeToWalletEnabled?: boolean;
       posLayout?: PosLayoutId;
+      maxOpeningFloat?: number;
+      qrFeeThreshold?: number;
+      qrFeePercent?: number;
+      scaleBarcodeMode?: "AUTO" | "PRICE" | "WEIGHT";
     }>("/tenants/pos-settings").then((r) => {
+      if (r.data?.scaleBarcodeMode) setScaleModeInput(r.data.scaleBarcodeMode);
+      if (r.data?.maxOpeningFloat != null) setMaxFloatInput(String(r.data.maxOpeningFloat));
+      if (r.data?.qrFeeThreshold != null) setQrFeeThresholdInput(String(r.data.qrFeeThreshold));
+      if (r.data?.qrFeePercent != null) setQrFeePercentInput(String(r.data.qrFeePercent));
       setPosForm({
         allowNegativeStock: Boolean(r.data?.allowNegativeStock),
         autoPrint: Boolean(r.data?.autoPrint),
         roundOff: r.data?.roundOff !== false,
         loyalty: r.data?.loyalty !== false,
+        saveChangeToWalletEnabled: r.data?.saveChangeToWalletEnabled === true,
         posLayout: (r.data?.posLayout as PosLayoutId) || "classic",
       });
     }).catch(() => { /* optional */ });
@@ -618,6 +634,7 @@ export default function SettingsPage() {
             <TabsTrigger value="whatsapp" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><MessageCircle className="h-3.5 w-3.5" />WhatsApp</TabsTrigger>
             <TabsTrigger value="payslip" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
             <TabsTrigger value="reload" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Smartphone className="h-3.5 w-3.5" />Reload</TabsTrigger>
+            <TabsTrigger value="bill-message" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><MessageCircle className="h-3.5 w-3.5" />Bill message</TabsTrigger>
             <TabsTrigger value="profile" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
             <TabsTrigger value="security" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
             <TabsTrigger value="branches" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
@@ -734,10 +751,127 @@ export default function SettingsPage() {
                   {POS_LAYOUT_OPTIONS.find((o) => o.id === posForm.posLayout)?.description}
                 </p>
               </div>
+              <div className="space-y-2 pb-4 mb-1 border-b border-border">
+                <Label htmlFor="pos-max-float" className="text-sm font-medium">Maximum opening float (LKR)</Label>
+                <p className="text-xs text-muted-foreground">
+                  A cashier cannot start a new cash wallet with more than this amount (protects against mistyped floats).
+                  Counter handovers keep the existing drawer balance.
+                </p>
+                <div className="flex items-center gap-2 max-w-md">
+                  <Input
+                    id="pos-max-float"
+                    inputMode="decimal"
+                    value={maxFloatInput}
+                    disabled={posSaving}
+                    onChange={(e) => setMaxFloatInput(e.target.value.replace(/[^\d.]/g, ""))}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={posSaving}
+                    onClick={() => {
+                      const v = Number(maxFloatInput);
+                      if (!/^\d+(\.\d{1,2})?$/.test(maxFloatInput) || !(v >= 1)) { toast.error("Enter a positive amount (max 2 decimals)"); return; }
+                      setPosSaving(true);
+                      api.put<{ maxOpeningFloat?: number }>("/tenants/pos-settings", { maxOpeningFloat: v })
+                        .then((r) => { setMaxFloatInput(String(r.data?.maxOpeningFloat ?? v)); toast.success("Maximum opening float saved"); })
+                        .catch((e: unknown) => toast.error((e as Error).message || "Failed to save — admin permission required"))
+                        .finally(() => setPosSaving(false));
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 pb-4 mb-1 border-b border-border">
+                <p className="text-sm font-medium">QR payment fee</p>
+                <p className="text-xs text-muted-foreground">
+                  For a QR payment ABOVE the minimum amount, the bank deducts this percentage of the whole QR amount. The customer pays the bill
+                  amount (never more); the shop receives the net amount. The cashier sees the QR amount, fee and net before confirming. The fee is
+                  booked as a bank / payment charge expense. Changing these values only affects new sales. 0 % switches the fee off.
+                </p>
+                <div className="flex flex-wrap items-end gap-3 max-w-xl">
+                  <div className="space-y-1">
+                    <Label htmlFor="qr-fee-threshold" className="text-xs">Minimum amount (LKR)</Label>
+                    <Input id="qr-fee-threshold" inputMode="decimal" value={qrFeeThresholdInput} disabled={posSaving} className="w-40"
+                      onChange={(e) => setQrFeeThresholdInput(e.target.value.replace(/[^\d.]/g, ""))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qr-fee-percent" className="text-xs">Fee (%)</Label>
+                    <Input id="qr-fee-percent" inputMode="decimal" value={qrFeePercentInput} disabled={posSaving} className="w-28"
+                      onChange={(e) => setQrFeePercentInput(e.target.value.replace(/[^\d.]/g, ""))} />
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={posSaving}
+                    onClick={() => {
+                      const t = Number(qrFeeThresholdInput);
+                      const pct = Number(qrFeePercentInput);
+                      if (!/^\d+(\.\d{1,2})?$/.test(qrFeeThresholdInput) || !(t >= 0)) { toast.error("Enter the minimum amount (0 or more, max 2 decimals)"); return; }
+                      if (!/^\d+(\.\d{1,2})?$/.test(qrFeePercentInput) || !(pct >= 0) || pct > 20) { toast.error("Enter a fee between 0 and 20 % (max 2 decimals)"); return; }
+                      setPosSaving(true);
+                      api.put<{ qrFeeThreshold?: number; qrFeePercent?: number }>("/tenants/pos-settings", { qrFeeThreshold: t, qrFeePercent: pct })
+                        .then((r) => {
+                          setQrFeeThresholdInput(String(r.data?.qrFeeThreshold ?? t));
+                          setQrFeePercentInput(String(r.data?.qrFeePercent ?? pct));
+                          try { localStorage.removeItem("pos_tenant_settings_cache"); } catch { /* noop */ }
+                          notifyPosTenantSettingsUpdated();
+                          toast.success("QR fee settings saved");
+                        })
+                        .catch((e: unknown) => toast.error((e as Error).message || "Failed to save — admin permission required"))
+                        .finally(() => setPosSaving(false));
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 rounded-xl border border-border/60 p-4">
+                <p className="text-sm font-medium">Label scale barcode</p>
+                <p className="text-xs text-muted-foreground">
+                  How your label scale prints the 5-digit value in its EAN-13 labels (digits 8-12). &quot;Automatic&quot; keeps the original behaviour
+                  (a value of LKR 1.00 or more is read as a price, smaller as a weight). Choose the exact mode your scale uses to avoid mistakes
+                  with heavier weights. Changing it only affects new sales.
+                </p>
+                <div className="flex flex-wrap items-end gap-3 max-w-xl">
+                  <div className="space-y-1">
+                    <Label htmlFor="scale-barcode-mode" className="text-xs">Label contains</Label>
+                    <select
+                      id="scale-barcode-mode"
+                      value={scaleModeInput}
+                      disabled={posSaving}
+                      onChange={(e) => setScaleModeInput(e.target.value as "AUTO" | "PRICE" | "WEIGHT")}
+                      className="h-9 w-64 rounded-lg border border-input bg-card px-3 text-sm"
+                    >
+                      <option value="AUTO">Automatic (original behaviour)</option>
+                      <option value="PRICE">Price (in cents)</option>
+                      <option value="WEIGHT">Weight (in grams)</option>
+                    </select>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={posSaving}
+                    onClick={() => {
+                      setPosSaving(true);
+                      api.put<{ scaleBarcodeMode?: "AUTO" | "PRICE" | "WEIGHT" }>("/tenants/pos-settings", { scaleBarcodeMode: scaleModeInput })
+                        .then((r) => {
+                          setScaleModeInput(r.data?.scaleBarcodeMode ?? scaleModeInput);
+                          try { localStorage.removeItem("pos_tenant_settings_cache"); } catch { /* noop */ }
+                          notifyPosTenantSettingsUpdated();
+                          toast.success("Label scale setting saved");
+                        })
+                        .catch((e: unknown) => toast.error((e as Error).message || "Failed to save - admin permission required"))
+                        .finally(() => setPosSaving(false));
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
               {[
                 { key: "autoPrint" as const, label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout" },
                 { key: "roundOff" as const, label: "Round off totals", desc: "Round total amount to nearest unit" },
                 { key: "allowNegativeStock" as const, label: "Allow negative stock", desc: "Enable sales even when stock is 0 (inventory can go minus)" },
+                { key: "saveChangeToWalletEnabled" as const, label: "Allow saving change to customer wallet", desc: "Cashiers can save change only after selecting a customer and recording explicit consent" },
                 ...(showLoyalty ? [{ key: "loyalty" as const, label: "Loyalty points on every sale", desc: "Auto-apply loyalty program" }] : []),
               ].map((s) => (
                 <div key={s.key} className={ERP_TOGGLE_ROW_CLASS}>
@@ -1088,6 +1222,10 @@ export default function SettingsPage() {
 
         <TabsContent value="payslip">
           <PayslipSettingsTab receiptSettings={receiptForm} />
+        </TabsContent>
+
+        <TabsContent value="bill-message" className="mt-0">
+          <BillMessageSettingsTab />
         </TabsContent>
 
         <TabsContent value="reload" className="mt-0">

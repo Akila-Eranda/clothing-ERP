@@ -4,6 +4,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { ClothingService } from '@/modules/clothing/clothing.service';
 import { ReportsService } from './reports.service';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 
 @ApiTags('Reports')
 @ApiBearerAuth('access-token')
@@ -18,21 +19,30 @@ export class ReportsController {
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Generate sales report' })
   salesReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.salesReport(user.tenantId, start, end, branchId);
+    return this.reportsService.salesReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('inventory')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Generate inventory report' })
   inventoryReport(@CurrentUser() user: IAuthUser, @Query('branchId') branchId?: string) {
-    return this.reportsService.inventoryReport(user.tenantId, branchId);
+    return this.reportsService.inventoryReport(user.tenantId, resolveBranchScope(user, branchId));
   }
 
   @Get('stock-movement')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Stock movement report' })
-  stockMovementReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
-    return this.reportsService.stockMovementReport(user.tenantId, start, end);
+  stockMovementReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') start: string,
+    @Query('endDate') end: string,
+  ) {
+    return this.reportsService.stockMovementReport(
+      user.tenantId,
+      start,
+      end,
+      resolveBranchScope(user),
+    );
   }
 
   @Get('expiry')
@@ -45,7 +55,7 @@ export class ReportsController {
   ) {
     return this.reportsService.expiryReport(
       user.tenantId,
-      branchId || user.branchId || undefined,
+      resolveBranchScope(user, branchId),
       withinDays ? parseInt(withinDays, 10) : 90,
     );
   }
@@ -68,35 +78,35 @@ export class ReportsController {
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Tax/GST report' })
   taxReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.taxReport(user.tenantId, start, end, branchId);
+    return this.reportsService.taxReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('profit')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Profit report by product (revenue vs cost)' })
   profitReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.profitReport(user.tenantId, start, end, branchId);
+    return this.reportsService.profitReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('best-selling')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Best selling products by quantity' })
   bestSellingItems(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('limit') limit?: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.bestSellingItems(user.tenantId, start, end, limit ? parseInt(limit) : 20, branchId);
+    return this.reportsService.bestSellingItems(user.tenantId, start, end, limit ? parseInt(limit) : 20, resolveBranchScope(user, branchId));
   }
 
   @Get('cashier')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Sales performance by cashier' })
   cashierReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.cashierReport(user.tenantId, start, end, branchId);
+    return this.reportsService.cashierReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('branches')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Sales performance by branch' })
   branchReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
-    return this.reportsService.branchReport(user.tenantId, start, end);
+    return this.reportsService.branchReport(user.tenantId, start, end, resolveBranchScope(user));
   }
 
   @Get('purchases')
@@ -108,7 +118,7 @@ export class ReportsController {
     @Query('endDate') end: string,
     @Query('branchId') branchId?: string,
   ) {
-    return this.reportsService.purchaseReport(user.tenantId, start, end, branchId || user.branchId || undefined);
+    return this.reportsService.purchaseReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('cheques')
@@ -131,7 +141,7 @@ export class ReportsController {
     @Query('endDate') end: string,
     @Query('branchId') branchId?: string,
   ) {
-    return this.reportsService.commissionReport(user.tenantId, start, end, branchId || user.branchId || undefined);
+    return this.reportsService.commissionReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('supplier-performance')
@@ -157,14 +167,14 @@ export class ReportsController {
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Best selling tyre brands by revenue' })
   tyreBrandSales(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.tyreBrandSales(user.tenantId, start, end, branchId);
+    return this.reportsService.tyreBrandSales(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('service-revenue')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Workshop service revenue breakdown' })
   serviceRevenue(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
-    return this.reportsService.serviceRevenueReport(user.tenantId, start, end, branchId);
+    return this.reportsService.serviceRevenueReport(user.tenantId, start, end, resolveBranchScope(user, branchId));
   }
 
   @Get('technician-performance')
@@ -187,7 +197,7 @@ export class ReportsController {
       user.tenantId,
       from,
       to,
-      branchId || user.branchId || undefined,
+      resolveBranchScope(user, branchId),
     );
   }
 
@@ -212,7 +222,7 @@ export class ReportsController {
   ) {
     return this.clothingService.getReorderSuggestions(
       user.tenantId,
-      branchId || user.branchId || '',
+      resolveBranchScope(user, branchId) ?? '',
       {
         days: days ? parseInt(days, 10) : 30,
         productId,

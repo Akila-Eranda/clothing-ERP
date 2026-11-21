@@ -17,6 +17,7 @@ import {
 import { Type } from 'class-transformer';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 import { AdvancedAccountingService } from './advanced-accounting.service';
 
 class CreateCostCenterDto {
@@ -169,13 +170,16 @@ export class AdvancedAccountingController {
   @Get('recurring-journals')
   @RequirePermissions('accounting:read')
   listRecurring(@CurrentUser() user: IAuthUser) {
-    return this.advanced.listRecurring(user.tenantId);
+    return this.advanced.listRecurring(user.tenantId, resolveBranchScope(user));
   }
 
   @Post('recurring-journals')
   @RequirePermissions('accounting:create')
   createRecurring(@CurrentUser() user: IAuthUser, @Body() dto: CreateRecurringDto) {
-    return this.advanced.createRecurring(user.tenantId, user.id, dto);
+    return this.advanced.createRecurring(user.tenantId, user.id, {
+      ...dto,
+      branchId: resolveBranchScope(user, dto.branchId),
+    });
   }
 
   @Put('recurring-journals/:id')

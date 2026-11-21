@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { resolveBranchScope } from '@/shared/branch-scope.helper';
 import { ClothingService } from './clothing.service';
 import {
   CreateBundleDto,
@@ -45,7 +46,7 @@ export class ClothingController {
   @RequirePermissions('products:read')
   @ApiOperation({ summary: 'List store floors' })
   listFloors(@CurrentUser() user: IAuthUser, @Query('branchId') branchId: string) {
-    return this.clothing.listFloors(user.tenantId, branchId);
+    return this.clothing.listFloors(user.tenantId, resolveBranchScope(user, branchId) ?? '');
   }
 
   @Post('floors')
@@ -184,14 +185,14 @@ export class ClothingController {
     @Param('variantId') variantId: string,
     @Query('branchId') branchId: string,
   ) {
-    return this.clothing.getVariantLocation(user.tenantId, variantId, branchId);
+    return this.clothing.getVariantLocation(user.tenantId, variantId, resolveBranchScope(user, branchId) ?? '');
   }
 
   @Get('location-tree')
   @RequirePermissions('products:read')
   @ApiOperation({ summary: 'Nested floors → sections → racks → shelves' })
   locationTree(@CurrentUser() user: IAuthUser, @Query('branchId') branchId: string) {
-    return this.clothing.getLocationTree(user.tenantId, branchId);
+    return this.clothing.getLocationTree(user.tenantId, resolveBranchScope(user, branchId) ?? '');
   }
 
   // ── Colors ───────────────────────────────────────────────────────────────
@@ -270,7 +271,7 @@ export class ClothingController {
     @Param('productId') productId: string,
     @Query('branchId') branchId: string,
   ) {
-    return this.clothing.getBundleAvailability(user.tenantId, productId, branchId);
+    return this.clothing.getBundleAvailability(user.tenantId, productId, resolveBranchScope(user, branchId) ?? '');
   }
 
   // ── Fitting rooms ────────────────────────────────────────────────────────
@@ -279,7 +280,7 @@ export class ClothingController {
   @RequirePermissions('products:read')
   @ApiOperation({ summary: 'List fitting rooms' })
   listFittingRooms(@CurrentUser() user: IAuthUser, @Query('branchId') branchId: string) {
-    return this.clothing.listFittingRooms(user.tenantId, branchId);
+    return this.clothing.listFittingRooms(user.tenantId, resolveBranchScope(user, branchId) ?? '');
   }
 
   @Post('fitting-rooms')
@@ -315,7 +316,7 @@ export class ClothingController {
     @Query('branchId') branchId: string,
     @Query('status') status?: string,
   ) {
-    return this.clothing.listFittingSessions(user.tenantId, branchId, status);
+    return this.clothing.listFittingSessions(user.tenantId, resolveBranchScope(user, branchId) ?? '', status);
   }
 
   @Post('fitting-sessions')
@@ -360,7 +361,7 @@ export class ClothingController {
     @Query('to') to?: string,
     @Query('search') search?: string,
   ) {
-    return this.clothing.getReorderSuggestions(user.tenantId, branchId, {
+    return this.clothing.getReorderSuggestions(user.tenantId, resolveBranchScope(user, branchId) ?? '', {
       days: days ? parseInt(days, 10) : 30,
       productId,
       categoryId,

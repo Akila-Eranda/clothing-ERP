@@ -6,9 +6,10 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender } from '@prisma/client';
+import { Gender, UserStatus } from '@prisma/client';
 
 export class CreateUserDto {
   @ApiProperty()
@@ -87,4 +88,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   avatar?: string;
+}
+
+export class UpdateUserStatusDto {
+  @ApiProperty({ enum: UserStatus }) @IsEnum(UserStatus) status: UserStatus;
+}
+
+export class AssignUserRolesDto {
+  @ApiProperty({ type: [String] })
+  @IsArray() @ArrayMaxSize(20) @IsString({ each: true })
+  roleIds: string[];
 }

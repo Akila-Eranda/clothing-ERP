@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { BankDetailsFields } from "@/components/accounting/bank-details-fields";
+import { accountTypeNeedsBankDetails, bankFieldsForSave, EMPTY_BANK_DETAILS, type BankDetailsInput } from "@/lib/bank-account";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { PageKpiGrid } from "@/components/ui/page-kpi";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,13 +29,17 @@ import {
 } from "@/components/ui/dialog";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, tokenStorage } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useSubmitKey } from "@/lib/submit-key";
 import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { parseApiList } from "@/lib/parse-api-list";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { BankAccountsCard, type BankAccountRow, type QrLink } from "@/components/settings/bank-accounts-card";
+import { canManageBankAccounts, permissionsFromToken } from "@/lib/bank-account";
+import { PaymentQrSettingsTab } from "@/components/settings/payment-qr-settings-tab";
 
 type Tab = "accounts" | "cash" | "bank" | "recon";
 
@@ -47,6 +53,12 @@ type BankAccount = {
   openingBalance: number;
   glAccountId?: string | null;
   isActive: boolean;
+  accountNumber?: string | null;
+  accountHolderName?: string | null;
+  branchName?: string | null;
+  branchCode?: string | null;
+  updatedAt: string;
+  paymentQrCodes?: QrLink[];
 };
 
 type CashEntry = {
@@ -236,6 +248,7 @@ function AccountsOverviewPanel({
   const [xferAmt, setXferAmt] = useState("");
   const [xferDesc, setXferDesc] = useState("");
   const [xferBusy, setXferBusy] = useState(false);
+  const transferSubmitKey = useSubmitKey();
 
   // add account dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -243,6 +256,8 @@ function AccountsOverviewPanel({
   const [baName, setBaName] = useState("");
   const [baType, setBaType] = useState("CURRENT");
   const [baBank, setBaBank] = useState("");
+  const [baDetails, setBaDetails] = useState<BankDetailsInput>(EMPTY_BANK_DETAILS);
+  const [baTried, setBaTried] = useState(false);
   const [baOpen, setBaOpen] = useState("0");
   const [baGl, setBaGl] = useState("");
   const [baBusy, setBaBusy] = useState(false);
@@ -251,7 +266,7 @@ function AccountsOverviewPanel({
     setLoading(true);
     try {
       const [b, a, w] = await Promise.all([
-        api.get<BankAccount[]>("/accounting/bank-accounts"),
+        api.get<BankAccount[]>(`/accounting/bank-accounts?includeInactive=true`),
         api.get<{ data: GlAccount[] }>("/accounting/accounts?flat=true"),
         api.get<WalletsResponse>("/cash/wallets").catch(() => null),
       ]);
@@ -370,7 +385,9 @@ function AccountsOverviewPanel({
         toAccountId: xferTo,
         amount: amt,
         description: xferDesc || undefined,
+        clientRequestId: transferSubmitKey.current(),
       });
+      transferSubmitKey.reset();
       toast.success("Transfer completed");
       setXferFrom(null);
       setXferTo("");
@@ -389,19 +406,21 @@ function AccountsOverviewPanel({
       toast.error("Code and name required");
       return;
     }
+    const bk = bankFieldsForSave(baType, baDetails, baBank);
+    if (bk.firstProblem) { setBaTried(true); toast.error(bk.firstProblem); return; }
     setBaBusy(true);
     try {
       await api.post("/accounting/bank-accounts", {
         code: baCode,
         name: baName,
         type: baType,
-        bankName: baBank || undefined,
+        ...bk.fields,
         openingBalance: parseFloat(baOpen) || 0,
         glAccountId: baGl || undefined,
       });
       toast.success("Account created");
       setAddOpen(false);
-      setBaCode(""); setBaName(""); setBaBank(""); setBaOpen("0"); setBaGl("");
+      setBaCode(""); setBaName(""); setBaBank(""); setBaOpen("0"); setBaGl(""); setBaDetails(EMPTY_BANK_DETAILS); setBaTried(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -636,9 +655,6 @@ function AccountsOverviewPanel({
         <Button variant="outline" onClick={onReconcile} className="h-10 rounded-[12px] gap-1.5 text-sm">
           <Scale className="h-[18px] w-[18px]" /> Reconcile
         </Button>
-        <Button onClick={() => setAddOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm">
-          <Plus className="h-[18px] w-[18px]" /> Add Account
-        </Button>
       </div>
 
       <PageKpiGrid items={summaryRows} />
@@ -646,7 +662,14 @@ function AccountsOverviewPanel({
       <div className="space-y-4">
         {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/10 text-emerald-600", cashAccounts)}
         {walletSection}
-        {section("bank-accounts", "Bank accounts", <Landmark className="h-4 w-4" />, "bg-indigo-500/15 text-indigo-600", bankAccounts)}
+        <BankAccountsCard
+          accounts={bankAccounts as BankAccountRow[]}
+          qrCodes={bankAccounts.flatMap((account) => account.paymentQrCodes ?? [])}
+          canManage={canManageBankAccounts(permissionsFromToken(tokenStorage.getAccess()))}
+          loading={false}
+          onChanged={load}
+        />
+        <PaymentQrSettingsTab showBankAccounts={false} />
         {otherAccounts.length > 0 &&
           section("other-accounts", "Other accounts", <Wallet className="h-4 w-4" />, "bg-teal-500/15 text-teal-600", otherAccounts)}
       </div>
@@ -808,10 +831,17 @@ function AccountsOverviewPanel({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Bank name</Label>
-              <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
-            </div>
+            {accountTypeNeedsBankDetails(baType) ? (
+              <div className="col-span-2">
+                <BankDetailsFields compact idPrefix="bank-hub" required value={baDetails} onChange={setBaDetails} disabled={baBusy}
+                  errors={baTried ? bankFieldsForSave(baType, baDetails).problems : {}} />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="text-xs">Bank name</Label>
+                <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Opening balance</Label>
               <Input className="h-9" type="number" placeholder="0" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} disabled={baBusy} />
@@ -1148,6 +1178,8 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
   const [baName, setBaName] = useState("");
   const [baType, setBaType] = useState("CURRENT");
   const [baBank, setBaBank] = useState("");
+  const [baDetails, setBaDetails] = useState<BankDetailsInput>(EMPTY_BANK_DETAILS);
+  const [baTried, setBaTried] = useState(false);
   const [baOpen, setBaOpen] = useState("0");
   const [baGl, setBaGl] = useState("");
   const [baBusy, setBaBusy] = useState(false);
@@ -1162,6 +1194,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
   const [xferAmt, setXferAmt] = useState("");
   const [xferDesc, setXferDesc] = useState("");
   const [xferBusy, setXferBusy] = useState(false);
+  const transferSubmitKey = useSubmitKey();
 
   const [newAccountOpen, setNewAccountOpen] = useState(false);
   const [txnOpen, setTxnOpen] = useState(false);
@@ -1213,13 +1246,15 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
       toast.error("Code and name required");
       return;
     }
+    const bk = bankFieldsForSave(baType, baDetails, baBank);
+    if (bk.firstProblem) { setBaTried(true); toast.error(bk.firstProblem); return; }
     setBaBusy(true);
     try {
       await api.post("/accounting/bank-accounts", {
         code: baCode,
         name: baName,
         type: baType,
-        bankName: baBank || undefined,
+        ...bk.fields,
         openingBalance: parseFloat(baOpen) || 0,
         glAccountId: baGl || undefined,
       });
@@ -1230,6 +1265,8 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
       setBaBank("");
       setBaOpen("0");
       setBaGl("");
+      setBaDetails(EMPTY_BANK_DETAILS);
+      setBaTried(false);
       await loadBanks();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -1279,7 +1316,9 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         toAccountId: xferTo,
         amount: amt,
         description: xferDesc || undefined,
+        clientRequestId: transferSubmitKey.current(),
       });
+      transferSubmitKey.reset();
       toast.success("Transfer completed");
       setTransferOpen(false);
       setXferAmt("");
@@ -1460,10 +1499,17 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Bank name</Label>
-                <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
-              </div>
+              {accountTypeNeedsBankDetails(baType) ? (
+                <div className="col-span-2">
+                  <BankDetailsFields compact idPrefix="bank-hub2" required value={baDetails} onChange={setBaDetails} disabled={baBusy}
+                    errors={baTried ? bankFieldsForSave(baType, baDetails).problems : {}} />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-xs">Bank name</Label>
+                  <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Opening balance</Label>
                 <Input className="h-9" type="number" placeholder="0" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} disabled={baBusy} />

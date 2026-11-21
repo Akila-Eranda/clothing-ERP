@@ -4,7 +4,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { NotificationsService } from './notifications.service';
-import { CreateNotificationDto } from './notifications.dto';
+import { CreateNotificationDto, QueueSmsDto } from './notifications.dto';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('access-token')
@@ -55,7 +55,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Queue SMS notification (invoice, reminder, promo)' })
   sendSms(
     @CurrentUser() user: IAuthUser,
-    @Body() body: { phone: string; message: string; type?: string },
+    @Body() body: QueueSmsDto,
   ) {
     return this.notificationsService.queueSms(user.tenantId, user.id, body);
   }

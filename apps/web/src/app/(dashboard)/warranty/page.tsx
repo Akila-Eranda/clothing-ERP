@@ -415,6 +415,7 @@ export default function WarrantyPage() {
             columns={columns}
             searchableColumns={[
               { id: "claimNumber", title: "Claim #" },
+              { id: "customerSearch", title: "customer / phone / product", getValue: (r: Claim) => `${r.customer ? `${r.customer.firstName} ${r.customer.lastName ?? ""} ${r.customer.phone}` : ""} ${r.variant?.product?.name ?? ""} ${r.variant?.sku ?? ""}` },
             ]}
             filterableColumns={[
               {

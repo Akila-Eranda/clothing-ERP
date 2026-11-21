@@ -4,7 +4,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
-import { WhatsappSendBillDto, WhatsappSendDto } from './whatsapp.dto';
+import { WhatsappSendBillDto, WhatsappSendDto, WhatsappSendSaleBillDto } from './whatsapp.dto';
 import { WhatsappService } from './whatsapp.service';
 
 @ApiTags('WhatsApp')
@@ -39,6 +39,13 @@ export class WhatsappController {
   @ApiOperation({ summary: 'Send a WhatsApp text message' })
   send(@CurrentUser() user: IAuthUser, @Body() dto: WhatsappSendDto) {
     return this.whatsapp.sendText(user.tenantId, user.id, dto);
+  }
+
+  @Post('send-sale-bill')
+  @RequireAnyPermissions('sales:create')
+  @ApiOperation({ summary: 'Send the bill message of a sale (shop template, real invoice data) via WhatsApp' })
+  sendSaleBill(@CurrentUser() user: IAuthUser, @Body() dto: WhatsappSendSaleBillDto) {
+    return this.whatsapp.sendSaleBill(user.tenantId, user.id, dto);
   }
 
   @Post('send-bill')

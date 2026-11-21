@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseQty } from "@/lib/utils";
 import { useShopProfile, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
@@ -75,7 +76,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
 
   const submit = async () => {
     if (!item) return;
-    const qty = parseInt(quantity, 10);
+    const qty = parseQty(quantity, NaN);
     if (isNaN(qty) || qty < 0) { toast.error("Enter a valid quantity"); return; }
     setLoading(true);
     try {
@@ -170,18 +171,18 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
               )}
             </Label>
             <Input
-              type="number" min={0} placeholder="0" value={quantity}
+              type="number" min={0} step="any" placeholder="0" value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               autoFocus
             />
-            {movementType !== "ADJUSTMENT" && quantity && !isNaN(parseInt(quantity)) && (
+            {movementType !== "ADJUSTMENT" && quantity && !isNaN(parseQty(quantity, NaN)) && (
               <p className="text-[11px] text-muted-foreground">
                 New total:{" "}
                 <span className="font-semibold text-foreground">
                   {["SALE","TRANSFER_OUT","DAMAGE"].includes(movementType)
-                    ? Math.max(0, item.quantity - parseInt(quantity))
-                    : item.quantity + parseInt(quantity)}
+                    ? Math.max(0, item.quantity - parseQty(quantity, NaN))
+                    : item.quantity + parseQty(quantity, NaN)}
                 </span>
               </p>
             )}

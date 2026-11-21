@@ -48,7 +48,57 @@ const SENSITIVE_KEYS = new Set([
   'twoFactorSecret',
   'twoFactorCode',
   'authorization',
+  // POS PINs (cashier unlock, manager approval, PIN set), reload-card PINs and the tokens they yield
+  'pin',
+  'pins',
+  'newPin',
+  'currentPin',
+  'posPin',
+  'posPinHash',
+  'unlockToken',
+  'approvalToken',
+  'cardNumber',
+  'cvv',
+  // bank account numbers (customer / supplier / shop bank details)
+  'accountNumber',
 ]);
+
+/**
+ * Credential-looking keys, matched case-insensitively: PINs (pin, pins, newPin, managerPin, posPinHash…),
+ * passwords, secrets, tokens, card numbers / CVV, authorization. `pincode` (postal code) is not a PIN.
+ */
+const SENSITIVE_KEY_PATTERNS = [
+  /pin(s|hash)?$/i,
+  /^pin/i,
+  /password/i,
+  /secret/i,
+  /token$/i,
+  /^authorization$/i,
+  /cardnumber|^pan$|^cvv2?$|^cvc$/i,
+  /twofactorcode|otp$/i,
+];
+const NOT_SENSITIVE = new Set(['pincode', 'pinned', 'pinnedat']);
+
+export function isSensitiveAuditKey(key: string): boolean {
+  if (SENSITIVE_KEYS.has(key)) return true;
+  const k = key.toLowerCase();
+  if (NOT_SENSITIVE.has(k)) return false;
+  return SENSITIVE_KEY_PATTERNS.some((re) => re.test(k));
+}
+
+/**
+ * Replaces credential values anywhere in an object (any depth), leaving everything else exactly as it is
+ * (dates, arrays, numbers). Applied at the single audit write point, so no caller can store a PIN.
+ */
+export function redactSensitiveKeys<T>(value: T, depth = 0): T {
+  if (value == null || typeof value !== 'object' || depth > 8 || value instanceof Date) return value;
+  if (Array.isArray(value)) return value.map((v) => redactSensitiveKeys(v, depth + 1)) as unknown as T;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = isSensitiveAuditKey(k) ? '[redacted]' : redactSensitiveKeys(v, depth + 1);
+  }
+  return out as T;
+}
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -180,7 +230,7 @@ export function sanitizeAuditData(data: unknown, depth = 0): object | undefined 
       out._truncated = true;
       break;
     }
-    if (SENSITIVE_KEYS.has(key)) {
+    if (isSensitiveAuditKey(key)) {
       out[key] = '[redacted]';
       count++;
       continue;

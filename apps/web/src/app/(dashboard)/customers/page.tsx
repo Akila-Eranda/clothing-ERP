@@ -138,6 +138,12 @@ function buildColumns(
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function CustomersPage() {
+  // Search audit: header global search links here with ?search=<term> (read after mount).
+  const [urlSearch, setUrlSearch] = useState("");
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("search");
+    if (v) setUrlSearch(v);
+  }, []);
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, "loyalty");
   const customerTitle = profile.type === ShopType.AGRICULTURE
@@ -288,6 +294,7 @@ export default function CustomersPage() {
 
       {/* Table — single search, tier filter, one export */}
       <ClientSideTable
+        defaultSearch={urlSearch}
         data={customers}
         columns={columns}
         searchableColumns={[

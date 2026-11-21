@@ -1,5 +1,6 @@
 /** Audit Engine — sole audit/activity write + query boundary. */
 
+import { escapeLike, normalizeSearch } from '@/shared/search.helper';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -11,6 +12,7 @@ import {
   AUDIT_ACTION_LIST,
   normalizeClientAuditAction,
   sanitizeAuditData,
+  redactSensitiveKeys,
   buildAuthLoginAudit,
   buildAuthLogoutAudit,
   buildAuthLoginFailedAudit,
@@ -26,7 +28,12 @@ export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async log(payload: AuditLogPayload) {
-    const data = { ...payload };
+    // Last line of defence: no PIN / password / token is ever written, whatever the caller passed.
+    const data = {
+      ...payload,
+      ...(payload.newData !== undefined ? { newData: redactSensitiveKeys(payload.newData) } : {}),
+      ...(payload.oldData !== undefined ? { oldData: redactSensitiveKeys(payload.oldData) } : {}),
+    };
     try {
       if (data.userId) {
         const userOk = await this.prisma.user.findUnique({
@@ -64,12 +71,14 @@ export class AuditLogService {
     },
   ) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
-    const search = query.search?.trim();
+    const search = escapeLike(normalizeSearch(query.search)); // trimmed; %, _ match literally
+    const resource = escapeLike(normalizeSearch(query.resource));
+    const action = escapeLike(normalizeSearch(query.action));
     const where = {
       tenantId,
       ...(query.userId && { userId: query.userId }),
-      ...(query.resource && { resource: { contains: query.resource, mode: 'insensitive' as const } }),
-      ...(query.action && { action: { contains: query.action, mode: 'insensitive' as const } }),
+      ...(resource && { resource: { contains: resource, mode: 'insensitive' as const } }),
+      ...(action && { action: { contains: action, mode: 'insensitive' as const } }),
       ...(query.startDate &&
         query.endDate && {
           createdAt: {
@@ -83,6 +92,10 @@ export class AuditLogService {
           { resource: { contains: search, mode: 'insensitive' as const } },
           { resourceId: { contains: search, mode: 'insensitive' as const } },
           { ipAddress: { contains: search, mode: 'insensitive' as const } },
+          // Who made the change: the user is in this tenant (tenantId above still scopes every row).
+          { user: { is: { email: { contains: search, mode: 'insensitive' as const } } } },
+          { user: { is: { firstName: { contains: search, mode: 'insensitive' as const } } } },
+          { user: { is: { lastName: { contains: search, mode: 'insensitive' as const } } } },
         ],
       }),
     };
@@ -106,15 +119,17 @@ export class AuditLogService {
     action?: string;
   }) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const action = escapeLike(normalizeSearch(query.action));
+    const search = escapeLike(normalizeSearch(query.search)); // trimmed; %, _ match literally
     const where = {
-      ...(query.action &&
-        query.action !== 'ALL' && {
-          action: { contains: query.action, mode: 'insensitive' as const },
+      ...(action &&
+        action !== 'ALL' && {
+          action: { contains: action, mode: 'insensitive' as const },
         }),
-      ...(query.search?.trim() && {
+      ...(search && {
         OR: [
-          { action: { contains: query.search.trim(), mode: 'insensitive' as const } },
-          { resource: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { action: { contains: search, mode: 'insensitive' as const } },
+          { resource: { contains: search, mode: 'insensitive' as const } },
         ],
       }),
     };

@@ -19,7 +19,7 @@ import {
   PLATFORM_CONFIG_SUBDOMAIN,
   SubscriptionPlanDef,
 } from '@/modules/tenants/subscription-plans'
-import { ensureSystemRoles } from '@/modules/roles/default-system-roles'
+import { ensureSystemRolesExist } from '@/modules/roles/default-system-roles'
 
 const EXCLUDED_SUBDOMAINS = [PLATFORM_CONFIG_SUBDOMAIN]
 
@@ -454,7 +454,8 @@ export class PlatformOpsW3Service {
     const roleName = roleType === RoleType.PLATFORM_STAFF ? 'Platform Staff' : 'Super Admin'
 
     const platform = await this.resolvePlatformTenant()
-    await ensureSystemRoles(this.prisma, platform.id)
+    // Create missing platform roles only; never rewrite existing ones.
+    await ensureSystemRolesExist(this.prisma, platform.id)
 
     const existing = await this.prisma.user.findFirst({
       where: { tenantId: platform.id, email: body.email.toLowerCase() },

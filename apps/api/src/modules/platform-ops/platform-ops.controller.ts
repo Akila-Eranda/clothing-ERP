@@ -21,6 +21,18 @@ import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles'
 import { PlatformOpsService } from './platform-ops.service'
 import { PlatformOpsW3Service } from './platform-ops-w3.service'
 import { SecurityScanService } from './security-scan.service'
+import {
+  BillingWhatsAppOnboardDto,
+  BillingWhatsAppTenantDto,
+  BillingWhatsAppTestDto,
+  CreateAnnouncementDto,
+  CreatePlatformAdminDto,
+  CreateReleaseDto,
+  CreateSupportNoteDto,
+  UpdateAnnouncementDto,
+  UpdateReleaseDto,
+  UpdateSuggestionDto,
+} from './platform-ops.dto'
 
 @ApiTags('Platform Ops')
 @ApiBearerAuth('access-token')
@@ -42,7 +54,7 @@ export class PlatformOpsController {
 
   @Post('announcements')
   @ApiOperation({ summary: 'Create platform announcement' })
-  createAnnouncement(@Body() body: Record<string, unknown>, @CurrentUser() user: IAuthUser) {
+  createAnnouncement(@Body() body: CreateAnnouncementDto, @CurrentUser() user: IAuthUser) {
     return this.ops.createAnnouncement({
       title: String(body.title || ''),
       body: String(body.body || ''),
@@ -59,8 +71,8 @@ export class PlatformOpsController {
   }
 
   @Patch('announcements/:id')
-  updateAnnouncement(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.ops.updateAnnouncement(id, body)
+  updateAnnouncement(@Param('id') id: string, @Body() body: UpdateAnnouncementDto) {
+    return this.ops.updateAnnouncement(id, { ...body })
   }
 
   @Patch('announcements/:id/send')
@@ -89,16 +101,23 @@ export class PlatformOpsController {
   }
 
   @Post('releases')
-  createRelease(@Body() body: Record<string, unknown>, @CurrentUser() user: IAuthUser) {
+  createRelease(@Body() body: CreateReleaseDto, @CurrentUser() user: IAuthUser) {
     return this.ops.createRelease({
-      ...(body as any),
+      ...body,
+      summary: body.summary ?? '',
+      items: body.items?.map((i) => ({
+        ...i,
+        category: i.category ?? i.type ?? 'FEATURE',
+        featureName: i.featureName ?? i.title ?? '',
+        description: i.description ?? i.body ?? '',
+      })),
       createdBy: user.email,
     })
   }
 
   @Put('releases/:id')
-  updateRelease(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.ops.updateRelease(id, body)
+  updateRelease(@Param('id') id: string, @Body() body: UpdateReleaseDto) {
+    return this.ops.updateRelease(id, { ...body })
   }
 
   @Patch('releases/:id/publish')
@@ -142,13 +161,7 @@ export class PlatformOpsController {
   @Patch('feature-suggestions/:id')
   updateSuggestion(
     @Param('id') id: string,
-    @Body()
-    body: {
-      status?: FeatureSuggestionStatus
-      priority?: FeatureSuggestionPriority
-      publicResponse?: string
-      internalNote?: string
-    },
+    @Body() body: UpdateSuggestionDto,
     @CurrentUser() user: IAuthUser,
   ) {
     return this.ops.updateSuggestion(id, body, user.email)
@@ -172,7 +185,7 @@ export class PlatformOpsController {
   }
 
   @Post('support/notes')
-  createNote(@Body() body: Record<string, unknown>, @CurrentUser() user: IAuthUser) {
+  createNote(@Body() body: CreateSupportNoteDto, @CurrentUser() user: IAuthUser) {
     return this.ops.createSupportNote({
       tenantId: body.tenantId ? String(body.tenantId) : undefined,
       title: String(body.title || ''),
@@ -222,7 +235,7 @@ export class PlatformOpsController {
   @Post('admins')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create platform admin user (super or staff)' })
-  createAdmin(@Body() body: Record<string, unknown>) {
+  createAdmin(@Body() body: CreatePlatformAdminDto) {
     return this.w3.createPlatformAdmin({
       email: String(body.email || ''),
       password: String(body.password || ''),
@@ -268,7 +281,7 @@ export class PlatformOpsController {
   @Roles(RoleType.SUPER_ADMIN)
   billingWaTest(
     @CurrentUser() user: IAuthUser,
-    @Body() body: { phone?: string; message?: string },
+    @Body() body: BillingWhatsAppTestDto,
   ) {
     return this.w3.billingWhatsappTestMessage(user.id, String(body.phone || ''), body.message)
   }
@@ -277,14 +290,7 @@ export class PlatformOpsController {
   @Roles(RoleType.SUPER_ADMIN)
   billingWaOnboard(
     @CurrentUser() user: IAuthUser,
-    @Body()
-    body: {
-      phone?: string
-      businessName?: string
-      subdomain?: string
-      ownerEmail?: string
-      tempPassword?: string
-    },
+    @Body() body: BillingWhatsAppOnboardDto,
   ) {
     return this.w3.billingWhatsappSendOnboard({
       actorUserId: user.id,
@@ -299,7 +305,7 @@ export class PlatformOpsController {
   @Put('billing/whatsapp/tenant')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Pin which tenant hosts the billing WhatsApp session' })
-  setBillingWaTenant(@Body() body: { tenantId?: string }) {
+  setBillingWaTenant(@Body() body: BillingWhatsAppTenantDto) {
     return this.w3.setBillingWhatsAppTenantId(String(body.tenantId || ''))
   }
 

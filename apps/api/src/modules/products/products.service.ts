@@ -1,16 +1,21 @@
+import { textSearch } from '@/shared/search.helper';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt, IsIn,
+  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt, IsIn, ArrayMaxSize, ArrayNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BarcodeMode, ProductKind, ProductStatus, TubeType } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
+import { BarcodeMode, ProductKind, ProductStatus, TubeType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { InventoryService } from '@/modules/inventory/inventory.module';
+import { roundQty } from '@/modules/inventory/inventory-engine.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { nanoid } from 'nanoid';
 import slugify from 'slugify';
+
+/** Unit given to a NEW product when none is chosen. */
+export const NEW_PRODUCT_DEFAULT_UNIT = 'pcs';
 
 export class CreateVariantDto {
   @ApiProperty() @IsString() sku: string;
@@ -94,6 +99,33 @@ export class CreateProductDto {
   branchId?: string;
 }
 
+/** Variant row in a product edit: existing rows carry their id and can be deactivated. */
+export class UpdateProductVariantDto extends PartialType(CreateVariantDto) {
+  @ApiPropertyOptional() @IsOptional() @IsString() id?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateProductDto extends PartialType(OmitType(CreateProductDto, ['variants'] as const)) {
+  @ApiPropertyOptional({ type: [UpdateProductVariantDto] })
+  @IsOptional() @IsArray() @ArrayMaxSize(500) @ValidateNested({ each: true }) @Type(() => UpdateProductVariantDto)
+  variants?: UpdateProductVariantDto[];
+}
+
+export class BulkProductStatusDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayNotEmpty() @ArrayMaxSize(1000) @IsString({ each: true }) ids: string[];
+  @ApiProperty({ enum: ProductStatus }) @IsEnum(ProductStatus) status: ProductStatus;
+}
+
+export class ProductStatusDto {
+  @ApiProperty({ enum: ProductStatus }) @IsEnum(ProductStatus) status: ProductStatus;
+}
+
+export class AddProductVariantsDto {
+  @ApiProperty({ type: [CreateVariantDto] })
+  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(500) @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
+  variants: CreateVariantDto[];
+}
+
 export class CreateCategoryDto {
   @ApiProperty() @IsString() name: string;
   @ApiPropertyOptional() @IsOptional() @IsString() parentId?: string;
@@ -125,10 +157,11 @@ export class ProductsService {
     tenantId: string,
     branchScope: 'ALL' | 'SINGLE' = 'ALL',
     branchId?: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<string[]> {
     if (branchScope === 'SINGLE') {
       if (!branchId) throw new BadRequestException('branchId is required when branchScope is SINGLE');
-      const branch = await this.prisma.branch.findFirst({
+      const branch = await db.branch.findFirst({
         where: { id: branchId, tenantId, isActive: true },
         select: { id: true },
       });
@@ -136,7 +169,7 @@ export class ProductsService {
       return [branch.id];
     }
 
-    const branches = await this.prisma.branch.findMany({
+    const branches = await db.branch.findMany({
       where: { tenantId, isActive: true },
       select: { id: true },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
@@ -144,23 +177,27 @@ export class ProductsService {
     return branches.map((b) => b.id);
   }
 
-  private async ensureDefaultWarehouse(tenantId: string, branchId: string) {
-    const existing = await this.prisma.warehouse.findFirst({
+  private async ensureDefaultWarehouse(
+    tenantId: string,
+    branchId: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const existing = await db.warehouse.findFirst({
       where: { tenantId, branchId, isDefault: true, isActive: true },
     });
     if (existing) return existing;
 
-    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, tenantId } });
+    const branch = await db.branch.findFirst({ where: { id: branchId, tenantId } });
     if (!branch) throw new BadRequestException('Branch not found');
 
     const codeBase = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
     let code = codeBase;
     let n = 1;
-    while (await this.prisma.warehouse.findFirst({ where: { tenantId, code } })) {
+    while (await db.warehouse.findFirst({ where: { tenantId, code } })) {
       code = `${codeBase}-${n++}`.slice(0, 24);
     }
 
-    return this.prisma.warehouse.create({
+    return db.warehouse.create({
       data: {
         tenantId,
         branchId,
@@ -184,13 +221,15 @@ export class ProductsService {
       maxStock?: number;
       warehouseId?: string;
     },
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
   ) {
     if (!variantIds.length) return;
 
-    const branchIds = await this.resolveInventoryBranchIds(tenantId, branchScope, branchId);
+    const branchIds = await this.resolveInventoryBranchIds(tenantId, branchScope, branchId, db);
     if (!branchIds.length) return;
 
-    const openingQty = Math.max(0, Math.round(opts?.openingStock ?? 0));
+    // Keep decimals (loose goods: 50.5 kg). Was Math.round → 51 kg. inventory.quantity is DOUBLE.
+    const openingQty = Math.max(0, roundQty(opts?.openingStock ?? 0));
     const reorderPoint = Math.max(0, Math.round(opts?.reorderLevel ?? 5));
     const minStockLevel = Math.max(0, Math.round(opts?.minStock ?? 0));
     const maxStockLevel = Math.max(0, Math.round(opts?.maxStock ?? 0));
@@ -198,7 +237,7 @@ export class ProductsService {
     const warehouseByBranch = new Map<string, string>();
     for (const bid of branchIds) {
       if (opts?.warehouseId) {
-        const wh = await this.prisma.warehouse.findFirst({
+        const wh = await db.warehouse.findFirst({
           where: { id: opts.warehouseId, tenantId, branchId: bid, isActive: true },
           select: { id: true },
         });
@@ -207,13 +246,13 @@ export class ProductsService {
           continue;
         }
       }
-      const warehouse = await this.ensureDefaultWarehouse(tenantId, bid);
+      const warehouse = await this.ensureDefaultWarehouse(tenantId, bid, db);
       warehouseByBranch.set(bid, warehouse.id);
     }
 
     // Prefer explicit warehouse for SINGLE/ALL when provided and valid for any branch
     if (opts?.warehouseId && warehouseByBranch.size === 0) {
-      const wh = await this.prisma.warehouse.findFirst({
+      const wh = await db.warehouse.findFirst({
         where: { id: opts.warehouseId, tenantId, isActive: true },
         select: { id: true, branchId: true },
       });
@@ -222,6 +261,7 @@ export class ProductsService {
       }
     }
 
+    const tx = db === this.prisma ? undefined : db;
     await this.inventory.seedOpeningStock(
       branchIds.flatMap((bid) =>
         variantIds.map((variantId) => ({
@@ -235,6 +275,7 @@ export class ProductsService {
           maxStockLevel,
         })),
       ),
+      tx,
     );
 
     // Existing rows are skipDuplicates — always apply prefs when opening/reorder/min/max sent
@@ -250,7 +291,7 @@ export class ProductsService {
         ...(opts?.reorderLevel != null ? { reorderPoint } : {}),
         ...(opts?.minStock != null ? { minStockLevel } : {}),
         ...(opts?.maxStock != null ? { maxStockLevel } : {}),
-      });
+      }, tx);
     }
   }
 
@@ -291,6 +332,7 @@ export class ProductsService {
     tenantId: string,
     variantIds: string[],
     dto: Pick<CreateProductDto, 'suppliers' | 'supplierIds'>,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     if (!variantIds.length) return;
 
@@ -298,7 +340,7 @@ export class ProductsService {
     if (!rows.length) return;
 
     const supplierIds = rows.map((r) => r.supplierId);
-    const validSuppliers = await this.prisma.supplier.findMany({
+    const validSuppliers = await db.supplier.findMany({
       where: { tenantId, id: { in: supplierIds }, isActive: true },
       select: { id: true },
     });
@@ -308,7 +350,7 @@ export class ProductsService {
 
     for (const meta of rows) {
       for (const variantId of variantIds) {
-        await this.prisma.supplierProductAssignment.upsert({
+        await db.supplierProductAssignment.upsert({
           where: { supplierId_variantId: { supplierId: meta.supplierId, variantId } },
           create: {
             tenantId,
@@ -365,7 +407,8 @@ export class ProductsService {
       ? (barcodeTrim || null)
       : (barcodeTrim || this.generateEAN13());
 
-    const product = await this.prisma.product.create({
+    const { product } = await this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
       data: {
         tenantId,
         name: dto.name,
@@ -388,7 +431,9 @@ export class ProductsService {
         trackInventory: dto.trackInventory ?? true,
         productKind,
         barcodeMode,
-        unit: dto.unit || null,
+        // New products default to PCS (product forms, POS quick add, PO add-product, Excel import).
+        // Only on create: existing products keep whatever unit they have.
+        unit: dto.unit?.trim() || NEW_PRODUCT_DEFAULT_UNIT,
         allowNegativeStock: dto.allowNegativeStock ?? false,
         allowDecimalSelling: dto.allowDecimalSelling ?? isWeighted,
         weightScaleReady: dto.weightScaleReady ?? isWeighted,
@@ -404,9 +449,9 @@ export class ProductsService {
         seoDescription: dto.seoDescription,
       },
       include: { category: true, brand: true, _count: { select: { variants: true } } },
-    });
+      });
 
-    if (dto.variants?.length && hasVariants) {
+      if (dto.variants?.length && hasVariants) {
       const usedSkus = new Set<string>();
       const uniquify = (raw: string, index: number) => {
         const base = (raw || `VAR-${index + 1}`).trim() || `VAR-${index + 1}`;
@@ -419,7 +464,7 @@ export class ProductsService {
         return next;
       };
 
-      await this.prisma.productVariant.createMany({
+        await tx.productVariant.createMany({
         data: dto.variants.map((v, i) => ({
           productId: product.id,
           sku: uniquify(v.sku, i),
@@ -439,8 +484,8 @@ export class ProductsService {
               : (v.barcode?.trim() || null),
         })),
       });
-    } else {
-      await this.prisma.productVariant.create({
+      } else {
+        await tx.productVariant.create({
         data: {
           productId: product.id,
           sku: product.sku,
@@ -450,31 +495,33 @@ export class ProductsService {
           mrp: dto.mrp,
           barcode: sharedBarcode,
         },
+        });
+      }
+
+      const createdVariants = await tx.productVariant.findMany({
+        where: { productId: product.id },
+        select: { id: true },
       });
-    }
 
-    const createdVariants = await this.prisma.productVariant.findMany({
-      where: { productId: product.id },
-      select: { id: true },
+      await this.upsertSupplierAssignments(tenantId, createdVariants.map((v) => v.id), dto, tx);
+      if (dto.trackInventory !== false && createdVariants.length) {
+        await this.seedVariantInventory(
+          tenantId,
+          createdVariants.map((v) => v.id),
+          dto.branchScope ?? 'ALL',
+          dto.branchId,
+          {
+            openingStock: dto.openingStock,
+            reorderLevel: dto.reorderLevel,
+            minStock: dto.minStock,
+            maxStock: dto.maxStock,
+            warehouseId: dto.warehouseId,
+          },
+          tx,
+        );
+      }
+      return { product, createdVariants };
     });
-
-    await this.upsertSupplierAssignments(tenantId, createdVariants.map((v) => v.id), dto);
-
-    if (dto.trackInventory !== false && createdVariants.length) {
-      await this.seedVariantInventory(
-        tenantId,
-        createdVariants.map((v) => v.id),
-        dto.branchScope ?? 'ALL',
-        dto.branchId,
-        {
-          openingStock: dto.openingStock,
-          reorderLevel: dto.reorderLevel,
-          minStock: dto.minStock,
-          maxStock: dto.maxStock,
-          warehouseId: dto.warehouseId,
-        },
-      );
-    }
 
     return this.findOne(product.id, tenantId);
   }
@@ -485,26 +532,7 @@ export class ProductsService {
       tenantId,
       ...(query.status && { status: query.status }),
       ...(query.categoryId && { categoryId: query.categoryId }),
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' as const } },
-          { sku: { contains: query.search, mode: 'insensitive' as const } },
-          { barcode: { contains: query.search, mode: 'insensitive' as const } },
-          { tags: { has: query.search } },
-          {
-            variants: {
-              some: {
-                isActive: true,
-                OR: [
-                  { sku: { contains: query.search, mode: 'insensitive' as const } },
-                  { barcode: { contains: query.search, mode: 'insensitive' as const } },
-                  { name: { contains: query.search, mode: 'insensitive' as const } },
-                ],
-              },
-            },
-          },
-        ],
-      }),
+      ...textSearch(query.search, ['name', 'sku', 'barcode', (_f, word) => ({ tags: { has: word } }), (f) => ({ variants: { some: { isActive: true, OR: [{ sku: f }, { barcode: f }, { name: f }] } } })]),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -574,7 +602,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
+  async update(id: string, tenantId: string, dto: UpdateProductDto) {
     await this.findOne(id, tenantId);
     const {
       variants,

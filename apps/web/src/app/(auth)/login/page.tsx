@@ -69,6 +69,10 @@ function LoginContent() {
 
   const urlTenant = searchParams.get("tenant");
   const urlEmail = searchParams.get("email");
+  const isLocalhost =
+    typeof window !== "undefined"
+    && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const canResolveWorkspaceByEmail = isMainDomain || isLocalhost;
   const [subdomain, setSubdomain] = React.useState(urlTenant || "");
   const subdomainManualRef = React.useRef(Boolean(urlTenant));
 
@@ -131,7 +135,7 @@ function LoginContent() {
 
   // Main portal: auto-detect workspace(s) from email
   React.useEffect(() => {
-    if (!isMainDomain) {
+    if (!canResolveWorkspaceByEmail) {
       setEmailWorkspaces([]);
       setEmailLookupLoading(false);
       return;
@@ -175,10 +179,10 @@ function LoginContent() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [watchedEmail, isMainDomain]);
+  }, [watchedEmail, canResolveWorkspaceByEmail]);
 
   React.useEffect(() => {
-    if (!isMainDomain) return;
+    if (!canResolveWorkspaceByEmail) return;
     const slug = subdomain.trim();
     if (!slug) return;
     const fromEmail = emailWorkspaces.find((w) => w.subdomain === slug);
@@ -198,14 +202,14 @@ function LoginContent() {
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [isMainDomain, subdomain, emailWorkspaces]);
+  }, [canResolveWorkspaceByEmail, subdomain, emailWorkspaces]);
 
   const effectiveSlug = hostnameSlug ?? (subdomain.trim() || undefined);
   const shopType =
     tenantPreview?.shopType
     ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())?.shopType
     ?? null;
-  const showWorkspacePicker = isMainDomain && emailWorkspaces.length > 1;
+  const showWorkspacePicker = canResolveWorkspaceByEmail && emailWorkspaces.length > 1;
   const selectedWorkspace =
     tenantPreview
     ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())
@@ -227,7 +231,7 @@ function LoginContent() {
       return;
     }
     let slug = effectiveSlug;
-    if (isMainDomain && !slug) {
+    if (canResolveWorkspaceByEmail && !slug) {
       const email = data.email.trim().toLowerCase();
       try {
         const res = await fetch(`${API_BASE}/tenants/resolve-email?email=${encodeURIComponent(email)}`);
@@ -249,11 +253,11 @@ function LoginContent() {
         // fall through
       }
     }
-    if (isMainDomain && !slug) {
+    if (canResolveWorkspaceByEmail && !slug) {
       toast.error("No shop found for this email. Check the address and try again.");
       return;
     }
-    if (!isMainDomain && !slug) {
+    if (!canResolveWorkspaceByEmail && !slug) {
       toast.error("Open your shop login URL (your-shop.shop.hexalyte.com)");
       return;
     }
@@ -306,7 +310,7 @@ function LoginContent() {
         tenantSubdomain={selectedWorkspace?.subdomain ?? hostnameSlug}
         loading={
           (Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview))
-          || (isMainDomain && emailLookupLoading)
+          || (canResolveWorkspaceByEmail && emailLookupLoading)
         }
       />
 
@@ -421,10 +425,10 @@ function LoginContent() {
                     />
                   </div>
                   {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-                  {isMainDomain && emailLookupLoading && (
+                  {canResolveWorkspaceByEmail && emailLookupLoading && (
                     <p className="text-xs text-slate-500">Finding your shop…</p>
                   )}
-                  {isMainDomain && !emailLookupLoading && watchedEmail?.includes("@") && emailWorkspaces.length === 0 && (
+                  {canResolveWorkspaceByEmail && !emailLookupLoading && watchedEmail?.includes("@") && emailWorkspaces.length === 0 && (
                     <p className="text-xs text-destructive">
                       No shop found for this email.
                     </p>

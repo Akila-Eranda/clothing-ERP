@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { textSearch } from '@/shared/search.helper';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuthService } from '@/modules/auth/auth.service';
 import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
@@ -11,6 +12,8 @@ import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { UserStatus } from '@prisma/client';
+import { isPlatformRoleType } from '@/shared/platform-admin-roles';
+import { SAFE_SESSION_SELECT } from '@/shared/security/session-token';
 
 @Injectable()
 export class UsersService {
@@ -102,13 +105,7 @@ export class UsersService {
 
     const where = {
       ...(tenantId && { tenantId }),
-      ...(query.search && {
-        OR: [
-          { firstName: { contains: query.search, mode: 'insensitive' as const } },
-          { lastName: { contains: query.search, mode: 'insensitive' as const } },
-          { email: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['firstName', 'lastName', 'email']),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -133,13 +130,7 @@ export class UsersService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
-      ...(query.search && {
-        OR: [
-          { firstName: { contains: query.search, mode: 'insensitive' as const } },
-          { lastName: { contains: query.search, mode: 'insensitive' as const } },
-          { email: { contains: query.search, mode: 'insensitive' as const } },
-        ],
-      }),
+      ...textSearch(query.search, ['firstName', 'lastName', 'email']),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -162,7 +153,7 @@ export class UsersService {
       include: {
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
         branch: true,
-        sessions: { where: { isActive: true }, take: 5, orderBy: { createdAt: 'desc' } },
+        sessions: { where: { isActive: true }, take: 5, orderBy: { createdAt: 'desc' }, select: SAFE_SESSION_SELECT },
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -219,11 +210,17 @@ export class UsersService {
 
   private async assertRolesBelongToTenant(tenantId: string, roleIds: string[]) {
     if (!roleIds.length) return;
-    const count = await this.prisma.role.count({
-      where: { id: { in: roleIds }, tenantId },
+    const unique = [...new Set(roleIds)];
+    const roles = await this.prisma.role.findMany({
+      where: { id: { in: unique }, tenantId },
+      select: { id: true, type: true },
     });
-    if (count !== roleIds.length) {
+    if (roles.length !== unique.length) {
       throw new ForbiddenException('One or more roles do not belong to this tenant');
+    }
+    // Platform roles bypass tenant isolation — only the Platform Admin console may grant them.
+    if (roles.some((r) => isPlatformRoleType(r.type))) {
+      throw new ForbiddenException('Platform roles cannot be assigned from shop user management');
     }
   }
 

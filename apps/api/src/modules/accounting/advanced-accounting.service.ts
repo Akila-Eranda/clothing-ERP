@@ -302,9 +302,9 @@ export class AdvancedAccountingService {
 
   // ── Recurring journals ─────────────────────────────────────────────
 
-  listRecurring(tenantId: string) {
+  listRecurring(tenantId: string, branchId?: string) {
     return this.prisma.recurringJournal.findMany({
-      where: { tenantId },
+      where: { tenantId, ...(branchId && { branchId }) },
       orderBy: [{ isActive: 'desc' }, { nextRunDate: 'asc' }],
     });
   }

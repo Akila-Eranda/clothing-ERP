@@ -15,7 +15,7 @@ const PAY_OPTIONS = [
   { value: "BANK_TRANSFER", label: "Bank Transfer" },
   { value: "QR", label: "QR Pay" },
   { value: "CHEQUE", label: "Cheque" },
-  { value: "CUSTOMER_CREDIT", label: "Credit" },
+  { value: "CUSTOMER_CREDIT", label: "Credit / Wallet" },
 ] as const;
 
 export interface PaymentLine {
@@ -30,6 +30,10 @@ export type PosBankAccountOption = {
   code: string;
   name: string;
   bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolderName?: string | null;
+  branchName?: string | null;
+  branchCode?: string | null;
   currentBalance?: number;
   isActive?: boolean;
 };
@@ -281,12 +285,13 @@ export function PosPaymentPanel({
                   value={line.reference ?? ""}
                   onChange={(e) =>
                     updateLine(idx, {
-                      reference: e.target.value.replace(/\D/g, "").slice(0, 3),
+                      reference: e.target.value.replace(/\D/g, "").slice(0, 4),
                     })
                   }
                   inputMode="numeric"
-                  maxLength={3}
-                  placeholder="Card last 3 digits"
+                  maxLength={4}
+                  placeholder="Card last 4 digits"
+                  aria-label="Card last 4 digits"
                   className="h-8 text-xs text-white font-mono tracking-widest"
                   style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
                 />
@@ -322,7 +327,7 @@ export function PosPaymentPanel({
         </div>
       ) : (
         <div className="space-y-1 px-1">
-          {customerWallet !== undefined && customerWallet > 0 && (
+          {customerWallet !== undefined && (
             <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--pos-muted)" }}>
               <Wallet className="h-3 w-3" /> Wallet: LKR {formatNumber(customerWallet)}
             </div>
@@ -359,11 +364,15 @@ export function buildCheckoutPayments(
   totalAmt: number,
   chequeNumber?: string,
   partialPayAmount?: string,
-  cardLast3?: string,
+  cardLast4?: string,
   bankAccountId?: string,
-): { method: string; amount: number; reference?: string; bankAccountId?: string }[] {
-  const cardRef = (cardLast3 ?? "").replace(/\D/g, "").slice(0, 3);
+  qrCodeId?: string,
+): { method: string; amount: number; reference?: string; bankAccountId?: string; cardLast4?: string; qrCodeId?: string }[] {
+  // Card: exactly the last 4 digits (validated before checkout and again by the API).
+  const cardRef = (cardLast4 ?? "").replace(/\D/g, "").slice(0, 4);
+  const card = cardRef ? { reference: cardRef, cardLast4: cardRef } : {};
   const bankId = (bankAccountId ?? "").trim() || undefined;
+  const qrId = (qrCodeId ?? "").trim() || undefined;
   if (state.splitMode) {
     return state.paymentLines
       .map((l) => {
@@ -371,7 +380,7 @@ export function buildCheckoutPayments(
           l.method === "CHEQUE"
             ? l.reference?.trim()
             : l.method === "CARD"
-              ? (l.reference ?? "").replace(/\D/g, "").slice(0, 3)
+              ? (l.reference ?? "").replace(/\D/g, "").slice(0, 4)
               : l.reference?.trim();
         const lineBank =
           l.method === "BANK_TRANSFER" || l.method === "QR"
@@ -381,6 +390,7 @@ export function buildCheckoutPayments(
           method: l.method,
           amount: parseFloat(l.amount) || 0,
           ...(ref ? { reference: ref } : {}),
+          ...(ref && l.method === "CARD" ? { cardLast4: ref } : {}),
           ...(lineBank ? { bankAccountId: lineBank } : {}),
         };
       })
@@ -400,10 +410,10 @@ export function buildCheckoutPayments(
         return [{ method: "CHEQUE", amount: payNow, reference: chequeNumber?.trim() || undefined }];
       }
       if (method === "CARD") {
-        return [{ method: "CARD", amount: payNow, reference: cardRef || undefined }];
+        return [{ method: "CARD", amount: payNow, ...card }];
       }
       if (method === "BANK_TRANSFER" || method === "QR") {
-        return [{ method, amount: payNow, bankAccountId: bankId }];
+        return [{ method, amount: payNow, bankAccountId: bankId, ...(method === "QR" && qrId ? { qrCodeId: qrId } : {}) }];
       }
       return [{ method, amount: payNow }];
     }
@@ -421,10 +431,10 @@ export function buildCheckoutPayments(
     return [{ method: "CHEQUE", amount, reference: chequeNumber?.trim() || undefined }];
   }
   if (activePayment === "CARD") {
-    return [{ method: "CARD", amount, reference: cardRef || undefined }];
+    return [{ method: "CARD", amount, ...card }];
   }
   if (activePayment === "BANK_TRANSFER" || activePayment === "QR") {
-    return [{ method: activePayment, amount, bankAccountId: bankId }];
+    return [{ method: activePayment, amount, bankAccountId: bankId, ...(activePayment === "QR" && qrId ? { qrCodeId: qrId } : {}) }];
   }
   if (activePayment === "CUSTOMER_CREDIT") {
     return [{ method: "CUSTOMER_CREDIT", amount: totalAmt }];

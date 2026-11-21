@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile } from "@/lib/use-shop-profile";
+import { newItemDefaultUnit } from "@/lib/shop-profiles";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import {
   EMPTY_INVENTORY,
@@ -364,7 +365,7 @@ export function GroceryProductForm({ embedded }: { embedded?: EmbeddedProductFor
   const [categoryId, setCategoryId] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
   const [productType, setProductType] = useState<GroceryProductType>("STANDARD");
-  const [unit, setUnit] = useState(shopProfile.defaultUnit || "pcs");
+  const [unit, setUnit] = useState(newItemDefaultUnit(shopProfile));
   const [barcode, setBarcode] = useState("");
   const [skuHint, setSkuHint] = useState("");
   const [description, setDescription] = useState("");
@@ -410,8 +411,8 @@ export function GroceryProductForm({ embedded }: { embedded?: EmbeddedProductFor
   }, []);
 
   useEffect(() => {
-    setUnit(shopProfile.defaultUnit || "pcs");
-  }, [shopProfile.defaultUnit]);
+    setUnit(newItemDefaultUnit(shopProfile));
+  }, [shopProfile.defaultUnit]); // eslint-disable-line react-hooks/exhaustive-deps -- re-run only when the shop type changes
 
   const parentCategory = categories.find((c) => c.id === categoryId);
   const subCategories = parentCategory?.children ?? [];
@@ -533,7 +534,7 @@ export function GroceryProductForm({ embedded }: { embedded?: EmbeddedProductFor
     setCategoryId("");
     setSubCategoryId("");
     setProductType("STANDARD");
-    setUnit(shopProfile.defaultUnit || "pcs");
+    setUnit(newItemDefaultUnit(shopProfile));
     setBarcode("");
     setSkuHint("");
     setDescription("");
@@ -559,7 +560,7 @@ export function GroceryProductForm({ embedded }: { embedded?: EmbeddedProductFor
         ? [{ supplierId: embedded.defaultSupplierId, buyingPrice: "", leadTime: "", moq: "", active: true, isDefault: true }]
         : [],
     );
-  }, [shopProfile.defaultUnit, embedded?.defaultSupplierId]);
+  }, [shopProfile.defaultUnit, embedded?.defaultSupplierId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validate = (): boolean => {
     if (!name.trim()) {
@@ -1086,7 +1087,7 @@ return (
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input className="h-10 pl-9" placeholder="Search suppliers…" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} />
+                  <Input className="h-10 pl-9" placeholder="Search suppliers…" aria-label="Search suppliers" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} />
                 </div>
                 <Select value={supplierPick || undefined} onValueChange={setSupplierPick}>
                   <SelectTrigger className="h-10 sm:w-56"><SelectValue placeholder="Select…" /></SelectTrigger>

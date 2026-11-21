@@ -28,10 +28,19 @@ function writeCachedShopType(shopType: ShopType) {
 }
 
 export function useShopProfile(): ShopProfile {
+  return useShopProfileState().profile;
+}
+
+/**
+ * `ready` is false until the shop type is confirmed (fresh session cache or `/tenants/me`).
+ * Before that, `profile` may be the default profile, so callers must not redirect on it.
+ */
+export function useShopProfileState(): { profile: ShopProfile; ready: boolean } {
   const cached = readCachedShopType();
   const [profile, setProfile] = useState<ShopProfile>(() =>
     getShopProfile(cached ?? getStoredShopType()),
   );
+  const [ready, setReady] = useState<boolean>(() => cached !== null);
 
   useEffect(() => {
     const stored = getStoredShopType();
@@ -42,20 +51,26 @@ export function useShopProfile(): ShopProfile {
       setProfile(getShopProfile(stored));
     }
 
-    if (fromCache) return;
+    if (fromCache) {
+      setReady(true);
+      return;
+    }
 
+    let alive = true;
     api.get<{ shopType?: ShopType }>('/tenants/me')
       .then((r) => {
-        if (r.data?.shopType) {
+        if (alive && r.data?.shopType) {
           localStorage.setItem('fe_shop_type', r.data.shopType);
           writeCachedShopType(r.data.shopType);
           setProfile(getShopProfile(r.data.shopType));
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (alive) setReady(true); });
+    return () => { alive = false; };
   }, []);
 
-  return profile;
+  return { profile, ready };
 }
 
 export function isGroceryShop(profile?: ShopProfile): boolean {
