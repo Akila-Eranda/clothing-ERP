@@ -514,6 +514,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [creditPayBusy, setCreditPayBusy] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
+  // (priceOverrideReasonRef is cleared when the cart empties, see the effect after the cart store)
+  // Selling above MRP (manager/admin override) needs a written reason; the API refuses the sale without one.
+  const [priceReasonOpen, setPriceReasonOpen] = React.useState(false);
+  const [priceReasonDraft, setPriceReasonDraft] = React.useState("");
+  const priceOverrideReasonRef = React.useRef("");
   const [discountEditType, setDiscountEditType] = React.useState<"percentage" | "fixed">("percentage");
   const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{
     entityId: string;
@@ -629,6 +634,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const checkoutConfirmRef = React.useRef<HTMLButtonElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount, allowNegativeStock, setAllowNegativeStock } = useCartStore();
+  React.useEffect(() => { if (!items.length) priceOverrideReasonRef.current = ""; }, [items.length]);
   const taxEnabled = taxRate > 0;
 
   React.useEffect(() => {
@@ -2211,6 +2217,7 @@ ${receiptSoftwareCreditHtml()}
         notes:cartNotes,
         ...(helperEmployeeId ? { helperEmployeeId } : {}),
         ...(activeHeldBillId?{heldBillId:activeHeldBillId}:{}),
+        ...(priceOverrideReasonRef.current ? { priceOverrideReason: priceOverrideReasonRef.current } : {}),
       };
       // Same cart retried (double click / timeout / reload) re-sends the same key → API returns the original sale.
       const clientRequestId = checkoutRequestKey(checkoutSignature(payload));
@@ -2219,6 +2226,7 @@ ${receiptSoftwareCreditHtml()}
       // The server has recorded the sale. From here on the idempotency key stays in place until the cart is reset,
       // so a failure of the on-screen finishing can never turn a retry into a second sale.
       saleConfirmedRef.current = s.invoiceNumber;
+      priceOverrideReasonRef.current = "";
       const saleTotal = Number(s.total) || totalAmt;
       const cashTendered =
         payMethod === "CASH" && tenderPad.trim()
@@ -2403,6 +2411,10 @@ ${receiptSoftwareCreditHtml()}
       const msg=(e as Error).message??"Checkout failed";
       toast.error(msg);
       if (/QR fee changed/i.test(msg)) void reloadPosTenantSettings(); // an admin changed the fee: show the new figure
+      if (/needs a reason|price is above MRP/i.test(msg)) {
+        setPriceReasonDraft(priceOverrideReasonRef.current);
+        setPriceReasonOpen(true); // ask for the reason, then retry the same checkout
+      }
       if (/no longer in catalog|variant that no longer exists/i.test(msg)) {
         clearCart();
         setSelectedCartIdx(-1);
@@ -6246,6 +6258,10 @@ ${rows}
                   onBack={() => setShowDemoProduct(false)}
                   taxRate={taxRate}
                   onAddToCart={(item) => {
+                    const roleKey = String(user?.role ?? "").toLowerCase();
+                    if (!["super_admin", "tenant_admin", "branch_manager"].includes(roleKey)) {
+                      toast.warning("Bill-only items need manager authorization — checkout is refused unless a manager is signed in.", { duration: 6000 });
+                    }
                     addItem(item);
                     setShowDemoProduct(false);
                   }}
@@ -6254,6 +6270,50 @@ ${rows}
             </motion.div>
           </motion.div>
         )}</AnimatePresence>
+
+        {/* PRICE ABOVE MRP: reason required by the API (audited manager override) */}
+        {priceReasonOpen && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+            <div className="rounded-2xl border shadow-2xl w-full max-w-md p-5" style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}>
+              <h2 className="text-white font-bold text-sm mb-1">Reason for selling above MRP</h2>
+              <p className="text-xs mb-3" style={{ color: "var(--pos-muted)" }}>
+                One or more items are priced above their maximum price. Enter why; it is saved with the sale for audit.
+              </p>
+              <textarea
+                autoFocus
+                value={priceReasonDraft}
+                onChange={(e) => setPriceReasonDraft(e.target.value.slice(0, 300))}
+                rows={3}
+                placeholder="e.g. Price increased by supplier, label not updated"
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" }}
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl text-sm hover:bg-white/10"
+                  style={{ color: "var(--pos-muted)" }}
+                  onClick={() => { priceOverrideReasonRef.current = ""; setPriceReasonOpen(false); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!priceReasonDraft.trim()}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
+                  style={{ background: "var(--pos-success)" }}
+                  onClick={() => {
+                    priceOverrideReasonRef.current = priceReasonDraft.trim();
+                    setPriceReasonOpen(false);
+                    setTimeout(() => { void handleCheckout(); }, 0);
+                  }}
+                >
+                  Save reason &amp; pay
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* SHORTCUTS */}
         <AnimatePresence>{showShortcuts&&(
