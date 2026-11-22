@@ -1,0 +1,130 @@
+# HEXALYTE staging stack - fully ISOLATED from production:
+#   * own compose project name, own network, own named volumes (nothing shared with docker-compose.yml)
+#   * every published port is bound to 127.0.0.1 (reach it through an SSH tunnel / the staging reverse proxy)
+#   * all secrets come from .env.staging (git-ignored; template: .env.staging.example) - NEVER from production
+#   * same hardening as production (uid 1001, read-only root fs, no capabilities) so permission problems show up here first
+#
+#   docker compose -p hexalyte-staging --env-file .env.staging -f docker-compose.staging.yml build
+#   docker compose -p hexalyte-staging --env-file .env.staging -f docker-compose.staging.yml up -d postgres redis
+#   (database: restore a SANITISED copy, or `node scripts/db-fresh-install.mjs`; see ops/staging/README.md)
+#   docker compose -p hexalyte-staging --env-file .env.staging -f docker-compose.staging.yml up -d api-a web
+#   multi-instance test:  ... --profile multi up -d api-b
+name: hexalyte-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${STG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${STG_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${STG_POSTGRES_DB}
+    ports:
+      - '127.0.0.1:${STG_POSTGRES_PORT:-58431}:5432'
+    volumes:
+      - stg_postgres:/var/lib/postgresql/data
+    networks: [stg]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${STG_POSTGRES_USER} -d ${STG_POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--requirepass', '${STG_REDIS_PASSWORD}', '--maxmemory', '128mb', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '127.0.0.1:${STG_REDIS_PORT:-58432}:6379'
+    volumes:
+      - stg_redis:/data
+    networks: [stg]
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli --no-auth-warning -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${STG_REDIS_PASSWORD}
+
+  api-a: &api
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    image: hexalyte-staging-api:local
+    user: '1001:1001'
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment: &api-env
+      DATABASE_URL: postgresql://${STG_POSTGRES_USER}:${STG_POSTGRES_PASSWORD}@postgres:5432/${STG_POSTGRES_DB}?connection_limit=${STG_DB_POOL:-20}&pool_timeout=20
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${STG_REDIS_PASSWORD}
+      JWT_ACCESS_SECRET: ${STG_JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${STG_JWT_REFRESH_SECRET}
+      NODE_ENV: production
+      PORT: 3001
+      ALLOWED_ORIGINS: ${STG_WEB_ORIGIN:-http://127.0.0.1:58000}
+      FRONTEND_URL: ${STG_WEB_ORIGIN:-http://127.0.0.1:58000}
+      KEYCLOAK_AUTH_ENABLED: 'false'
+      UPLOAD_DIR: /app/uploads
+      LOCAL_UPLOAD_DIR: /app/uploads
+      SSL_PENDING_DIR: /app/uploads/.ssl-pending
+      WHATSAPP_AUTH_DIR: /app/private/whatsapp-sessions
+      # staging must never open a real WhatsApp socket on its own (no accounts are paired in staging)
+      WHATSAPP_AUTO_RESUME: 'false'
+      # one proxy hop in front of the API (staging reverse proxy); the direct 127.0.0.1 ports are for operators only
+      TRUST_PROXY_HOPS: 1
+      # staging must not touch DNS / SSL / Cloudflare
+      CLOUDFLARE_API_TOKEN: ''
+      CLOUDFLARE_ZONE_ID: ''
+      TENANT_SSL_HOOK_URL: ''
+      TENANT_SSL_HOOK_SECRET: ''
+    ports:
+      - '127.0.0.1:${STG_API_A_PORT:-58001}:3001'
+    volumes:
+      - stg_uploads:/app/uploads
+      - stg_private:/app/private
+    networks: [stg]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    pids_limit: 300
+    mem_limit: 1536m
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://127.0.0.1:3001/api/v1/health\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  # second API instance: proves WhatsApp session ownership across instances (same Redis, same private volume)
+  api-b:
+    <<: *api
+    profiles: [multi]
+    ports:
+      - '127.0.0.1:${STG_API_B_PORT:-58002}:3001'
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${STG_PUBLIC_API_URL:-http://127.0.0.1:58001/api/v1}
+    image: hexalyte-staging-web:local
+    depends_on: [api-a]
+    environment:
+      NEXT_PUBLIC_API_URL: ${STG_PUBLIC_API_URL:-http://127.0.0.1:58001/api/v1}
+    ports:
+      - '127.0.0.1:${STG_WEB_PORT:-58000}:3000'
+    networks: [stg]
+
+networks:
+  stg:
+    name: hexalyte-staging-net
+
+volumes:
+  stg_postgres:
+  stg_redis:
+  stg_uploads:
+  stg_private:

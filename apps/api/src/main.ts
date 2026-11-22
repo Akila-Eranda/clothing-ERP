@@ -28,6 +28,14 @@ async function bootstrap(): Promise<void> {
   const port = config.get<number>('app.port', 4000);
   const isDev = config.get<string>('app.env') !== 'production';
 
+  // ── Client IP behind the reverse proxy ────────────────────
+  // Without this, every request seen by Express comes from the proxy's own address, so the rate limiter (per client
+  // IP) treats ALL users of the platform as ONE client (verified: 30 requests claiming 30 different client IPs ->
+  // 10 served, 20 x 429). Set TRUST_PROXY_HOPS to the number of proxies in front of the API (nginx only = 1).
+  // Default 0 = do not trust X-Forwarded-For (the API is reachable directly, so a client could spoof its IP).
+  const proxyHops = parseInt(process.env.TRUST_PROXY_HOPS ?? '0', 10);
+  if (Number.isInteger(proxyHops) && proxyHops > 0) app.set('trust proxy', proxyHops);
+
   // ── Security ──────────────────────────────────────────────
   app.use(helmet({ contentSecurityPolicy: !isDev }));
 
