@@ -7,6 +7,8 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // lib/fonts.ts holds the `font-sans-local` / `font-mono-local` class names that define --font-sans/--font-mono.
+    "./src/lib/**/*.{js,ts,jsx,tsx}",
     "./node_modules/react-table-craft/dist/**/*.{js,mjs}",
   ],
   // TableCraft responsive toolbars — keep these utilities even if scan misses the package

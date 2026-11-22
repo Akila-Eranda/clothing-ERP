@@ -4,8 +4,8 @@
  */
 
 export const ERP_COLORS = {
-  primary: "#1677FF",
-  primaryHover: "#1268E6",
+  primary: "#2563EB",
+  primaryHover: "#1D4ED8",
   text: "#1F2937",
   textSecondary: "#64748B",
   textMuted: "#94A3B8",
@@ -15,7 +15,7 @@ export const ERP_COLORS = {
   success: "#10B981",
   warning: "#F59E0B",
   danger: "#EF4444",
-  info: "#1677FF",
+  info: "#2563EB",
 } as const;
 
 export const ERP_RADIUS = {

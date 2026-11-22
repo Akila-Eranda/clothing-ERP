@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { formatNumber } from "@/lib/utils";
 
-const ORANGE = "#1677FF";
+const ORANGE = "#2563EB";
 const ORANGE_LIGHT = "#DBEAFE";
 const TEAL = "#10B981";
 const EXPENSE = "#EF4444";
@@ -215,7 +215,7 @@ export function DreamsCategoryDonut({
   totalProducts: number;
   totalCategories: number;
 }) {
-  const colors = ["#1677FF", "#10B981", "#64748B", "#F59E0B", "#EF4444"];
+  const colors = ["#2563EB", "#10B981", "#64748B", "#F59E0B", "#EF4444"];
   const slices = categories.slice(0, 3).map((c, i) => ({
     name: c.name,
     value: c.count,

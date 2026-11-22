@@ -185,6 +185,8 @@ function AccentSwatches({
             key={preset.id}
             type="button"
             title={preset.name}
+            aria-label={`${preset.name} accent`}
+            aria-pressed={value === preset.id}
             onClick={() => onPick(preset.id)}
             className={cn("tc-accent-dot", value === preset.id && "tc-accent-dot--active")}
             style={{ background: preset.hex }}
@@ -200,6 +202,7 @@ function AccentSwatches({
           {value === "custom" && <Check className="relative z-[1] h-3.5 w-3.5 text-white drop-shadow" strokeWidth={3} />}
           <input
             type="color"
+            aria-label="Custom accent color"
             value={customHex}
             onChange={(e) => onCustom(e.target.value.toUpperCase())}
             className="absolute inset-0 opacity-0 cursor-pointer"

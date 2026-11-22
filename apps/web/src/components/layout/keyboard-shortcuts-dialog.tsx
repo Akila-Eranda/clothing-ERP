@@ -23,7 +23,8 @@ const APP_SHORTCUTS: { title: string; items: [string, string][] }[] = [
   {
     title: "Navigation",
     items: [
-      ["⌘K / Ctrl+K", "Focus search (coming soon)"],
+      ["⌘K / Ctrl+K", "Open global search"],
+      ["Alt+M", "Search the sidebar menu"],
       ["POS Terminal button", "Open POS overlay"],
     ],
   },

@@ -16,8 +16,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
+import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import { BranchSwitcher } from "@/components/branch/branch-switcher";
-import { cn, getInitials } from "@/lib/utils";
+import { getInitials } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME, DESKTOP_DOWNLOAD_URL } from "@/lib/constants";
@@ -217,7 +218,8 @@ export function Header() {
     ? crumbLabel(breadcrumbs.length - 1)
     : pageTitle;
 
-  const notificationCount = isMaintenance ? 1 : 4;
+  const unreadCount = useUnreadNotifications(pathname);
+  const notificationCount = unreadCount + (isMaintenance ? 1 : 0);
 
   return (
     <header
@@ -233,7 +235,7 @@ export function Header() {
         <div className="hex-header__left">
           <button
             type="button"
-            className="hex-header__icon-btn lg:hidden"
+            className="hex-header__icon-btn md:hidden"
             onClick={toggleMobileSidebar}
             aria-label="Open menu"
           >
@@ -344,11 +346,11 @@ export function Header() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="hex-header__icon-btn hex-header__icon-btn--badge relative" aria-label="Notifications">
+                <button type="button" className="hex-header__icon-btn hex-header__icon-btn--badge relative" aria-label={notificationCount > 0 ? `Notifications, ${isMaintenance ? "maintenance notice" : `${unreadCount} unread`}` : "Notifications"}>
                   <Bell className="h-[18px] w-[18px]" />
                   {notificationCount > 0 && (
                     <span className="hex-header__badge">
-                      {isMaintenance ? "!" : notificationCount}
+                      {isMaintenance ? "!" : notificationCount > 99 ? "99+" : notificationCount}
                     </span>
                   )}
                 </button>

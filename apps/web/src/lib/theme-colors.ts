@@ -80,9 +80,9 @@ const LEGACY_LIGHT_CANVAS = new Set([
 
 export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   lightAccent: "blue",
-  customLightAccent: "#1677FF",
+  customLightAccent: "#2563EB",
   darkAccent: "match-light",
-  customDarkAccent: "#1677FF",
+  customDarkAccent: "#2563EB",
 
   lightBackground: "#F5F7FA",
   lightCard: "#FFFFFF",
@@ -100,7 +100,7 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   darkChromeFg: "#D8DFEE",
   darkChromeBorder: "#1F2228",
   darkChromeMuted: "#6B7280",
-  darkChromeActive: "#1677FF",
+  darkChromeActive: "#2563EB",
   darkChromeLogoBg: "#141414",
 
   lightChromeBg: "#FFFFFF",
@@ -108,7 +108,7 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   lightChromeFg: "#1F2937",
   lightChromeBorder: "#E5E7EB",
   lightChromeMuted: "#64748B",
-  lightChromeActive: "#1677FF",
+  lightChromeActive: "#2563EB",
   lightChromeLogoBg: "#FFFFFF",
 
   darkChromeBgCss: "",
@@ -119,7 +119,7 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   buttonDanger: "#EF4444",
   buttonWarning: "#F59E0B",
   buttonDestructive: "#EF4444",
-  buttonInfo: "#1677FF",
+  buttonInfo: "#2563EB",
 };
 
 export function normalizeThemeColorsState(
@@ -218,7 +218,7 @@ function accentHue(hsl: string): string {
   return hsl.split(" ")[0] ?? "32";
 }
 
-function resolveAccentHsl(state: ThemeColorsState, isDark: boolean): string {
+export function resolveAccentHsl(state: ThemeColorsState, isDark: boolean): string {
   if (isDark) {
     if (state.darkAccent === "match-light") {
       return resolveAccentHsl({ ...state, darkAccent: state.lightAccent }, false);

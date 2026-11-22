@@ -50,6 +50,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [mounted, isAuthenticated, posOnly, openPos]);
 
+  // Mobile drawer: lock background scroll, close on Escape or when resized up to tablet/desktop.
+  React.useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileSidebarOpen(false);
+    };
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMobileSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [sidebarMobileOpen, setMobileSidebarOpen]);
+
+  // Drawer a11y: move focus in, trap Tab inside, and give focus back to the opener on close.
+  const drawerRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() =>
+      drawerRef.current?.querySelector<HTMLElement>('[aria-label="Close menu"]')?.focus(),
+    );
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const items = Array.from(
+        root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      ).filter((el) => !el.closest("[inert]") && el.getClientRects().length > 0);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !root.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onTab);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onTab);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [sidebarMobileOpen]);
+
   const handlePosOnlyLogout = React.useCallback(async () => {
     await logoutApi();
     router.replace("/login");
@@ -98,20 +156,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <BranchProvider>
       <ThemeLayoutApplier />
       <div className="dashboard-shell flex h-screen overflow-hidden bg-background">
-        {/* Desktop Sidebar */}
+        {/* Desktop sidebar (expanded / collapsed) */}
         <div className="hidden lg:flex">
           <Sidebar />
         </div>
 
-        {/* Mobile sidebar overlay */}
+        {/* Tablet: compact icon rail */}
+        <div className="hidden md:flex lg:hidden">
+          <Sidebar forceCollapsed />
+        </div>
+
+        {/* Mobile: off-canvas drawer */}
         {sidebarMobileOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200 motion-reduce:animate-none"
               onClick={() => setMobileSidebarOpen(false)}
+              aria-hidden="true"
             />
-            <div className="relative h-full w-fit shadow-2xl">
-              <Sidebar />
+            <div ref={drawerRef} className="relative h-full w-fit shadow-2xl animate-in slide-in-from-left duration-200 motion-reduce:animate-none">
+              <Sidebar mobile />
             </div>
           </div>
         )}

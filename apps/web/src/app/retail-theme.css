@@ -770,26 +770,26 @@ html.dark .hex-retail-sidebar {
 /* DreamsPOS dark mode — sidebar matches dark shell (not light strip) */
 html.dark[data-sidebar="light"] .hex-retail-sidebar,
 html.dark[data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
-  --retail-sidebar-bg: var(--chrome-bg, #0d0d0d);
-  --retail-sidebar-fg: var(--chrome-fg, #d8dfee);
-  --retail-sidebar-muted: var(--chrome-muted, #6b7280);
-  --retail-sidebar-border: var(--chrome-border, #1f2228);
+  --retail-sidebar-bg: var(--chrome-bg, #0F172A);
+  --retail-sidebar-fg: var(--chrome-fg, #F8FAFC);
+  --retail-sidebar-muted: var(--chrome-muted, #94A3B8);
+  --retail-sidebar-border: var(--chrome-border, #334155);
   --retail-sidebar-hover: var(--chrome-hover, rgba(255, 255, 255, 0.05));
-  --retail-sidebar-active-bg: var(--chrome-active-bg, rgba(59, 130, 246, 0.14));
+  --retail-sidebar-active-bg: var(--chrome-active-bg, rgba(37, 99, 235, 0.18));
   --retail-sidebar-active-fg: var(--chrome-active-fg, #60a5fa);
 }
 
 html.dark[data-topbar="white"] .hex-retail-header,
 html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
   --retail-topbar-bg: var(--chrome-bg, rgba(13, 13, 13, 0.92));
-  --retail-topbar-fg: var(--chrome-fg, #d8dfee);
+  --retail-topbar-fg: var(--chrome-fg, #F8FAFC);
   --retail-topbar-border: var(--chrome-border, rgba(255, 255, 255, 0.06));
 }
 
 [data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
   --retail-sidebar-bg: var(--chrome-bg, #fbfbfb);
   --retail-sidebar-fg: var(--chrome-fg, #1f2937);
-  --retail-sidebar-muted: var(--chrome-muted, #6b7280);
+  --retail-sidebar-muted: var(--chrome-muted, #94A3B8);
   --retail-sidebar-border: var(--chrome-border, rgba(0, 0, 0, 0.06));
   --retail-sidebar-hover: var(--chrome-hover, #f3f4f6);
   --retail-sidebar-active-bg: var(--chrome-active-bg, rgba(37, 99, 235, 0.1));

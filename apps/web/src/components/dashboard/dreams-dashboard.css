@@ -12,10 +12,10 @@
 }
 
 .dreams-pos-dash {
-  --dp-primary: #1677ff;
+  --dp-primary: #2563EB;
   --dp-secondary: #1f2937;
-  --dp-teal: #1677ff;
-  --dp-info: #1677ff;
+  --dp-teal: #2563EB;
+  --dp-info: #2563EB;
   --dp-orange: #ef4444;
   --dp-success: #10b981;
   --dp-danger: #ef4444;
@@ -646,13 +646,13 @@
 
 .dreams-pos-dash .dp-date-range-trigger:hover,
 .dp-date-range-trigger:hover {
-  border-color: #1677ff;
+  border-color: #2563EB;
 }
 
 .dreams-pos-dash .dp-date-range-trigger:focus-visible,
 .dp-date-range-trigger:focus-visible {
   outline: none;
-  border-color: #1677ff;
+  border-color: #2563EB;
   box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.2);
 }
 
@@ -682,7 +682,7 @@
 
 .dp-day-picker-wrap {
   --rdp-cell-size: 36px;
-  --rdp-accent-color: #1677ff;
+  --rdp-accent-color: #2563EB;
   --rdp-background-color: rgba(22, 119, 255, 0.12);
 }
 
@@ -694,7 +694,7 @@
 .dp-day-picker-wrap .rdp-day_selected,
 .dp-day-picker-wrap .rdp-day_selected:focus-visible,
 .dp-day-picker-wrap .rdp-day_selected:hover {
-  background-color: #1677ff;
+  background-color: #2563EB;
 }
 
 .dp-day-picker-wrap .rdp-day_range_middle {
@@ -961,7 +961,7 @@
 /* Dark mode — DreamsPOS dark canvas + elevated cards */
 .dark .dreams-pos-dash {
   --dp-secondary: #1a1a1a;
-  --dp-info: #1677ff;
+  --dp-info: #2563EB;
   --dp-border: hsl(0 0% 100% / 0.08);
   --dp-text: #d8dfee;
   --dp-muted: #9ca3af;
