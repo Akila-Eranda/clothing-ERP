@@ -696,7 +696,8 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
       ...groupPeers,
     ];
     const childActive = itemOrChildActive(pathname, { ...item, peerHrefs });
-    const open = openMenus[key] ?? childActive;
+    // Flat sidebar: sub-items are always visible (no dropdown).
+    const open = true;
     const Icon = item.icon;
     const onToggle = () => setOpenMenus((prev) => ({ ...prev, [key]: !open }));
     const panelId = `${uid}-sub-${key.replace(/[^a-zA-Z0-9]/g, "-")}`;
@@ -769,29 +770,14 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
           {item.href ? (
             <Link
               href={item.href}
-              onClick={() => {
-                setOpenMenus((p) => ({ ...p, [key]: true }));
-                closeMobile();
-              }}
+              onClick={closeMobile}
               className={cn(labelCls, "rounded-md", FOCUS_RING)}
             >
               {labelInner}
             </Link>
           ) : (
-            <button type="button" onClick={onToggle} className={cn(labelCls, "cursor-pointer rounded-md", FOCUS_RING)}>
-              {labelInner}
-            </button>
+            <div className={cn(labelCls, "rounded-md")}>{labelInner}</div>
           )}
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={open}
-            aria-controls={panelId}
-            aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
-            className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10", FOCUS_RING)}
-          >
-            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} strokeWidth={2} />
-          </button>
         </div>
         <Collapse open={open} id={panelId}>
           <div className="ml-[21px] mt-0.5 space-y-0.5 border-l pl-1.5" style={{ borderColor: theme.border }}>
@@ -816,31 +802,21 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
 
     const GroupIcon = group.icon;
     const hasActive = !!computeActive([group], pathname).groupsOpen[group.title];
-    const open = openGroups[group.title] ?? false;
+    // Flat sidebar: every group is always expanded (no dropdown).
+    const open = true;
     const panelId = `${uid}-grp-${gi}`;
 
     return (
       <div key={group.title} className={gi > 0 ? "mt-1.5" : ""}>
-        <button
-          type="button"
-          onClick={() => setOpenGroups((p) => ({ ...p, [group.title]: !open }))}
-          aria-expanded={open}
-          aria-controls={panelId}
+        <div
           className={cn(
-            "flex h-9 w-full items-center gap-3 rounded-[10px] px-3 text-left transition-colors duration-150",
-            FOCUS_RING,
-            hasActive
-              ? "bg-[var(--sb-active-bg)] text-[var(--sb-active-fg)]"
-              : "text-[var(--sb-fg)] hover:bg-[var(--sb-hover)]",
+            "flex h-9 w-full items-center gap-3 rounded-[10px] px-3 text-left",
+            hasActive ? "text-[var(--sb-active-fg)]" : "text-[var(--sb-fg)]",
           )}
         >
           <GroupIcon className={cn(iconSize, "shrink-0")} strokeWidth={1.75} />
           <span className="flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.1em]">{group.title}</span>
-          <ChevronDown
-            className={cn("h-4 w-4 shrink-0 text-[var(--sb-muted)] transition-transform duration-200", open && "rotate-180")}
-            strokeWidth={2}
-          />
-        </button>
+        </div>
         <Collapse open={open} id={panelId}>
           <div className="space-y-0.5 pb-1 pl-1.5 pt-1">{items}</div>
         </Collapse>
