@@ -268,7 +268,7 @@ export class PaymentQrController {
   }
 
   @Post()
-  @RequirePermissions('accounting:update')
+  @RequirePermissions('accounting:create')
   @ApiOperation({ summary: 'Add a QR payment code' })
   create(@CurrentUser() user: IAuthUser, @Body() dto: CreatePaymentQrDto) {
     return this.service.create(user.tenantId, user.id, {

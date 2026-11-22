@@ -7,6 +7,7 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as request from 'supertest';
 import { RoleType } from '@prisma/client';
@@ -45,7 +46,7 @@ describe('Bank account management + QR payment details', () => {
     const r = request(app.getHttpServer())[method](`/api/v1${url}`).set(hdr(s[who], s.sub));
     return body ? r.send(body) : r;
   };
-  const withToken = async (method: 'get' | 'put', token: string, sub: string, url: string, body?: object) => {
+  const withToken = async (method: 'get' | 'post' | 'put', token: string, sub: string, url: string, body?: object) => {
     await pace();
     const r = request(app.getHttpServer())[method](`/api/v1${url}`).set(hdr(token, sub));
     return body ? r.send(body) : r;
@@ -60,7 +61,7 @@ describe('Bank account management + QR payment details', () => {
 
   async function seed(label: 'a' | 'b'): Promise<Shop> {
     const sub = `bnk${label}${run}`;
-    const t = await prisma.tenant.create({ data: { name: `BNK ${label}`, subdomain: sub, shopType: 'GROCERY', plan: 'PROFESSIONAL', status: 'ACTIVE' } });
+    const t = await prisma.tenant.create({ data: { name: `BNK ${label}`, subdomain: sub, shopType: label === 'a' ? 'GROCERY' : 'CLOTHING', plan: 'PROFESSIONAL', status: 'ACTIVE' } });
     const branch = await prisma.branch.create({ data: { tenantId: t.id, name: 'Main', code: 'MAIN' } });
     await prisma.warehouse.create({ data: { tenantId: t.id, branchId: branch.id, name: 'Main', code: `WH-${label}`, isDefault: true } });
     const perms = await Promise.all(PERMISSION_CATALOGUE.map((k) => {
@@ -213,7 +214,9 @@ describe('Bank account management + QR payment details', () => {
     expect((await call('post', A, 'cashier', '/accounting/bank-accounts', good(7, { accountNumber: '4444333322' }))).status).toBe(403);
     expect((await call('put', A, 'cashier', `/accounting/bank-accounts/${boc.id}`, { branchName: 'Cashier edit' })).status).toBe(403);
     expect((await call('put', A, 'cashier', `/accounting/bank-accounts/${boc.id}`, { isActive: false })).status).toBe(403);
-    expect((await call('post', A, 'cashier', '/payment-qr', { label: 'x', bankAccountId: boc.id })).status).toBe(403);
+    const qrDenied = await call('post', A, 'cashier', '/payment-qr', { label: 'x', bankAccountId: boc.id });
+    expect(qrDenied.status).toBe(403);
+    expect(qrDenied.body.message).toBe('Insufficient permissions. Required: [accounting:create]');
     expect(await row(boc.id)).toEqual(before);
     expect(await prisma.bankAccount.count({ where: { tenantId: A.id } })).toBe(countBefore);
   });
@@ -273,10 +276,76 @@ describe('Bank account management + QR payment details', () => {
     expect((await call('post', A, 'cashier', `/payment-qr/${qrHnb}/render`, { amount: 100 })).status).toBe(201);
   });
 
+  it('7c. QR creation requires accounting:create; editing still requires accounting:update', async () => {
+    const adminRole = await prisma.role.findFirstOrThrow({ where: { tenantId: A.id, name: 'Tenant Admin' } });
+    const updatePermission = await prisma.permission.findUniqueOrThrow({
+      where: { resource_action: { resource: 'accounting', action: 'update' } },
+    });
+    await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id, permissionId: updatePermission.id } });
+    try {
+      const created = await call('post', A, 'admin', '/payment-qr', {
+        label: 'Create-only QR',
+        bankAccountId: boc.id,
+      });
+      expect(created.status).toBe(201);
+      const edited = await call('put', A, 'admin', `/payment-qr/${created.body.data.id}`, { label: 'Not allowed' });
+      expect(edited.status).toBe(403);
+      expect(edited.body.message).toBe('Insufficient permissions. Required: [accounting:update]');
+    } finally {
+      await prisma.rolePermission.createMany({
+        data: [{ roleId: adminRole.id, permissionId: updatePermission.id }],
+        skipDuplicates: true,
+      });
+    }
+  });
+
+  it('7d. an expired access token cannot create a payment QR', async () => {
+    const jwt = app.get(JwtService);
+    const expiredToken = await jwt.signAsync(
+      { sub: 'expired-test-user', email: 'expired@test.invalid', tenantId: A.id, roles: [], permissions: [] },
+      { expiresIn: '-1s' },
+    );
+    const response = await withToken('post', expiredToken, A.sub, '/payment-qr', {
+      label: 'Expired token QR',
+      bankAccountId: boc.id,
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it('7e. a suspended shop is rejected by the global subscription guard', async () => {
+    await prisma.tenant.update({ where: { id: A.id }, data: { status: 'SUSPENDED' } });
+    try {
+      const response = await call('post', A, 'admin', '/payment-qr', {
+        label: 'Suspended shop QR',
+        bankAccountId: boc.id,
+      });
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This shop is suspended. Contact support.');
+    } finally {
+      await prisma.tenant.update({ where: { id: A.id }, data: { status: 'ACTIVE' } });
+    }
+  });
+
   // ── 6. shop isolation ───────────────────────────────────────────────────────────────────────────────────
   it('8. shop isolation: another shop sees, edits and renders none of this', async () => {
     const bOwn = await call('post', B, 'admin', '/accounting/bank-accounts', good(1, { code: 'B-ONLY', accountNumber: '0081 2345 1001' }));   // same number as A's: allowed in another shop
     expect(bOwn.status).toBe(201);
+    const clothingQr = await call('post', B, 'admin', '/payment-qr', { label: 'Clothing QR', bankAccountId: bOwn.body.data.id });
+    expect(clothingQr.status).toBe(201);
+    const foreignBranch = await prisma.branch.findFirstOrThrow({ where: { tenantId: B.id } });
+    const wrongBranch = await call('post', A, 'admin', '/payment-qr', {
+      label: 'Wrong branch',
+      bankAccountId: boc.id,
+      branchId: foreignBranch.id,
+    });
+    expect(wrongBranch.status).toBe(403);
+    expect(wrongBranch.body.message).toBe('Branch is not available in this tenant.');
+    const wrongTenant = await withToken('post', A.admin, B.sub, '/payment-qr', {
+      label: 'Wrong tenant',
+      bankAccountId: boc.id,
+    });
+    expect(wrongTenant.status).toBe(403);
+    expect(wrongTenant.body.message).toBe('Tenant context does not match authenticated session');
     const bList = (await call('get', B, 'admin', '/accounting/bank-accounts?includeInactive=true')).body.data as { code: string }[];
     expect(bList.map((x) => x.code)).toEqual(['B-ONLY']);
     expect(JSON.stringify((await call('get', B, 'cashier', '/payment-qr/pos')).body.data)).not.toContain('Renamed Holder');
