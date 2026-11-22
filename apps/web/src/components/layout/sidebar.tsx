@@ -504,7 +504,6 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
 
   /* ── Expand state ── */
   const initial = React.useMemo(() => computeActive(navGroups, pathname), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>(initial.groupsOpen);
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>(initial.menusOpen);
 
   /* Auto-expand the owner of the current route on navigation / refresh. */
@@ -516,7 +515,6 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
     const a = computeActive(navGroupsRef.current, pathname);
     const merge = (p: Record<string, boolean>, add: Record<string, boolean>) =>
       Object.keys(add).every((k) => p[k]) ? p : { ...p, ...add };
-    setOpenGroups((p) => merge(p, a.groupsOpen));
     setOpenMenus((p) => merge(p, a.menusOpen));
   }, [pathname, navSig]);
 
@@ -532,7 +530,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
       for (const it of g.items) {
         if (it.href && !it.sectionLabel) out.push({ label: it.label, href: it.href, icon: it.icon, trail: g.title });
         for (const c of it.children ?? []) {
-          if (c.href && !c.sectionLabel) out.push({ label: c.label, href: c.href, icon: c.icon, trail: `${g.title} › ${it.label}` });
+          if (c.href && !c.sectionLabel) out.push({ label: c.label, href: c.href, icon: c.icon, trail: g.title.trim().toLowerCase() === it.label.trim().toLowerCase() ? it.label : `${g.title} › ${it.label}` });
         }
       }
     }
@@ -643,7 +641,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
         )}
         {!collapsed && (
           <>
-            <span className="flex-1 truncate text-left text-[13.5px] leading-none" title={item.label}>
+            <span className="flex-1 truncate text-left text-[13.5px] leading-none">
               {item.label}
             </span>
             {count > 0 && <CountBadge count={count} />}
@@ -696,8 +694,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
       ...groupPeers,
     ];
     const childActive = itemOrChildActive(pathname, { ...item, peerHrefs });
-    // Flat sidebar: sub-items are always visible (no dropdown).
-    const open = true;
+    const open = openMenus[key] ?? childActive;
     const Icon = item.icon;
     const onToggle = () => setOpenMenus((prev) => ({ ...prev, [key]: !open }));
     const panelId = `${uid}-sub-${key.replace(/[^a-zA-Z0-9]/g, "-")}`;
@@ -770,14 +767,29 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
           {item.href ? (
             <Link
               href={item.href}
-              onClick={closeMobile}
+              onClick={() => {
+                setOpenMenus((p) => ({ ...p, [key]: true }));
+                closeMobile();
+              }}
               className={cn(labelCls, "rounded-md", FOCUS_RING)}
             >
               {labelInner}
             </Link>
           ) : (
-            <div className={cn(labelCls, "rounded-md")}>{labelInner}</div>
+            <button type="button" onClick={onToggle} className={cn(labelCls, "cursor-pointer rounded-md", FOCUS_RING)}>
+              {labelInner}
+            </button>
           )}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={panelId}
+            aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
+            className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10", FOCUS_RING)}
+          >
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} strokeWidth={2} />
+          </button>
         </div>
         <Collapse open={open} id={panelId}>
           <div className="ml-[21px] mt-0.5 space-y-0.5 border-l pl-1.5" style={{ borderColor: theme.border }}>
@@ -807,18 +819,19 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
     const panelId = `${uid}-grp-${gi}`;
 
     return (
-      <div key={group.title} className={gi > 0 ? "mt-1.5" : ""}>
+      <div key={group.title}>
         <div
+          role="presentation"
           className={cn(
-            "flex h-9 w-full items-center gap-3 rounded-[10px] px-3 text-left",
-            hasActive ? "text-[var(--sb-active-fg)]" : "text-[var(--sb-fg)]",
+            "flex items-center gap-2 px-3 pb-1.5 pt-3 text-[10.5px] font-bold uppercase tracking-[0.12em]",
+            hasActive ? "text-[var(--sb-active-fg)]" : "text-[var(--sb-muted)]",
           )}
         >
-          <GroupIcon className={cn(iconSize, "shrink-0")} strokeWidth={1.75} />
-          <span className="flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.1em]">{group.title}</span>
+          <GroupIcon className="h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={2} />
+          <span className="truncate">{group.title}</span>
         </div>
         <Collapse open={open} id={panelId}>
-          <div className="space-y-0.5 pb-1 pl-1.5 pt-1">{items}</div>
+          <div className="space-y-0.5 pb-0.5">{items}</div>
         </Collapse>
       </div>
     );
