@@ -100,3 +100,12 @@ export function bankFieldsForSave(
   const first = BANK_DETAIL_KEYS.map((k) => problems[k]).find(Boolean);
   return { fields, problems, ...(first ? { firstProblem: first } : {}) };
 }
+
+/**
+ * Bank detail keys whose (cleaned) value differs from what the editor loaded. QA-006: an edit used to send all five
+ * details every time, so the API treated every save as "details changed" and enforced the full rules - a legacy
+ * account with a missing holder / branch could not even be renamed or disabled. Only changed details are sent now.
+ */
+export function changedBankDetails(original: Partial<BankDetailsInput>, current: Partial<BankDetailsInput>): BankDetailKey[] {
+  return BANK_DETAIL_KEYS.filter((k) => cleanText(current[k]) !== cleanText(original[k]));
+}

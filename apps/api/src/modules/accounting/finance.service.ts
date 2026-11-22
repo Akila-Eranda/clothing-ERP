@@ -1,3 +1,4 @@
+import { appendCashBookEntryTx } from '@/shared/cash-book.helper';
 import { textSearch } from '@/shared/search.helper';
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import {
@@ -475,15 +476,9 @@ export class FinanceService {
     const entryDate = dto.entryDate ? new Date(dto.entryDate) : new Date();
     await this.periods.assertDateInOpenPeriod(tenantId, entryDate);
 
-    const last = await this.prisma.cashBookEntry.findFirst({
-      where: { tenantId, ...(branchId && { branchId }) },
-      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
-    });
-    const prev = last?.balanceAfter ?? 0;
-    const balanceAfter = round2(prev + debit - credit);
-
-    const entry = await this.prisma.cashBookEntry.create({
-      data: {
+    // serialised with every other cash-book writer (per-tenant advisory lock) so the running balance stays exact
+    const entry = await this.prisma.$transaction((tx) =>
+      appendCashBookEntryTx(tx, {
         tenantId,
         branchId: branchId || undefined,
         entryDate,
@@ -491,13 +486,12 @@ export class FinanceService {
         description: dto.description,
         debit,
         credit,
-        balanceAfter,
         paymentMethod: dto.paymentMethod,
         referenceType: dto.referenceType,
         referenceId: dto.referenceId,
         createdBy: userId,
-      },
-    });
+      }),
+    );
 
     let journalEntryId: string | null = null;
     if (dto.postToGl !== false) {
@@ -698,7 +692,22 @@ export class FinanceService {
     if (dto.notes !== undefined) data.notes = dto.notes;
     if (dto.glAccountId !== undefined) data.glAccountId = dto.glAccountId;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
-    const updated = await this.prisma.bankAccount.update({ where: { id }, data });
+    // QA-006: the "changed by someone else" check above only compared a value read moments earlier. The write itself
+    // must be conditional on that same updatedAt, otherwise two saves in the same window both pass and the second one
+    // silently overwrites the first.
+    let updated: typeof existing;
+    if (dto.expectedUpdatedAt) {
+      const result = await this.prisma.bankAccount.updateMany({
+        where: { id, tenantId, updatedAt: existing.updatedAt },
+        data,
+      });
+      if (result.count !== 1) {
+        throw new ConflictException('This bank account was changed by someone else. Reload it and try again.');
+      }
+      updated = await this.getBankAccount(tenantId, id);
+    } else {
+      updated = await this.prisma.bankAccount.update({ where: { id }, data });
+    }
     await this.audit.log({
       tenantId, userId, action: 'UPDATE', resource: 'bank_accounts', resourceId: id,
       oldData: auditBankSnapshot(existing),

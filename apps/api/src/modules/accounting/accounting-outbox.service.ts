@@ -1,6 +1,7 @@
 /** Durable accounting outbox — enqueue, process, retry commerce GL posts. */
 
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { AccountingOutboxStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AccountingPostingService } from './accounting-posting.service';
@@ -107,6 +108,59 @@ export class AccountingOutboxService {
       orderBy: { createdAt: 'desc' },
       take: Math.min(200, query?.limit ?? 50),
     });
+  }
+
+  /**
+   * Reliability sweep (all tenants). Guarantees that a committed business record eventually gets its journal even if
+   * the process died after commit, the fast path failed, or a worker crashed mid-posting:
+   *   1. PROCESSING rows untouched for `stuckMinutes` (a crashed worker) are returned to FAILED so they are retried;
+   *   2. PENDING / FAILED rows older than `minAgeSeconds` (gives the fast path time to run) with fewer than
+   *      `maxAttempts` attempts are processed.
+   * Safe with several API instances: each event is claimed atomically in processOne, so it is posted once.
+   */
+  async sweep(opts: { limit?: number; stuckMinutes?: number; minAgeSeconds?: number; maxAttempts?: number } = {}) {
+    const limit = Math.min(500, opts.limit ?? 100);
+    const stuckBefore = new Date(Date.now() - (opts.stuckMinutes ?? 10) * 60_000);
+    const olderThan = new Date(Date.now() - (opts.minAgeSeconds ?? 60) * 1000);
+    const maxAttempts = opts.maxAttempts ?? 10;
+
+    const recovered = await this.prisma.accountingOutboxEvent.updateMany({
+      where: { status: AccountingOutboxStatus.PROCESSING, updatedAt: { lt: stuckBefore } },
+      data: { status: AccountingOutboxStatus.FAILED, lastError: 'recovered_stale_processing' },
+    });
+
+    const due = await this.prisma.accountingOutboxEvent.findMany({
+      where: {
+        status: { in: [AccountingOutboxStatus.PENDING, AccountingOutboxStatus.FAILED] },
+        attempts: { lt: maxAttempts },
+        createdAt: { lt: olderThan },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: { id: true, tenantId: true },
+    });
+
+    let posted = 0;
+    let failed = 0;
+    let skipped = 0;
+    for (const ev of due) {
+      const r = await this.processOne(ev.id, ev.tenantId);
+      if (r.status === AccountingOutboxStatus.POSTED) posted++;
+      else if (r.status === AccountingOutboxStatus.FAILED) failed++;
+      else skipped++;
+    }
+    return { recovered: recovered.count, picked: due.length, posted, failed, skipped };
+  }
+
+  @Cron('*/2 * * * *')
+  async sweepScheduled() {
+    if (process.env.ACCOUNTING_OUTBOX_SWEEP === 'false') return;
+    try {
+      const r = await this.sweep();
+      if (r.recovered || r.picked) this.logger.log(`Outbox sweep: ${JSON.stringify(r)}`);
+    } catch (err) {
+      this.logger.error(`Outbox sweep failed: ${(err as Error).message}`);
+    }
   }
 
   async processPending(tenantId: string, limit = 50) {

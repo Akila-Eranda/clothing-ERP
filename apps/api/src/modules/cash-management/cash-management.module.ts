@@ -37,6 +37,7 @@ import { WorkflowService } from '@/modules/workflow/workflow.module';
 import { WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import * as dayjs from 'dayjs';
+import { buildPhysicalCashFlow, physicalCashFlowToCsv } from '@/shared/physical-cash-flow.helper';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1240,6 +1241,45 @@ export class CashManagementService {
     };
   }
 
+  /**
+   * Physical cash flow (cash basis) for a date range in the SHOP's timezone: opening, inflows, outflows, transfers,
+   * expected closing, counted cash and variance - per day, branch and cashier. Branch-scoped: a branch-bound user
+   * only ever sees their own branch. See shared/physical-cash-flow.helper.ts for the definitions.
+   */
+  async getPhysicalCashFlow(tenantId: string, branchId: string | undefined, range: { from?: string; to?: string }) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } });
+    let from: Date;
+    let to: Date;
+    try {
+      const f = shopDayBounds(range.from, tenant?.timezone);
+      const t = shopDayBounds(range.to ?? range.from, tenant?.timezone);
+      from = f.from;
+      to = t.to;
+    } catch {
+      throw new BadRequestException('Invalid date (use YYYY-MM-DD)');
+    }
+    if (from > to) throw new BadRequestException('"from" must not be after "to"');
+    if (to.getTime() - from.getTime() > 400 * 86_400_000) throw new BadRequestException('Choose a range of at most 400 days');
+    const registers = await this.prisma.cashRegister.findMany({
+      where: { tenantId, ...(branchId ? { branchId } : {}), openingTime: { gte: from, lte: to } },
+      orderBy: { openingTime: 'asc' },
+      include: {
+        movements: { select: { type: true, amount: true, reference: true } },
+        cashier: { select: { firstName: true, lastName: true } },
+        branch: { select: { name: true } },
+      },
+    });
+    return buildPhysicalCashFlow(
+      registers.map((r) => ({
+        id: r.id, branchId: r.branchId, branchName: r.branch?.name ?? null, cashierId: r.cashierId,
+        cashierName: `${r.cashier.firstName} ${r.cashier.lastName ?? ''}`.trim(),
+        openingTime: r.openingTime, closingTime: r.closingTime, status: r.status, openingCash: r.openingCash,
+        actualCash: r.actualCash, movements: r.movements,
+      })),
+      tenant?.timezone,
+    );
+  }
+
   async getCloseSummary(registerId: string, tenantId: string) {
     const register = await this.getRegisterEntity(registerId, tenantId);
     if (register.status === CashRegisterStatus.CLOSED) {
@@ -1255,39 +1295,56 @@ export class CashManagementService {
     dto: CloseCashRegisterDto,
     opts: { actingCashierId?: string; roles?: string[] } = {},
   ) {
-    const register = await this.getRegisterEntity(registerId, tenantId);
-    const isOwner = register.cashierId === userId || register.cashierId === opts.actingCashierId;
-    if (!isOwner && !this.canManageCashTransfers(opts.roles ?? [])) {
-      throw new ForbiddenException('Only the wallet owner or a manager can close this shift');
-    }
-    if (register.status === CashRegisterStatus.CLOSED) {
-      throw new BadRequestException('Shift already closed');
-    }
+    // The close runs under a row lock on the shift: two simultaneous close requests (double click, retry after a
+    // timeout) cannot both pass the status check, and the expected cash is computed from the movements as they are
+    // at the moment of closing (a late movement can no longer slip in between). Only an OPEN shift can be closed:
+    // a shift waiting for approval (PENDING_APPROVAL) can NOT be closed again with a different counted amount.
+    const closed = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "cash_registers" WHERE "id" = ${registerId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException('Cash register session not found');
+      const register = await tx.cashRegister.findFirstOrThrow({
+        where: { id: registerId, tenantId },
+        include: { movements: { orderBy: { createdAt: 'asc' } } },
+      });
+      const isOwner = register.cashierId === userId || register.cashierId === opts.actingCashierId;
+      if (!isOwner && !this.canManageCashTransfers(opts.roles ?? [])) {
+        throw new ForbiddenException('Only the wallet owner or a manager can close this shift');
+      }
+      if (register.status === CashRegisterStatus.PENDING_APPROVAL) {
+        throw new BadRequestException('This shift is already closed and is waiting for manager approval');
+      }
+      if (register.status !== CashRegisterStatus.OPEN) {
+        throw new BadRequestException('Shift already closed');
+      }
 
-    const summary = this.buildCloseSummary(register);
-    const denomTotal = dto.denominations ? denominationTotal(dto.denominations) : 0;
-    const actualCash = denomTotal > 0 ? denomTotal : dto.actualCash;
-    const variance = Math.round((actualCash - summary.expectedCash) * 100) / 100;
-    const needsApproval = Math.abs(variance) > CASH_VARIANCE_APPROVAL_THRESHOLD;
+      const summary = this.buildCloseSummary(register);
+      const denomTotal = dto.denominations ? denominationTotal(dto.denominations) : 0;
+      const actualCash = denomTotal > 0 ? denomTotal : dto.actualCash;
+      const variance = Math.round((actualCash - summary.expectedCash) * 100) / 100;
+      const needsApproval = Math.abs(variance) > CASH_VARIANCE_APPROVAL_THRESHOLD;
 
-    const updated = await this.prisma.cashRegister.update({
-      where: { id: registerId },
-      data: {
-        closingCash: actualCash,
-        closingTime: new Date(),
-        expectedCash: summary.expectedCash,
-        actualCash,
-        variance,
-        denominationCount: (dto.denominations ?? {}) as object,
-        notes: dto.notes ?? register.notes,
-        status: needsApproval ? CashRegisterStatus.PENDING_APPROVAL : CashRegisterStatus.CLOSED,
-      },
-      include: {
-        movements: true,
-        cashier: { select: { id: true, firstName: true, lastName: true } },
-        branch: { select: { id: true, name: true } },
-      },
+      const updated = await tx.cashRegister.update({
+        where: { id: registerId },
+        data: {
+          closingCash: actualCash,
+          closingTime: new Date(),
+          expectedCash: summary.expectedCash,
+          actualCash,
+          variance,
+          denominationCount: (dto.denominations ?? {}) as object,
+          notes: dto.notes ?? register.notes,
+          status: needsApproval ? CashRegisterStatus.PENDING_APPROVAL : CashRegisterStatus.CLOSED,
+        },
+        include: {
+          movements: true,
+          cashier: { select: { id: true, firstName: true, lastName: true } },
+          branch: { select: { id: true, name: true } },
+        },
+      });
+      return { updated, summary, actualCash, variance, needsApproval };
     });
+    const { updated, summary, actualCash, variance, needsApproval } = closed;
 
     if (needsApproval) {
       await this.workflowService.ensureDefinition(tenantId, 'cash_variance');
@@ -2396,6 +2453,23 @@ export class CashManagementController {
   @ApiOperation({ summary: 'Shift, balance and handover history of a counter' })
   counterHistory(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Query('limit') limit?: string) {
     return this.cashService.getCounterHistory(user.tenantId, user.branchId, id, limit ? Number(limit) || 50 : 50);
+  }
+
+  @Get('physical-flow')
+  @RequirePermissions('cash:read')
+  @ApiOperation({ summary: 'Physical cash flow (cash basis): opening, inflows, outflows, expected closing, counted, variance' })
+  physicalFlow(@CurrentUser() user: IAuthUser, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.cashService.getPhysicalCashFlow(user.tenantId, user.branchId, { from, to });
+  }
+
+  @Get('physical-flow/csv')
+  @RequirePermissions('cash:read')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="physical-cash-flow.csv"')
+  @ApiOperation({ summary: 'Physical cash flow as CSV' })
+  async physicalFlowCsv(@CurrentUser() user: IAuthUser, @Query('from') from?: string, @Query('to') to?: string) {
+    const report = await this.cashService.getPhysicalCashFlow(user.tenantId, user.branchId, { from, to });
+    return new StreamableFile(Buffer.from(physicalCashFlowToCsv(report), 'utf8'));
   }
 
   @Get('summary')

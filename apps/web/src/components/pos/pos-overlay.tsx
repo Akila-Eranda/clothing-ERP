@@ -12,9 +12,10 @@ import { useCartStore, type HeldBillData } from "@/stores/cart-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatNumber, formatUserRole } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { api, tokenStorage } from "@/lib/api";
 import { withManagerApproval, ManagerApprovalCancelled } from "@/lib/cash-approval";
 import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
+import { BILL_ONLY_MANAGER_MESSAGE, canSellBillOnlyItems, cartHasBillOnlyItems, rolesFromToken } from "@/lib/pos-custom-items";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { receiptMoney, receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
@@ -2026,6 +2027,13 @@ ${receiptSoftwareCreditHtml()}
     setShowQuickProduct(true);
   }, []);
 
+  /** Can the acting operator (PIN-unlocked cashier, else the signed-in user) sell bill-only / Demo items? Mirrors the API rule. */
+  const operatorCanSellBillOnly = React.useCallback(() => canSellBillOnlyItems({
+    pinCashierRole: posCashierStorage.getToken() ? posCashierStorage.getCashier()?.role ?? null : null,
+    tokenRoles: rolesFromToken(tokenStorage.getAccess()),
+    userRole: user?.role ?? null,
+  }), [user?.role]);
+
   const openDemoProductPopup = React.useCallback(() => {
     setActiveNav("products");
     setCartCustomerOpen(false);
@@ -2178,6 +2186,7 @@ ${receiptSoftwareCreditHtml()}
         return;
       }
     }
+    if (cartHasBillOnlyItems(items) && !operatorCanSellBillOnly()) { toast.error(BILL_ONLY_MANAGER_MESSAGE, { duration: 6000 }); return; }
     // Everything above is synchronous (no await), so taking the latch here is race-free.
     if (!checkoutLatchRef.current.tryEnter()) return;
     saleConfirmedRef.current = null;
@@ -2420,7 +2429,7 @@ ${receiptSoftwareCreditHtml()}
         setSelectedCartIdx(-1);
       }
     } finally{setCheckoutLoading(false);checkoutLatchRef.current.leave();}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast4,payBankAccountId,payQrCodeId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled,qrFeeSettings,reloadPosTenantSettings,changeAmt]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast4,payBankAccountId,payQrCodeId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled,qrFeeSettings,reloadPosTenantSettings,changeAmt,operatorCanSellBillOnly]);
 
   /** Quick Pay reload: post as its own cash sale immediately — current cart is untouched. */
   const recordQuickReloadSale = React.useCallback(async (item: CartItem): Promise<boolean> => {
@@ -6258,9 +6267,8 @@ ${rows}
                   onBack={() => setShowDemoProduct(false)}
                   taxRate={taxRate}
                   onAddToCart={(item) => {
-                    const roleKey = String(user?.role ?? "").toLowerCase();
-                    if (!["super_admin", "tenant_admin", "branch_manager"].includes(roleKey)) {
-                      toast.warning("Bill-only items need manager authorization — checkout is refused unless a manager is signed in.", { duration: 6000 });
+                    if (!operatorCanSellBillOnly()) {
+                      toast.warning(BILL_ONLY_MANAGER_MESSAGE, { duration: 6000 });
                     }
                     addItem(item);
                     setShowDemoProduct(false);

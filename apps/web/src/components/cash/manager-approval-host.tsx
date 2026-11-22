@@ -109,7 +109,7 @@ export function ManagerApprovalHost() {
           >
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
-          <form onSubmit={submit} className="space-y-4" autoComplete="off">
+          <form method="post" onSubmit={submit} className="space-y-4" autoComplete="off">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-primary" />
               <DialogPrimitive.Title className="text-lg font-semibold">Manager approval</DialogPrimitive.Title>

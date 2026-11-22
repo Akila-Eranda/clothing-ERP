@@ -252,7 +252,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="glass-card rounded-2xl p-8 shadow-glass">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form method="post" onSubmit={handleSubmit(onSubmit)}>
               <AnimatePresence mode="wait">
                 {/* ── Step 1: Business ── */}
                 {step === 1 && (

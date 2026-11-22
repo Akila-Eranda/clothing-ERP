@@ -28,6 +28,8 @@ function createService(
   const walletRows: Array<{ id: string; type: string; amount: number; referenceId: string }> = [];
   const tx = {
     $queryRaw: jest.fn().mockResolvedValue([]),
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    accountingOutboxEvent: { upsert: jest.fn().mockResolvedValue({}) },
     customer: {
       findFirst: jest.fn(async () => ({ ...account })),
       updateMany: jest.fn(async ({ data }: { data: { creditBalance?: { decrement: number }; walletBalance?: { increment?: number; decrement?: number } } }) => {
@@ -156,8 +158,36 @@ describe('CustomerCreditService payment allocation', () => {
     expect(account.walletBalance).toBe(1000);
     expect(walletRows).toEqual([expect.objectContaining({ type: 'ADVANCE', amount: 1000 })]);
     expect(tx.customerCreditTransaction.create).not.toHaveBeenCalled();
-    expect(tx.cashBookEntry.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ debit: 1000, paymentMethod: 'CARD' }),
+    // Policy (Part 1): a CARD collection is NOT a physical cash movement - it settles through the card clearing /
+    // bank account in the general ledger (outbox row below), never through the drawer's cash book.
+    expect(tx.cashBookEntry.create).not.toHaveBeenCalled();
+    expect(tx.accountingOutboxEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        sourceType: 'CUSTOMER_CREDIT_PAYMENT',
+        payload: expect.objectContaining({ method: 'CARD', amount: 1000, advance: 1000 }),
+      }),
     }));
+  });
+
+  it('writes the GL outbox row inside the payment transaction (no payment without its accounting intent)', async () => {
+    const { service, tx, prisma } = createService(500);
+    await service.receiveCreditPayment('customer-1', 'tenant-1', 200, 'Customer payment', {
+      clientRequestId: 'outbox-request-1',
+      paymentMethod: 'CASH',
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.accountingOutboxEvent.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.accountingOutboxEvent.upsert.mock.calls[0][0].create).toMatchObject({
+      tenantId: 'tenant-1', sourceType: 'CUSTOMER_CREDIT_PAYMENT', sourceId: 'payment-1',
+    });
+  });
+
+  it('a replayed request writes no second cash-book row and no second outbox row', async () => {
+    const { service, tx } = createService(500);
+    const options = { clientRequestId: 'replay-request-1', paymentMethod: 'CASH' as const };
+    await service.receiveCreditPayment('customer-1', 'tenant-1', 200, 'Customer payment', options);
+    await service.receiveCreditPayment('customer-1', 'tenant-1', 200, 'Customer payment', options);
+    expect(tx.cashBookEntry.create).toHaveBeenCalledTimes(1);
+    expect(tx.accountingOutboxEvent.upsert).toHaveBeenCalledTimes(1);
   });
 });

@@ -2038,7 +2038,7 @@ model SalePayment {
   processedAt   DateTime      @default(now())
 
   sale        Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  bankAccount BankAccount?   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   qrCode      PaymentQrCode? @relation(fields: [qrCodeId], references: [id])
 
   @@index([saleId])
@@ -3204,7 +3204,7 @@ model BankTransaction {
   createdBy        String?
   createdAt        DateTime      @default(now())
 
-  bankAccount    BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  bankAccount    BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   reconciliation BankReconciliation? @relation(fields: [reconciliationId], references: [id])
 
   @@index([tenantId, bankAccountId])
@@ -3235,7 +3235,7 @@ model Cheque {
   updatedAt     DateTime        @updatedAt
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -3259,7 +3259,7 @@ model BankReconciliation {
   updatedAt        DateTime                 @updatedAt
 
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount       @relation(fields: [bankAccountId], references: [id])
+  bankAccount BankAccount       @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   matchedTxns BankTransaction[]
 
   @@index([tenantId])
@@ -4247,7 +4247,7 @@ model PaymentQrCode {
   updatedAt       DateTime      @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id])
+  bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   salePayments SalePayment[]
 
   @@index([tenantId, isActive])

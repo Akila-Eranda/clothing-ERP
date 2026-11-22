@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidatePosQrCache } from "@/lib/pos-qr-cache";
 import * as React from "react";
 import { Loader2, Plus, QrCode, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +66,7 @@ export function PaymentQrSettingsTab({ showBankAccounts = true }: { showBankAcco
   const [feeSaving, setFeeSaving] = React.useState<"threshold" | "percent" | null>(null);
 
   const load = React.useCallback(async () => {
+    invalidatePosQrCache(); // QA-002: the POS must re-read the QR list after any admin change
     setLoading(true);
     setLoadError(null);
     try {

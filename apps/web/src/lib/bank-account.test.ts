@@ -11,6 +11,7 @@ import {
   missingBankDetails,
   normalizeAccountNumber,
   permissionsFromToken,
+  changedBankDetails,
 } from "./bank-account.ts";
 
 const GOOD = { bankName: "Bank of Ceylon", accountNumber: "0081 2345 6789", accountHolderName: "Lanka Traders (Pvt) Ltd", branchName: "Colombo Fort", branchCode: "001" };
@@ -83,4 +84,12 @@ test("forms: current / savings send all five validated details; cash accounts se
   assert.deepEqual(bankFieldsForSave("CASH_IN_HAND", EMPTY_BANK_DETAILS, "  ").fields, {});
   assert.deepEqual(bankFieldsForSave("PETTY_CASH", EMPTY_BANK_DETAILS, " Safe  box ").fields, { bankName: "Safe box" });
   assert.equal(bankFieldsForSave("PETTY_CASH", EMPTY_BANK_DETAILS).firstProblem, undefined);
+});
+
+test("changedBankDetails: only edited details count (whitespace-insensitive)", () => {
+  const original = { bankName: "BOC", accountNumber: "123456", accountHolderName: "", branchName: "Main", branchCode: "" };
+  assert.deepEqual(changedBankDetails(original, { ...original }), []);
+  assert.deepEqual(changedBankDetails(original, { ...original, bankName: "  BOC " }), []);
+  assert.deepEqual(changedBankDetails(original, { ...original, accountNumber: "654321" }), ["accountNumber"]);
+  assert.deepEqual(changedBankDetails(original, { ...original, accountHolderName: "A B", branchCode: "001" }), ["accountHolderName", "branchCode"]);
 });

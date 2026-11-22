@@ -30,6 +30,8 @@ import {
   encodeCustomerHistoryCursor,
 } from './customer-history.helper';
 import { buildAgingReport, chequeSourceNotes } from '../accounting/finance.helper';
+import { enqueueOutboxInTx } from '../accounting/accounting-outbox.tx';
+import { appendCashBookEntryTx, isPhysicalCashMethod } from '@/shared/cash-book.helper';
 import { CARD_LAST4_REQUIRED_MESSAGE, maskCardLast4, parseCardLast4 } from '@/shared/card-payment.helper';
 import * as dayjs from 'dayjs';
 import { ChequeDirection, ChequeStatus, PaymentMethod, ReturnStatus, SaleStatus } from '@prisma/client';
@@ -622,35 +624,30 @@ export class CustomerCreditService {
         });
       }
 
-      // Cash/card collections hit the cash book (wallet settle + cheques do not)
-      if (!applyFromWallet && method !== PaymentMethod.CHEQUE && amount > 0.009) {
-        const last = await tx.cashBookEntry.findFirst({
-          where: { tenantId, ...(opts.branchId ? { branchId: opts.branchId } : {}) },
-          orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
-        });
-        const prev = last?.balanceAfter ?? 0;
-        await tx.cashBookEntry.create({
-          data: {
-            tenantId,
-            branchId: opts.branchId || undefined,
-            entryDate: new Date(),
-            type: advance > 0.009 && applied > 0.009
-              ? 'CUSTOMER_CREDIT_AND_ADVANCE'
-              : advance > 0.009
-                ? 'CUSTOMER_ADVANCE'
-                : 'CUSTOMER_CREDIT_PAYMENT',
-            description:
-              advance > 0.009
-                ? `${description} (AR LKR ${applied.toFixed(2)} + advance LKR ${advance.toFixed(2)})`
-                : description,
-            debit: amount,
-            credit: 0,
-            balanceAfter: round2(prev + amount),
-            paymentMethod: method === PaymentMethod.WALLET ? PaymentMethod.CASH : method,
-            referenceType: 'CustomerCredit',
-            referenceId: customerId,
-            createdBy: opts.userId,
-          },
+      // Only PHYSICAL CASH goes to the cash book. Card / QR / UPI / bank-transfer collections settle through their
+      // bank / clearing accounts in the general ledger (tenderAccount) and must not inflate the cash drawer book;
+      // cheques are tracked as cheques; wallet settlement moves no money. Appended under a per-tenant lock so the
+      // running balance cannot be corrupted by concurrent payments.
+      if (!applyFromWallet && isPhysicalCashMethod(method) && amount > 0.009) {
+        await appendCashBookEntryTx(tx, {
+          tenantId,
+          branchId: opts.branchId,
+          entryDate: new Date(),
+          type: advance > 0.009 && applied > 0.009
+            ? 'CUSTOMER_CREDIT_AND_ADVANCE'
+            : advance > 0.009
+              ? 'CUSTOMER_ADVANCE'
+              : 'CUSTOMER_CREDIT_PAYMENT',
+          description:
+            advance > 0.009
+              ? `${description} (AR LKR ${applied.toFixed(2)} + advance LKR ${advance.toFixed(2)})`
+              : description,
+          debit: amount,
+          credit: 0,
+          paymentMethod: PaymentMethod.CASH,
+          referenceType: 'CustomerCredit',
+          referenceId: customerId,
+          createdBy: opts.userId,
         });
       }
 
@@ -671,6 +668,24 @@ export class CustomerCreditService {
             notes: chequeSourceNotes('CustomerCredit', customerId, description),
             createdBy: opts.userId,
           },
+        });
+      }
+
+      // Transactional outbox: the GL-posting intent commits (or rolls back) together with the payment.
+      if (paymentTxnId) {
+        await enqueueOutboxInTx(tx, tenantId, 'CUSTOMER_CREDIT_PAYMENT', paymentTxnId, {
+          tenantId,
+          branchId: opts.branchId,
+          userId: opts.userId,
+          customerId,
+          paymentTxnId,
+          amount,
+          applied,
+          advance,
+          method,
+          applyFromWallet,
+          description,
+          date: new Date().toISOString(),
         });
       }
     });

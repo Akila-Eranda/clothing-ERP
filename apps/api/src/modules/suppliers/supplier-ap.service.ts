@@ -1,3 +1,4 @@
+import { appendCashBookEntryTx } from '@/shared/cash-book.helper';
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -1099,29 +1100,18 @@ export class SupplierApService {
     const desc = `Supplier payment — ${opts.supplierName}`;
 
     if (isCash) {
-      const last = await tx.cashBookEntry.findFirst({
-        where: {
-          tenantId: opts.tenantId,
-          ...(opts.branchId ? { branchId: opts.branchId } : {}),
-        },
-        orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
-      });
-      const prev = last?.balanceAfter ?? 0;
-      await tx.cashBookEntry.create({
-        data: {
-          tenantId: opts.tenantId,
-          branchId: opts.branchId || undefined,
-          entryDate: opts.paidAt,
-          type: 'SUPPLIER_PAYMENT',
-          description: desc,
-          debit: 0,
-          credit: amount,
-          balanceAfter: roundAp(prev - amount),
-          paymentMethod: PaymentMethod.CASH,
-          referenceType: 'SupplierPayment',
-          referenceId: opts.paymentId,
-          createdBy: opts.userId,
-        },
+      await appendCashBookEntryTx(tx, {
+        tenantId: opts.tenantId,
+        branchId: opts.branchId,
+        entryDate: opts.paidAt,
+        type: 'SUPPLIER_PAYMENT',
+        description: desc,
+        debit: 0,
+        credit: amount,
+        paymentMethod: PaymentMethod.CASH,
+        referenceType: 'SupplierPayment',
+        referenceId: opts.paymentId,
+        createdBy: opts.userId,
       });
 
       // POS / counter: paid out of this cashier's open wallet; main cash only receives what is left at clear

@@ -58,6 +58,7 @@ import { heldBillScopeWhere, holdBillDataRejection } from './pos-hold.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { paymentLineReferences, preparePaymentLines } from './pos-payment-lines.helper';
 import { assertQrCodesForPayments } from '@/modules/payment-qr/payment-qr.helper';
+import { enqueueOutboxInTx } from '@/modules/accounting/accounting-outbox.tx';
 import { resolveQrFeeSettings, type QrFeeResult } from '@/shared/qr-fee.helper';
 import { computeQrFeeCents } from '@/shared/qr-fee-cents.helper';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
@@ -105,6 +106,10 @@ export class ReturnSaleDto {
   @ApiPropertyOptional({ enum: ReturnReason }) @IsOptional() @IsEnum(ReturnReason) reason?: ReturnReason;
   @ApiPropertyOptional() @IsOptional() @IsString() refundMethod?: string;
 }
+
+/** Interactive-transaction limits for createSale (see QA-005 note at the call site). */
+export const SALE_TX_MAX_WAIT_MS = 10_000;
+export const SALE_TX_TIMEOUT_MS = 30_000;
 
 export class SaleItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() variantId?: string;
@@ -1179,7 +1184,16 @@ export class PosService {
         await tx.sale.update({ where: { id: created.id }, data: { cashRegisterId: movementRegisterId } });
       }
 
+      // Transactional outbox: the "post this sale to the ledger" intent commits (or rolls back) with the sale itself.
+      await enqueueOutboxInTx(tx, tenantId, 'SALE', created.id, { branchId });
+
       return created;
+    }, {
+      // QA-005: Prisma's default interactive-transaction timeout is 5 s. A sale does stock checks, FEFO lots, payments,
+      // loyalty / wallet / credit and cash-drawer writes in one transaction; a big basket or a busy database must not
+      // abort it half-way with "Transaction already closed". Longer limits only - nothing else changes.
+      maxWait: SALE_TX_MAX_WAIT_MS,
+      timeout: SALE_TX_TIMEOUT_MS,
     })
       .then((created) => ({ created, replay: null }))
       .catch(async (e: unknown) => {

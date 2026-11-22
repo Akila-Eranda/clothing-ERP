@@ -1,5 +1,6 @@
 "use client";
 
+import { posQrCache } from "@/lib/pos-qr-cache";
 import * as React from "react";
 import { Loader2, Maximize2, QrCode, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -41,13 +42,12 @@ type Rendered = {
   bankAccount?: PosQrBankAccount | null;
 };
 
-let qrCache: { at: number; codes: PosQrCode[] } | null = null;
-
 async function loadPosQrCodes(force = false): Promise<PosQrCode[]> {
-  if (!force && qrCache && Date.now() - qrCache.at < 60_000) return qrCache.codes;
+  const cached = posQrCache.get(force) as PosQrCode[] | null;
+  if (cached) return cached;
   const r = await api.get<PosQrCode[]>("/payment-qr/pos");
   const codes = Array.isArray(r.data) ? r.data : [];
-  qrCache = { at: Date.now(), codes };
+  posQrCache.set(codes);
   return codes;
 }
 

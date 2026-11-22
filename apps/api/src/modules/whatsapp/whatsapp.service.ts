@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  OnApplicationBootstrap,
   OnModuleDestroy,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -15,6 +16,15 @@ import { WhatsappSendBillDto, WhatsappSendDto, WhatsappSendSaleBillDto } from '.
 import { buildSaleBillMessage } from '@/shared/sale-bill-message';
 import { toWhatsappJid } from './whatsapp-phone.util';
 import { assertWhatsappConnectAllowed } from './whatsapp-connect.guard';
+import { publicExposureWarning, resolveWhatsappAuthRoot } from './whatsapp-auth-dir.helper';
+import { listResumableTenants, MAX_AUTO_RECONNECT, reconnectDelayMs, shouldResetAuth } from './whatsapp-reconnect.helper';
+import Redis from 'ioredis';
+import {
+  LocalWhatsappSessionLock,
+  RedisWhatsappSessionLock,
+  SESSION_LOCK_RENEW_MS,
+  type WhatsappSessionLock,
+} from './whatsapp-session-lock';
 import type { WhatsappConnectionStatus, WhatsappStatusResponse } from './whatsapp.types';
 
 type SessionState = {
@@ -29,49 +39,198 @@ type SessionState = {
   reconnectTimer?: ReturnType<typeof setTimeout> | null;
   reconnectAttempts?: number;
   generation?: number;
+  /** In-flight start: a second start for the same tenant joins it instead of opening a second socket. */
+  startPromise?: Promise<void>;
+  /** This process currently owns the tenant's session (cross-instance lock). */
+  lockHeld?: boolean;
 };
 
-const MAX_AUTO_RECONNECT = 3;
-
 @Injectable()
-export class WhatsappService implements OnModuleDestroy {
+export class WhatsappService implements OnModuleDestroy, OnApplicationBootstrap {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly sessions = new Map<string, SessionState>();
   private baileys: any | null = null;
   private baileysLoadError: string | null = null;
 
+  private sessionLock: WhatsappSessionLock;
+  private lockRedis: Redis | null = null;
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private heartbeatTicks = 0;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    this.sessionLock = this.createSessionLock();
+  }
 
+  /**
+   * Cross-instance ownership: with Redis configured, only the instance holding the tenant's lock may open its
+   * socket. Without Redis (single process, tests) a local always-granting lock is used - single-instance assumption.
+   */
+  private createSessionLock(): WhatsappSessionLock {
+    const host = process.env.REDIS_HOST?.trim();
+    if (!host || this.config.get<string>('app.env') === 'test') return new LocalWhatsappSessionLock();
+    this.lockRedis = new Redis({
+      host,
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD || undefined,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+      lazyConnect: false,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+    });
+    this.lockRedis.on('error', (e) => this.logger.warn(`WhatsApp session-lock Redis error: ${e.message}`));
+    return new RedisWhatsappSessionLock(this.lockRedis);
+  }
+
+  /** Test seam: replace the ownership lock. */
+  setSessionLock(lock: WhatsappSessionLock) {
+    this.sessionLock = lock;
+  }
+
+  /**
+   * QA-004: after an API restart / deploy the in-memory sessions are gone but the paired logins are still on
+   * disk. Reconnect them (one at a time, in the background) so the shop does not have to scan the QR again and
+   * bill / payment messages keep working. Never wipes anything; skipped in test mode or when disabled.
+   */
+  async onApplicationBootstrap() {
+    if (this.config.get<string>('app.env') === 'test') return;
+    this.startHeartbeat();
+    if (this.config.get<string>('WHATSAPP_AUTO_RESUME')?.trim().toLowerCase() === 'false') return;
+    const root = resolveWhatsappAuthRoot({
+      configured: this.config.get<string>('WHATSAPP_AUTH_DIR'),
+      cwd: process.cwd(),
+    });
+    const tenants = listResumableTenants(root);
+    if (!tenants.length) return;
+    this.logger.log(`Resuming ${tenants.length} saved WhatsApp session(s)`);
+    void (async () => {
+      for (const tenantId of tenants) {
+        const session = this.getOrCreate(tenantId);
+        if (session.status === 'connected' || session.starting) continue;
+        try {
+          session.starting = true;
+          session.status = 'connecting';
+          await this.startSocket(tenantId, { resetAuth: false });
+        } catch (e) {
+          session.starting = false;
+          session.status = 'disconnected';
+          session.lastError = (e as Error).message;
+          this.logger.warn(`WhatsApp resume failed for ${tenantId}: ${(e as Error).message}`);
+        }
+        await new Promise((r) => setTimeout(r, 2000)); // stagger connections
+      }
+    })();
+  }
+
+  // ── ownership heartbeat / health ────────────────────────────────────────────
+
+  private startHeartbeat() {
+    if (this.heartbeat) return;
+    this.heartbeat = setInterval(() => void this.heartbeatTick(), SESSION_LOCK_RENEW_MS);
+    this.heartbeat.unref?.();
+  }
+
+  /** Renew every owned session's lock; drop sessions whose ownership moved to another instance. */
+  async heartbeatTick() {
+    this.heartbeatTicks++;
+    for (const [tenantId, session] of this.sessions) {
+      if (!session.lockHeld) continue;
+      try {
+        const stillOwner = await this.sessionLock.renew(tenantId);
+        if (!stillOwner) await this.stopOwned(tenantId, 'Session ownership moved to another server instance.');
+      } catch (e) {
+        // cannot reach the lock store right now: keep the socket (do NOT drop a healthy session over a Redis blip)
+        this.logger.warn(`WhatsApp ownership renew failed for ${tenantId}: ${(e as Error).message}`);
+      }
+    }
+    if (this.heartbeatTicks % 15 === 0) this.logger.log(`WhatsApp health: ${JSON.stringify(this.getHealthSummary())}`);
+  }
+
+  /** Close our socket without logging out and without touching saved credentials (ownership lost / shutdown). */
+  private async stopOwned(tenantId: string, reason: string) {
+    const session = this.getOrCreate(tenantId);
+    this.clearReconnect(session);
+    session.generation = (session.generation ?? 0) + 1; // ignore events of the socket we are closing
+    try {
+      await session.sock?.end?.(undefined);
+    } catch {
+      /* noop */
+    }
+    session.sock = undefined;
+    session.starting = false;
+    session.lockHeld = false;
+    session.status = 'disconnected';
+    session.lastError = reason;
+    this.logger.warn(`WhatsApp session for ${tenantId} stopped: ${reason}`);
+  }
+
+  /** Operational health, no secrets: counts per status plus the sessions that need attention. */
+  getHealthSummary() {
+    const counts: Record<string, number> = {};
+    const attention: { tenantId: string; status: string; attempts: number; lastError: string | null }[] = [];
+    for (const [tenantId, s] of this.sessions) {
+      counts[s.status] = (counts[s.status] ?? 0) + 1;
+      if (s.status !== 'connected') {
+        attention.push({ tenantId, status: s.status, attempts: s.reconnectAttempts ?? 0, lastError: s.lastError ?? null });
+      }
+    }
+    return { sessions: this.sessions.size, counts, owner: this.sessionLock.ownerId, attention };
+  }
+
+  /** Graceful shutdown: stop timers, close sockets WITHOUT logging out (credentials stay), release ownership. */
   async onModuleDestroy() {
+    if (this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = null;
+    }
     for (const [tenantId, session] of this.sessions) {
       this.clearReconnect(session);
+      session.generation = (session.generation ?? 0) + 1;
       try {
         await session.sock?.end?.(undefined);
       } catch {
         /* noop */
       }
+      if (session.lockHeld) {
+        try {
+          await this.sessionLock.release(tenantId);
+        } catch {
+          /* the lock expires by itself */
+        }
+      }
       this.sessions.delete(tenantId);
+    }
+    try {
+      await this.lockRedis?.quit();
+    } catch {
+      /* noop */
     }
   }
 
-  private authDir(tenantId: string) {
-    const configured = this.config.get<string>('WHATSAPP_AUTH_DIR')?.trim();
-    if (configured) return path.join(configured, tenantId);
-
-    const uploadRoot =
+  private uploadRoot() {
+    return path.resolve(
       this.config.get<string>('LOCAL_UPLOAD_DIR')?.trim() ||
-      this.config.get<string>('UPLOAD_DIR')?.trim() ||
-      path.join(process.cwd(), 'uploads');
-    return path.join(uploadRoot, 'whatsapp-sessions', tenantId);
+        this.config.get<string>('UPLOAD_DIR')?.trim() ||
+        path.join(process.cwd(), 'uploads'),
+    );
+  }
+
+  private authDir(tenantId: string) {
+    const root = resolveWhatsappAuthRoot({
+      configured: this.config.get<string>('WHATSAPP_AUTH_DIR'),
+      cwd: process.cwd(),
+    });
+    return path.join(root, tenantId);
   }
 
   private ensureAuthDir(tenantId: string) {
     const dir = this.authDir(tenantId);
+    const exposure = publicExposureWarning(dir, this.uploadRoot());
+    if (exposure) this.logger.warn(exposure);
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
       return dir;
     } catch (e) {
       const code = (e as NodeJS.ErrnoException)?.code;
@@ -212,7 +371,45 @@ export class WhatsappService implements OnModuleDestroy {
     return this.getStatus(tenantId);
   }
 
-  private async startSocket(
+  /**
+   * Start the tenant's socket. Joins an in-flight start (never two sockets for one tenant in this process) and takes
+   * the cross-instance ownership lock first (never two instances for one tenant).
+   */
+  private startSocket(tenantId: string, opts: { resetAuth?: boolean } = {}): Promise<void> {
+    const session = this.getOrCreate(tenantId);
+    if (session.startPromise) return session.startPromise;
+    const run = this.startSocketOwned(tenantId, opts).finally(() => {
+      if (session.startPromise === run) session.startPromise = undefined;
+    });
+    session.startPromise = run;
+    return run;
+  }
+
+  private async startSocketOwned(tenantId: string, opts: { resetAuth?: boolean }) {
+    const session = this.getOrCreate(tenantId);
+    let owned = false;
+    try {
+      owned = await this.sessionLock.acquire(tenantId);
+    } catch (e) {
+      session.starting = false;
+      session.status = 'disconnected';
+      session.lastError = 'Cannot verify which server owns this WhatsApp session right now. Retrying.';
+      this.logger.warn(`WhatsApp ownership check failed for ${tenantId}: ${(e as Error).message}`);
+      this.scheduleReconnect(tenantId, {});
+      return;
+    }
+    if (!owned) {
+      session.starting = false;
+      session.status = 'disconnected';
+      session.lastError = 'This WhatsApp session is active on another server instance.';
+      this.logger.warn(`WhatsApp session for ${tenantId} is owned by another instance; not connecting here`);
+      return;
+    }
+    session.lockHeld = true;
+    await this.startSocketUnsafe(tenantId, opts);
+  }
+
+  private async startSocketUnsafe(
     tenantId: string,
     opts: { resetAuth?: boolean } = {},
   ) {
@@ -338,6 +535,8 @@ export class WhatsappService implements OnModuleDestroy {
           session.connectedAt = null;
           session.qrDataUrl = null;
           this.clearAuth(tenantId);
+          session.lockHeld = false;
+          void this.sessionLock.release(tenantId).catch(() => undefined);
           void this.persistTenantMeta(tenantId, { connected: false });
           return;
         }
@@ -347,8 +546,8 @@ export class WhatsappService implements OnModuleDestroy {
           session.lastError =
             'Connection dropped while waiting for scan — click Show QR again if it expires.';
           this.scheduleReconnect(tenantId, {
-            resetAuth: timedOut,
-            delayMs: 4000,
+            resetAuth: shouldResetAuth({ timedOut }),
+            timedOut,
           });
           return;
         }
@@ -359,8 +558,8 @@ export class WhatsappService implements OnModuleDestroy {
           : lastDisconnect?.error?.message ?? 'Connection closed';
 
         this.scheduleReconnect(tenantId, {
-          resetAuth: timedOut,
-          delayMs: timedOut ? 5000 : 3000,
+          resetAuth: shouldResetAuth({ timedOut }),
+          timedOut,
         });
       }
     });
@@ -368,7 +567,7 @@ export class WhatsappService implements OnModuleDestroy {
 
   private scheduleReconnect(
     tenantId: string,
-    opts: { resetAuth?: boolean; delayMs?: number } = {},
+    opts: { resetAuth?: boolean; timedOut?: boolean } = {},
   ) {
     const session = this.getOrCreate(tenantId);
     this.clearReconnect(session);
@@ -386,7 +585,7 @@ export class WhatsappService implements OnModuleDestroy {
     }
 
     session.reconnectAttempts = attempts + 1;
-    const delay = opts.delayMs ?? 3000;
+    const delay = reconnectDelayMs(attempts, !!opts.timedOut);
     session.reconnectTimer = setTimeout(() => {
       session.reconnectTimer = null;
       if (session.status === 'connected') return;
@@ -463,6 +662,8 @@ export class WhatsappService implements OnModuleDestroy {
     session.lastError = null;
     session.reconnectAttempts = 0;
     this.clearAuth(tenantId);
+    session.lockHeld = false;
+    await this.sessionLock.release(tenantId).catch(() => undefined);
     await this.persistTenantMeta(tenantId, { connected: false, phone: null });
     return this.getStatus(tenantId);
   }

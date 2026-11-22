@@ -45,6 +45,8 @@ import {
 } from './inventory.dto';
 import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 
+type DbClient = PrismaService | Prisma.TransactionClient;
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -55,8 +57,8 @@ export class InventoryService {
   ) {}
 
   /** Resolve FEFO vs FIFO from tenant.settings.lotAllocation (default FEFO). */
-  private async resolveLotStrategy(tenantId: string): Promise<LotAllocationStrategy> {
-    const tenant = await this.prisma.tenant.findUnique({
+  private async resolveLotStrategy(tenantId: string, db: DbClient = this.prisma): Promise<LotAllocationStrategy> {
+    const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { settings: true },
     });
@@ -65,8 +67,8 @@ export class InventoryService {
   }
 
   /** POS Block Expired — default ON; tenant.settings.posBlockExpired / blockExpiredLots can disable. */
-  private async resolveBlockExpired(tenantId: string): Promise<boolean> {
-    const tenant = await this.prisma.tenant.findUnique({
+  private async resolveBlockExpired(tenantId: string, db: DbClient = this.prisma): Promise<boolean> {
+    const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { settings: true },
     });
@@ -75,8 +77,8 @@ export class InventoryService {
   }
 
   /** Allow selling below zero stock — tenant.settings.pos.allowNegativeStock (default ON). */
-  private async resolveAllowNegativeStock(tenantId: string): Promise<boolean> {
-    const tenant = await this.prisma.tenant.findUnique({
+  private async resolveAllowNegativeStock(tenantId: string, db: DbClient = this.prisma): Promise<boolean> {
+    const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { settings: true },
     });
@@ -86,8 +88,8 @@ export class InventoryService {
     return typeof v === 'boolean' ? v : true;
   }
 
-  private async resolveTenantLotSettings(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+  private async resolveTenantLotSettings(tenantId: string, db: DbClient = this.prisma) {
+    const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { settings: true },
     });
@@ -102,23 +104,23 @@ export class InventoryService {
   }
 
   /** Default warehouse for a branch (creates MAIN if missing). POS uses this location. */
-  async ensureDefaultWarehouse(tenantId: string, branchId: string) {
-    const existing = await this.prisma.warehouse.findFirst({
+  async ensureDefaultWarehouse(tenantId: string, branchId: string, db: DbClient = this.prisma) {
+    const existing = await db.warehouse.findFirst({
       where: { tenantId, branchId, isDefault: true, isActive: true },
     });
     if (existing) return existing;
 
-    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, tenantId } });
+    const branch = await db.branch.findFirst({ where: { id: branchId, tenantId } });
     if (!branch) throw new NotFoundException('Branch not found');
 
     const codeBase = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
     let code = codeBase;
     let n = 1;
-    while (await this.prisma.warehouse.findFirst({ where: { tenantId, code } })) {
+    while (await db.warehouse.findFirst({ where: { tenantId, code } })) {
       code = `${codeBase}-${n++}`.slice(0, 24);
     }
 
-    return this.prisma.warehouse.create({
+    return db.warehouse.create({
       data: {
         tenantId,
         branchId,
@@ -130,9 +132,9 @@ export class InventoryService {
     });
   }
 
-  async resolveWarehouseId(tenantId: string, branchId: string, warehouseId?: string | null) {
+  async resolveWarehouseId(tenantId: string, branchId: string, warehouseId?: string | null, db: DbClient = this.prisma) {
     if (warehouseId) {
-      const wh = await this.prisma.warehouse.findFirst({
+      const wh = await db.warehouse.findFirst({
         where: { id: warehouseId, tenantId, branchId, isActive: true },
       });
       if (!wh) {
@@ -140,7 +142,7 @@ export class InventoryService {
       }
       return wh.id;
     }
-    const def = await this.ensureDefaultWarehouse(tenantId, branchId);
+    const def = await this.ensureDefaultWarehouse(tenantId, branchId, db);
     return def.id;
   }
 
@@ -384,11 +386,11 @@ export class InventoryService {
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx ?? this.prisma;
-    const allowNegative = await this.resolveAllowNegativeStock(tenantId);
+    const allowNegative = await this.resolveAllowNegativeStock(tenantId, client);
     if (allowNegative) return;
 
-    const blockExpired = await this.resolveBlockExpired(tenantId);
-    const warehouseId = await this.resolveWarehouseId(tenantId, branchId);
+    const blockExpired = await this.resolveBlockExpired(tenantId, client);
+    const warehouseId = await this.resolveWarehouseId(tenantId, branchId, undefined, client);
     const heldByVariant = new Map<string, number>();
     if (heldBillId) {
       const reservations = await client.inventoryReservation.findMany({
@@ -465,8 +467,12 @@ export class InventoryService {
     tx?: Prisma.TransactionClient,
   ) {
     const effectiveBranch = branchId || await this.resolveBranchId(tenantId, branchId);
-    const { strategy, blockExpired: tenantBlockExpired, allowNegativeStock } = await this.resolveTenantLotSettings(tenantId);
-    const warehouseId = await this.resolveWarehouseId(tenantId, effectiveBranch, dto.warehouseId);
+    // Inside a caller's transaction EVERY lookup uses that transaction's connection. Using the root client here
+    // would borrow a SECOND pooled connection while the first is held: with N concurrent checkouts >= pool size all
+    // connections are held and every request waits for another one (pool timeout) - a self-inflicted deadlock.
+    const db: DbClient = tx ?? this.prisma;
+    const { strategy, blockExpired: tenantBlockExpired, allowNegativeStock } = await this.resolveTenantLotSettings(tenantId, db);
+    const warehouseId = await this.resolveWarehouseId(tenantId, effectiveBranch, dto.warehouseId, db);
 
     const clientRequestId = normalizeClientRequestId(dto.clientRequestId);
     const fingerprint = adjustRequestFingerprint({ ...dto, warehouseId });

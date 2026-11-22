@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidatePosQrCache } from "@/lib/pos-qr-cache";
 import * as React from "react";
 import { Landmark, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +16,8 @@ import { BankDetailsFields } from "@/components/accounting/bank-details-fields";
 import { postFile, resolvePublicAssetUrl } from "@/lib/upload";
 import {
   accountTypeNeedsBankDetails,
+  BANK_DETAIL_KEYS,
+  changedBankDetails,
   bankDetailProblems,
   cleanText,
   EMPTY_BANK_DETAILS,
@@ -47,7 +50,7 @@ const TYPES: { value: string; label: string }[] = [
   { value: "PETTY_CASH", label: "Petty cash" },
 ];
 
-type Form = { id?: string; updatedAt?: string; code: string; name: string; type: string; isActive: boolean; details: BankDetailsInput };
+type Form = { id?: string; updatedAt?: string; original?: BankDetailsInput; code: string; name: string; type: string; isActive: boolean; details: BankDetailsInput };
 const EMPTY_FORM: Form = { code: "", name: "", type: "CURRENT", isActive: true, details: EMPTY_BANK_DETAILS };
 
 /**
@@ -89,26 +92,38 @@ export function BankAccountsCard({
     setErrors({});
     setQrFile(null);
     setRemoveQr(false);
+    const loaded: BankDetailsInput = {
+      bankName: a.bankName ?? "", accountNumber: a.accountNumber ?? "", accountHolderName: a.accountHolderName ?? "",
+      branchName: a.branchName ?? "", branchCode: a.branchCode ?? "",
+    };
     setForm({
-      id: a.id, updatedAt: a.updatedAt, code: a.code, name: a.name, type: a.type, isActive: a.isActive,
-      details: {
-        bankName: a.bankName ?? "", accountNumber: a.accountNumber ?? "", accountHolderName: a.accountHolderName ?? "",
-        branchName: a.branchName ?? "", branchCode: a.branchCode ?? "",
-      },
+      id: a.id, updatedAt: a.updatedAt, original: loaded, code: a.code, name: a.name, type: a.type, isActive: a.isActive,
+      details: { ...loaded },
     });
   };
 
   const save = async () => {
     if (!form) return;
-    const requireAll = accountTypeNeedsBankDetails(form.type);
-    const problems: Partial<Record<BankDetailKey | "code" | "name", string>> = { ...bankDetailProblems(form.details, { requireAll }) };
+    // QA-006: when editing, only validate / send the bank details the user actually changed. A legacy account whose
+    // details are incomplete can still be renamed or enabled / disabled; once any detail is edited the API enforces
+    // the full rules on the merged result, so we validate all five then.
+    const changedKeys = form.id && form.original ? changedBankDetails(form.original, form.details) : [...BANK_DETAIL_KEYS];
+    const detailsTouched = changedKeys.length > 0;
+    const requireAll = accountTypeNeedsBankDetails(form.type) && detailsTouched;
+    const problems: Partial<Record<BankDetailKey | "code" | "name", string>> = detailsTouched
+      ? { ...bankDetailProblems(form.details, { requireAll }) }
+      : {};
     if (!form.id && !cleanText(form.code)) problems.code = "Code is required";
     if (!cleanText(form.name)) problems.name = "Display name is required";
     setErrors(problems);
     if (Object.keys(problems).length) { toast.error("Please fix the highlighted fields"); return; }
     setSaving(true);
     try {
-      const details = Object.fromEntries(Object.entries(form.details).map(([k, v]) => [k, cleanText(v)]));
+      const details = Object.fromEntries(
+        Object.entries(form.details)
+          .filter(([k]) => !form.id || changedKeys.includes(k as BankDetailKey))
+          .map(([k, v]) => [k, cleanText(v)]),
+      );
       let savedId = form.id;
       if (form.id) {
         await api.put(`/accounting/bank-accounts/${form.id}`, { name: cleanText(form.name), isActive: form.isActive, ...details, expectedUpdatedAt: form.updatedAt });
@@ -138,6 +153,7 @@ export function BankAccountsCard({
       setForm(null);
       setQrFile(null);
       setRemoveQr(false);
+      invalidatePosQrCache(); // QA-002: POS re-reads the QR list
       await onChanged();
     } catch (e: unknown) {
       const msg = (e as Error).message || "Save failed";
@@ -169,6 +185,7 @@ export function BankAccountsCard({
     try {
       await api.put(`/payment-qr/${q.id}`, { isDefault: true });
       toast.success(`${q.label} is now the default QR code`);
+      invalidatePosQrCache();
       await onChanged();
     } catch (e: unknown) {
       toast.error((e as Error).message || "Update failed");

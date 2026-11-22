@@ -357,7 +357,7 @@ function LoginContent() {
             )}
 
             {pending2fa ? (
-              <form onSubmit={handleTotpSubmit(onTotpSubmit)} className="space-y-5">
+              <form method="post" onSubmit={handleTotpSubmit(onTotpSubmit)} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="totp" className="text-slate-800 font-medium">
                     Authenticator code
@@ -410,7 +410,7 @@ function LoginContent() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-slate-800 font-medium">Email address</Label>
                   <div className="relative">

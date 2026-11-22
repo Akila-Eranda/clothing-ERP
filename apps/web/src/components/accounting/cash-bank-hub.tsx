@@ -661,7 +661,6 @@ function AccountsOverviewPanel({
 
       <div className="space-y-4">
         {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/10 text-emerald-600", cashAccounts)}
-        {walletSection}
         <BankAccountsCard
           accounts={bankAccounts as BankAccountRow[]}
           qrCodes={bankAccounts.flatMap((account) => account.paymentQrCodes ?? [])}
@@ -672,6 +671,8 @@ function AccountsOverviewPanel({
         <PaymentQrSettingsTab showBankAccounts={false} />
         {otherAccounts.length > 0 &&
           section("other-accounts", "Other accounts", <Wallet className="h-4 w-4" />, "bg-teal-500/15 text-teal-600", otherAccounts)}
+        {/* QA-003: the day-end clear (cashier wallets -> main cash) is the LAST step of the day, so it is the last section. */}
+        {walletSection}
       </div>
 
       {/* ── Clear cashier wallet dialog ── */}

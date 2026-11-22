@@ -46,7 +46,7 @@ export default function AdminLoginPage() {
         </div>
 
         <div className={`${ADMIN_CARD} p-6`}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form method="post" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">Company admin email</label>
               <input
