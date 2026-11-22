@@ -16,7 +16,7 @@ TENANTS = [
     ("tyres", "admin@tyres.demo.fashionerp.com", "TIRE_SHOP", "tyres.shop.hexalyte.com"),
 ]
 
-PASSWORD = "Admin@123456"
+from _ssh_config import PASSWORD
 
 CTX = ssl.create_default_context()
 

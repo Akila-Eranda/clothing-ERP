@@ -7,7 +7,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HOST = "95.217.14.198"
 USER = "root"
-PASSWORD = r"FrCnCXMdTgiu"
+from _ssh_config import PASSWORD
 DEPLOY_DIR = "/opt/fashionerp"
 
 DEPLOY = f"""#!/bin/bash

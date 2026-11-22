@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { publicExposureWarning, resolveWhatsappAuthRoot } from '../whatsapp/whatsapp-auth-dir.helper';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserStatus } from '@prisma/client';
@@ -296,7 +297,19 @@ export class SecurityScanService {
       this.config.get<string>('UPLOAD_DIR')?.trim() ||
       path.join(process.cwd(), 'uploads');
 
-    const waDir = path.join(uploadRoot, 'whatsapp-sessions');
+    const waDir = resolveWhatsappAuthRoot({
+      configured: this.config.get<string>('WHATSAPP_AUTH_DIR'),
+      cwd: process.cwd(),
+    });
+    const waExposure = publicExposureWarning(waDir, path.resolve(uploadRoot));
+    push({
+      id: 'whatsapp-sessions-private',
+      category: 'Filesystem',
+      title: 'WhatsApp credentials are outside public uploads',
+      status: waExposure ? 'fail' : 'pass',
+      detail: waExposure ?? 'WhatsApp session folder is not under the upload root',
+      recommendation: waExposure ? 'Set WHATSAPP_AUTH_DIR to a private folder and move the sessions there' : undefined,
+    });
     const sslPending = path.join(uploadRoot, '.ssl-pending');
 
     const uploadOk = fs.existsSync(uploadRoot);

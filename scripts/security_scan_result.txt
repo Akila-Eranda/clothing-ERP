@@ -1,0 +1,579 @@
+======== FASHIONERP SECURITY SCAN Sun Jul 19 02:50:12 AM UTC 2026 ========
+
+=== 1. CURRENT REDIRECT CHECK ===
+--- shop.hexalyte.com ---
+HTTP/1.1 307 Temporary Redirect
+Server: nginx/1.31.1
+Date: Sun, 19 Jul 2026 02:50:12 GMT
+Connection: keep-alive
+Location: https://d-stat.net/
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: upgrade-insecure-requests
+
+--- sl-deen-supermarket.shop.hexalyte.com ---
+HTTP/1.1 307 Temporary Redirect
+Server: nginx/1.31.1
+Date: Sun, 19 Jul 2026 02:50:12 GMT
+Connection: keep-alive
+Location: https://d-stat.net/
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: upgrade-insecure-requests
+
+--- web:3000 ---
+
+=== 2. DOCKER CONTAINERS / IMAGES ===
+NAMES                  IMAGE                          STATUS                  CREATED AT
+fashionerp_web         fashionerp-web                 Up 11 hours             2026-07-18 15:27:17 +0000 UTC
+fashionerp_api         fashionerp-api                 Up 12 hours (healthy)   2026-07-18 14:43:32 +0000 UTC
+fashionerp_nginx       nginx:alpine                   Up 2 days               2026-07-15 05:19:47 +0000 UTC
+fashionerp_db          postgres:16-alpine             Up 22 hours (healthy)   2026-07-15 05:19:43 +0000 UTC
+fashionerp_redis       redis:7-alpine                 Up 3 days (healthy)     2026-07-15 05:19:43 +0000 UTC
+hexalyte-invoice-app   hexalyte-invoice-invoice-app   Up 22 hours             2026-07-08 17:44:53 +0000 UTC
+
+IMAGE                                 ID             DISK USAGE   CONTENT SIZE   EXTRA
+fashionerp-api:latest                 35af5f7b4e5c        766MB          161MB   U    
+fashionerp-web:latest                 41e026b9826e        288MB         66.7MB   U    
+hexalyte-invoice-invoice-app:latest   1c0eabe6591b        542MB          141MB   U    
+nginx:alpine                          8b1e78743a03       93.6MB           27MB   U    
+postgres:16-alpine                    16bc17c64a57        396MB          111MB   U    
+redis:7-alpine                        6ab0b6e73817       57.8MB         16.8MB   U    
+
+=== 3. CRON (system + users) ===
+-- /etc/crontab --
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+# You can also override PATH, but by default, newer versions inherit it from the environment
+#PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+17 *	* * *	root	cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.daily; }
+47 6	* * 7	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.weekly; }
+52 6	1 * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.monthly; }
+#
+*/3 * * * * root /opt/fashionerp/scripts/process_ssl_pending.sh >> /var/log/fashionerp-ssl-pending.log 2>&1
+*/2 * * * * root /usr/local/bin/fashionerp-anti-hijack.sh
+-- /etc/cron.d --
+total 24
+drwxr-xr-x   2 root root 4096 Jun 15 05:50 .
+drwxr-xr-x 106 root root 4096 Jul 18 06:50 ..
+-rw-r--r--   1 root root  102 Nov  5  2025 .placeholder
+-rw-r--r--   1 root root  802 Apr 16  2023 certbot
+-rw-r--r--   1 root root  188 Feb 13 12:17 e2scrub_all
+-rw-r--r--   1 root root  119 Jun 15 05:50 fashionerp-ssl
+FILE /etc/cron.d/certbot
+# /etc/cron.d/certbot: crontab entries for the certbot package
+#
+# Upstream recommends attempting renewal twice a day
+#
+# Eventually, this will be an opportunity to validate certificates
+# haven't been revoked, etc.  Renewal will only occur if expiration
+# is within 30 days.
+#
+# Important Note!  This cronjob will NOT be executed if you are
+# running systemd as your init system.  If you are running systemd,
+# the cronjob.timer function takes precedence over this cronjob.  For
+# more details, see the systemd.timer manpage, or use systemctl show
+# certbot.timer.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+0 */12 * * * root test -x /usr/bin/certbot -a \! -d /run/systemd/system && perl -e 'sleep int(rand(43200))' && certbot -q renew --no-random-sleep-on-renew
+
+FILE /etc/cron.d/e2scrub_all
+30 3 * * 0 root test -e /run/systemd/system || SERVICE_MODE=1 /usr/libexec/e2fsprogs/e2scrub_all_cron
+10 3 * * * root test -e /run/systemd/system || SERVICE_MODE=1 /sbin/e2scrub_all -A -r
+
+FILE /etc/cron.d/fashionerp-ssl
+*/3 * * * * root cd /opt/fashionerp && bash scripts/process_ssl_pending.sh >> /var/log/fashionerp-ssl-pending.log 2>&1
+
+-- root crontab --
+-- other user crontabs --
+total 8
+drwx-wx--T 2 root crontab 4096 Apr 20 18:22 .
+drwxr-xr-x 5 root root    4096 May 31 04:22 ..
+
+=== 4. systemd timers / suspicious services ===
+NEXT                                 LEFT LAST                              PASSED UNIT                           ACTIVATES
+Sun 2026-07-19 03:00:00 UTC          9min Sun 2026-07-19 02:50:01 UTC      16s ago sysstat-collect.timer          sysstat-collect.service
+Sun 2026-07-19 03:10:03 UTC         19min Sun 2026-07-12 03:10:26 UTC   6 days ago e2scrub_all.timer              e2scrub_all.service
+Sun 2026-07-19 03:10:19 UTC         20min Sun 2026-07-12 03:10:26 UTC   6 days ago xfs_scrub_all.timer            xfs_scrub_all.service
+Sun 2026-07-19 03:13:13 UTC         22min Sat 2026-07-18 15:26:33 UTC      11h ago apt-daily.timer                apt-daily.service
+Sun 2026-07-19 03:45:37 UTC         55min Sat 2026-07-18 20:44:56 UTC       6h ago certbot.timer                  certbot.service
+Sun 2026-07-19 04:02:12 UTC      1h 11min Sat 2026-07-18 18:47:11 UTC       8h ago motd-news.timer                motd-news.service
+Sun 2026-07-19 05:37:36 UTC      2h 47min Sat 2026-07-18 00:01:36 UTC 1 day 2h ago man-db.timer                   man-db.service
+Sun 2026-07-19 06:53:46 UTC       4h 3min Sat 2026-07-18 06:50:10 UTC      20h ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+Sun 2026-07-19 16:38:49 UTC           13h Sat 2026-07-18 16:38:49 UTC      10h ago update-notifier-download.timer update-notifier-download.service
+Sun 2026-07-19 16:48:01 UTC           13h Sat 2026-07-18 16:48:01 UTC      10h ago systemd-tmpfiles-clean.timer   systemd-tmpfiles-clean.service
+Mon 2026-07-20 00:00:00 UTC           21h Sun 2026-07-19 00:00:01 UTC 2h 50min ago dpkg-db-backup.timer           dpkg-db-backup.service
+Mon 2026-07-20 00:00:00 UTC           21h Sun 2026-07-19 00:00:01 UTC 2h 50min ago sysstat-rotate.timer           sysstat-rotate.service
+Mon 2026-07-20 00:05:41 UTC           21h Sun 2026-07-19 00:01:56 UTC 2h 48min ago logrotate.timer                logrotate.service
+Mon 2026-07-20 00:07:00 UTC           21h Sun 2026-07-19 00:07:40 UTC 2h 42min ago sysstat-summary.timer          sysstat-summary.service
+Mon 2026-07-20 01:33:32 UTC           22h Mon 2026-07-13 01:32:06 UTC   6 days ago fstrim.timer                   fstrim.service
+Sun 2026-07-26 04:11:50 UTC 1 week 0 days Wed 2026-07-15 06:22:00 UTC   3 days ago update-notifier-motd.timer     update-notifier-motd.service
+-                                       - -                                      - apport-autoreport.timer        apport-autoreport.service
+-                                       - -                                      - snapd.snap-repair.timer        snapd.snap-repair.service
+-                                       - -                                      - ua-timer.timer                 ua-timer.service
+
+19 timers listed.
+  UNIT                       LOAD   ACTIVE SUB     DESCRIPTION
+  atd.service                loaded active running Deferred execution scheduler
+  containerd.service         loaded active running containerd container runtime
+  cron.service               loaded active running Regular background program processing daemon
+  dbus.service               loaded active running D-Bus System Message Bus
+  docker.service             loaded active running Docker Application Container Engine
+  getty@tty1.service         loaded active running Getty on tty1
+  multipathd.service         loaded active running Device-Mapper Multipath Device Controller
+  polkit.service             loaded active running Authorization Manager
+  qemu-guest-agent.service   loaded active running QEMU Guest Agent
+  rsyslog.service            loaded active running System Logging Service
+  serial-getty@ttyS0.service loaded active running Serial Getty on ttyS0
+  ssh.service                loaded active running OpenBSD Secure Shell server
+  systemd-journald.service   loaded active running Journal Service
+  systemd-logind.service     loaded active running User Login Management
+  systemd-networkd.service   loaded active running Network Management
+  systemd-resolved.service   loaded active running Network Name Resolution
+  systemd-udevd.service      loaded active running Rule-based Manager for Device Events and Files
+  user@0.service             loaded active running User Manager for UID 0
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+18 loaded units listed.
+
+=== 5. AUTHORIZED KEYS / USERS ===
+-- root authorized_keys --
+-- /home/*/authorized_keys --
+FILE /home/*/.ssh/authorized_keys
+-- users with shell --
+root:x:0:0:root:/root:/bin/bash
+-- last logins --
+-- failed ssh recent --
+Jul 19 02:43:40 Clothing sshd-session[3375204]: Connection closed by invalid user admin 163.7.1.156 port 47992 [preauth]
+Jul 19 02:44:01 Clothing sshd-session[3375334]: Invalid user deploy from 80.94.92.179 port 46562
+Jul 19 02:44:03 Clothing sshd-session[3375334]: Failed password for invalid user deploy from 80.94.92.179 port 46562 ssh2
+Jul 19 02:44:05 Clothing sshd-session[3375334]: Connection closed by invalid user deploy 80.94.92.179 port 46562 [preauth]
+Jul 19 02:45:13 Clothing sshd-session[3375679]: Invalid user fax from 45.148.10.239 port 40532
+Jul 19 02:45:15 Clothing sshd-session[3375700]: Invalid user admin from 185.242.3.195 port 39582
+Jul 19 02:45:16 Clothing sshd-session[3375679]: Failed password for invalid user fax from 45.148.10.239 port 40532 ssh2
+Jul 19 02:45:17 Clothing sshd-session[3375700]: Failed password for invalid user admin from 185.242.3.195 port 39582 ssh2
+Jul 19 02:45:17 Clothing sshd-session[3375700]: Connection closed by invalid user admin 185.242.3.195 port 39582 [preauth]
+Jul 19 02:45:18 Clothing sshd-session[3375679]: Connection closed by invalid user fax 45.148.10.239 port 40532 [preauth]
+Jul 19 02:45:24 Clothing sshd-session[3375769]: Invalid user starla from 2.57.121.112 port 42712
+Jul 19 02:45:25 Clothing sshd-session[3375767]: Invalid user bhagi from 128.199.87.192 port 50830
+Jul 19 02:45:26 Clothing sshd-session[3375767]: Failed password for invalid user bhagi from 128.199.87.192 port 50830 ssh2
+Jul 19 02:45:27 Clothing sshd-session[3375769]: Failed password for invalid user starla from 2.57.121.112 port 42712 ssh2
+Jul 19 02:45:27 Clothing sshd-session[3375767]: Connection closed by invalid user bhagi 128.199.87.192 port 50830 [preauth]
+Jul 19 02:45:29 Clothing sshd-session[3375769]: Failed password for invalid user starla from 2.57.121.112 port 42712 ssh2
+Jul 19 02:45:32 Clothing sshd-session[3375769]: Failed password for invalid user starla from 2.57.121.112 port 42712 ssh2
+Jul 19 02:45:34 Clothing sshd-session[3375769]: Failed password for invalid user starla from 2.57.121.112 port 42712 ssh2
+Jul 19 02:45:34 Clothing sshd-session[3375809]: Invalid user starla from 2.57.121.112 port 28656
+Jul 19 02:45:35 Clothing sshd-session[3375769]: Connection closed by invalid user starla 2.57.121.112 port 42712 [preauth]
+Jul 19 02:45:36 Clothing sshd-session[3375809]: Failed password for invalid user starla from 2.57.121.112 port 28656 ssh2
+Jul 19 02:45:37 Clothing sshd-session[3375809]: Connection closed by invalid user starla 2.57.121.112 port 28656 [preauth]
+Jul 19 02:45:46 Clothing sshd-session[3375849]: Failed password for root from 45.148.10.151 port 64836 ssh2
+Jul 19 02:45:48 Clothing unix_chkpwd[3375872]: password check failed for user (root)
+Jul 19 02:45:50 Clothing sshd-session[3375849]: Failed password for root from 45.148.10.151 port 64836 ssh2
+Jul 19 02:45:51 Clothing unix_chkpwd[3375915]: password check failed for user (root)
+Jul 19 02:45:53 Clothing sshd-session[3375849]: Failed password for root from 45.148.10.151 port 64836 ssh2
+Jul 19 02:45:57 Clothing sshd-session[3375849]: Failed password for root from 45.148.10.151 port 64836 ssh2
+Jul 19 02:45:59 Clothing unix_chkpwd[3375936]: password check failed for user (root)
+Jul 19 02:46:01 Clothing sshd-session[3375849]: Failed password for root from 45.148.10.151 port 64836 ssh2
+Jul 19 02:46:03 Clothing sshd-session[3375982]: Invalid user deploy from 80.94.92.179 port 49766
+Jul 19 02:46:06 Clothing sshd-session[3375982]: Failed password for invalid user deploy from 80.94.92.179 port 49766 ssh2
+Jul 19 02:46:07 Clothing sshd-session[3375982]: Connection closed by invalid user deploy 80.94.92.179 port 49766 [preauth]
+Jul 19 02:48:06 Clothing sshd-session[3376594]: Invalid user dev from 80.94.92.179 port 52964
+Jul 19 02:48:08 Clothing sshd-session[3376594]: Failed password for invalid user dev from 80.94.92.179 port 52964 ssh2
+Jul 19 02:48:08 Clothing sshd-session[3376594]: Connection closed by invalid user dev 80.94.92.179 port 52964 [preauth]
+Jul 19 02:50:08 Clothing sshd-session[3377204]: Accepted password for root from 112.135.78.163 port 45111 ssh2
+Jul 19 02:50:09 Clothing sshd-session[3377268]: Invalid user dev from 80.94.92.179 port 56162
+Jul 19 02:50:12 Clothing sshd-session[3377268]: Failed password for invalid user dev from 80.94.92.179 port 56162 ssh2
+Jul 19 02:50:12 Clothing sshd-session[3377268]: Connection closed by invalid user dev 80.94.92.179 port 56162 [preauth]
+
+=== 6. SEARCH STRESSER / REDIRECT IOC ===
+---- pattern: rebirthstress ----
+---- pattern: return.st ----
+---- pattern: DiamWall ----
+---- pattern: ref=NEXT ----
+---- pattern: ref=Q7hw ----
+---- pattern: stresser ----
+---- pattern: booter ----
+
+=== 7. WEB CONTAINER FILE ANOMALIES ===
+time="2026-07-19T02:50:28Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+/app:
+total 36
+drwxr-xr-x    1 root     root          4096 Jul 18 15:27 .
+drwxr-xr-x    1 root     root          4096 Jul 18 15:27 ..
+drwxr-xr-x    1 root     root          4096 Jul 18 15:27 .next
+drwxr-xr-x    3 root     root          4096 Jul 18 15:27 node_modules
+-rw-r--r--    1 root     root          2480 Jul 18 15:27 package.json
+drwxr-xr-x    2 root     root          4096 Jun 15 05:13 public
+-rw-r--r--    1 root     root          5847 Jul 18 15:27 server.js
+
+/app/.next:
+total 204
+drwxr-xr-x    1 root     root          4096 Jul 18 15:27 .
+drwxr-xr-x    1 root     root          4096 Jul 18 15:27 ..
+-rw-r--r--    1 root     root            21 Jul 18 15:27 BUILD_ID
+-rw-r--r--    1 root     root         89670 Jul 18 15:27 app-build-manifest.json
+-rw-r--r--    1 root     root          6443 Jul 18 15:27 app-path-routes-manifest.json
+-rw-r--r--    1 root     root           996 Jul 18 15:27 build-manifest.json
+drwxrwxrwt    2 nextjs   nodejs          40 Jul 18 15:27 cache
+-rw-r--r--    1 root     root            20 Jul 18 15:27 package.json
+-rw-r--r--    1 root     root         45858 Jul 18 15:27 prerender-manifest.json
+-rw-r--r--    1 root     root           495 Jul 18 15:27 react-loadable-manifest.json
+-rw-r--r--    1 root     root          5833 Jul 18 15:27 required-server-files.json
+-rw-r--r--    1 root     root         15483 Jul 18 15:27 routes-manifest.json
+drwxr-xr-x    6 root     root          4096 Jul 18 15:27 server
+drwxr-xr-x    6 root     root          4096 Jul 18 15:25 static
+
+/app/.next/server/src:
+total 104
+drwxr-xr-x    2 root     root          4096 Jul 18 15:27 .
+drwxr-xr-x    6 root     root          4096 Jul 18 15:27 ..
+-rw-r--r--    1 root     root         98232 Jul 18 15:27 middleware.js
+time="2026-07-19T02:50:28Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ab25f9d190225046da8f31e43504a0cb  /app/server.js
+6cc70d1cf36d121616076f588fe07019  /app/.next/server/src/middleware.js
+time="2026-07-19T02:50:28Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+sh: can't fork: Resource temporarily unavailable
+time="2026-07-19T02:50:28Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+time="2026-07-19T02:50:29Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+sh: can't fork: Resource temporarily unavailable
+
+=== 8. HOST FILE CHANGES LAST 3 DAYS under /opt/fashionerp ===
+2026-07-18+15:22:09.1677626810 /opt/fashionerp/.git/objects/3e/7ccf5a69b4bf16fe2d4308edbf04cd38428182
+2026-07-18+15:22:09.1717628650 /opt/fashionerp/.git/objects/c8/651d3fd0018d89e07eb7591ca8f4fabc5df584
+2026-07-18+15:22:09.1757630490 /opt/fashionerp/.git/objects/4f/7c5d33fd3e1dc9dad27107e8121c183120dfff
+2026-07-18+15:22:09.1837634160 /opt/fashionerp/.git/objects/b2/48d7c23d14d8ab7a6d71f89255438fc16e579b
+2026-07-18+15:22:09.1857635080 /opt/fashionerp/.git/objects/c8/9063e874e95316056d42e5fa4e0bedfa9b4c09
+2026-07-18+15:22:09.1877636000 /opt/fashionerp/.git/objects/07/264615e8cf833b0fe5bf79cc8e2e1a0104dd14
+2026-07-18+15:22:09.1877636000 /opt/fashionerp/.git/objects/a9/2217f511f23aefbe8e6a16a73882a5d36d5bbc
+2026-07-18+15:22:09.1917637840 /opt/fashionerp/.git/objects/82/937d39bbe11f665382fda27f1031e232f60bfe
+2026-07-18+15:22:09.1917637840 /opt/fashionerp/.git/objects/b1/493410acfcd1a53adcb48c61a937eaf3ad01f8
+2026-07-18+15:22:09.1937638760 /opt/fashionerp/.git/objects/9d/e2094a09047f007af615fc99f07a766798caac
+2026-07-18+15:22:09.1937638760 /opt/fashionerp/.git/objects/e5/e16f2773e68a64682b0e019f446a1f6836b708
+2026-07-18+15:22:09.1947639220 /opt/fashionerp/.git/objects/a3/7e0a3fa61d69cd1d39f36f7d78aa05b5754c09
+2026-07-18+15:22:09.1977640600 /opt/fashionerp/.git/objects/55/798472f5b65eb8118d4dce4c531814072478c6
+2026-07-18+15:22:09.2037643360 /opt/fashionerp/.git/objects/3a/ecc7d045cc6cc76ccb8d5348af1d3736e71e7a
+2026-07-18+15:22:09.2047643810 /opt/fashionerp/.git/objects/59/885c254506957c8ab4f9477e426e21fee3f317
+2026-07-18+15:22:09.2057644270 /opt/fashionerp/.git/objects/13/c602dd4d292c5be44ea488c203ffe9c376fd3b
+2026-07-18+15:22:09.2107646570 /opt/fashionerp/.git/objects/df/36c821c2199f92c59e636f9701504044460da1
+2026-07-18+15:22:09.2127647490 /opt/fashionerp/.git/objects/6f/1ef9580ae0477f19c2d1706f5afa3d36722abc
+2026-07-18+15:22:09.2157648870 /opt/fashionerp/.git/objects/81/55c5b00051f93c5446c522e8a9385457e7b06e
+2026-07-18+15:22:09.2167649330 /opt/fashionerp/.git/objects/e9/b2ea976079f9b340e2e3217e354e44cab9bf33
+2026-07-18+15:22:09.2207651170 /opt/fashionerp/.git/objects/23/c99adae7a9b0d200db5ee6c48f90d21c4332ee
+2026-07-18+15:22:09.2217651630 /opt/fashionerp/.git/objects/9c/b61e073eb058fef02c80732435993df1c20071
+2026-07-18+15:22:09.2227652080 /opt/fashionerp/.git/objects/83/c8e6817b54986dc78f4f8213dac706bd3c1524
+2026-07-18+15:22:09.2257653460 /opt/fashionerp/.git/objects/97/b6f04f0199d209b4f47603402444d3872989a1
+2026-07-18+15:22:09.2267653920 /opt/fashionerp/.git/objects/71/ff3b5c65e9b4f7f3707edc1fde3f3f14c9fd83
+2026-07-18+15:22:09.2277654380 /opt/fashionerp/.git/objects/55/d504260f7a4adb06715403b5f070b36cbf180f
+2026-07-18+15:22:09.2297655300 /opt/fashionerp/.git/objects/48/35f4ce767caae555b3032db1656f653f96eacc
+2026-07-18+15:22:09.2327656680 /opt/fashionerp/.git/objects/6a/a799e04acc5d3880484ef54afe05ec3814ff72
+2026-07-18+15:22:09.2387659440 /opt/fashionerp/.git/objects/e2/c9e23034c8db81e24c919a711249919eb22614
+2026-07-18+15:22:09.2397659900 /opt/fashionerp/.git/objects/7f/13cb034a412675a7a353405cef50ca374362f8
+2026-07-18+15:22:09.2427661280 /opt/fashionerp/.git/objects/d3/09204365baa676557b1906453c8fd33bb15f40
+2026-07-18+15:22:09.2467663110 /opt/fashionerp/.git/objects/6c/c1d16e502e28ad700956e01f8083a2d18aaa4b
+2026-07-18+15:22:09.2507664950 /opt/fashionerp/.git/objects/28/5d1bffbdb173b340770a6de5cd0673f0450d33
+2026-07-18+15:22:09.2547666790 /opt/fashionerp/.git/objects/d1/497c843c3262078b16d4c8af16f41e8e01669b
+2026-07-18+15:22:09.2547666790 /opt/fashionerp/.git/objects/ea/856ee6a3e21922c37ac10ae6347b292bfc866a
+2026-07-18+15:22:09.2557667250 /opt/fashionerp/.git/objects/20/43175d32514cb97ca9296cb9d63f006b44e250
+2026-07-18+15:22:09.2577668170 /opt/fashionerp/.git/objects/22/029435d44d6020cd24231cafc6ebb83ce6f49c
+2026-07-18+15:22:09.2597669090 /opt/fashionerp/.git/objects/d8/2fe52d590f326673fb754021225be38da1268e
+2026-07-18+15:22:09.3627716420 /opt/fashionerp/.git/refs/remotes/origin/main
+2026-07-18+15:22:09.3637716880 /opt/fashionerp/.git/logs/refs/remotes/origin/main
+2026-07-18+15:22:09.3667718250 /opt/fashionerp/.git/FETCH_HEAD
+2026-07-18+15:22:09.4047735720 /opt/fashionerp/apps/web/src/app/(dashboard)/appointments/page.tsx
+2026-07-18+15:22:09.4057736180 /opt/fashionerp/apps/web/src/app/(dashboard)/expenses/page.tsx
+2026-07-18+15:22:09.4067736630 /opt/fashionerp/apps/web/src/app/(dashboard)/job-cards/page.tsx
+2026-07-18+15:22:09.4097738010 /opt/fashionerp/apps/web/src/app/(dashboard)/promotions/page.tsx
+2026-07-18+15:22:09.4107738470 /opt/fashionerp/apps/web/src/app/(dashboard)/quotations/page.tsx
+2026-07-18+15:22:09.4117738930 /opt/fashionerp/apps/web/src/app/(dashboard)/returns/page.tsx
+2026-07-18+15:22:09.4127739390 /opt/fashionerp/apps/web/src/app/(dashboard)/sales/page.tsx
+2026-07-18+15:22:09.4137739850 /opt/fashionerp/apps/web/src/app/(dashboard)/services/page.tsx
+2026-07-18+15:22:09.4147740310 /opt/fashionerp/apps/web/src/app/(dashboard)/users/page.tsx
+2026-07-18+15:22:09.4157740770 /opt/fashionerp/apps/web/src/app/(dashboard)/warranty/page.tsx
+2026-07-18+15:22:09.4187742150 /opt/fashionerp/apps/web/src/components/accounting/accounting-hub.tsx
+2026-07-18+15:22:09.4207743070 /opt/fashionerp/apps/web/src/components/accounting/cheques-hub.tsx
+2026-07-18+15:22:09.4217743530 /opt/fashionerp/apps/web/src/components/accounting/customer-credit-hub.tsx
+2026-07-18+15:22:09.4217743530 /opt/fashionerp/apps/web/src/components/branches/add-branch-modal.tsx
+2026-07-18+15:22:09.4227743990 /opt/fashionerp/apps/web/src/components/brands/add-brand-modal.tsx
+2026-07-18+15:22:09.4237744450 /opt/fashionerp/apps/web/src/components/categories/add-category-modal.tsx
+2026-07-18+15:22:09.4247744910 /opt/fashionerp/apps/web/src/components/customers/add-customer-modal.tsx
+2026-07-18+15:22:09.4257745370 /opt/fashionerp/apps/web/src/components/hr/add-employee-modal.tsx
+2026-07-18+15:22:09.4267745830 /opt/fashionerp/apps/web/src/components/hr/hr-hub.tsx
+2026-07-18+15:22:09.4277746280 /opt/fashionerp/apps/web/src/components/inventory/lot-action-modal.tsx
+2026-07-18+15:22:09.4277746280 /opt/fashionerp/apps/web/src/components/inventory/stock-adjust-modal.tsx
+2026-07-18+15:22:09.4287746740 /opt/fashionerp/apps/web/src/components/inventory/stock-transfer-modal.tsx
+2026-07-18+15:22:09.4297747200 /opt/fashionerp/apps/web/src/components/procurement/invoice-payment-modal.tsx
+2026-07-18+15:22:09.4297747200 /opt/fashionerp/apps/web/src/components/procurement/quick-grn-modal.tsx
+2026-07-18+15:22:09.4297747200 /opt/fashionerp/apps/web/src/components/procurement/supplier-invoice-modal.tsx
+2026-07-18+15:22:09.4387751340 /opt/fashionerp/apps/web/src/components/purchases/add-grn-modal.tsx
+2026-07-18+15:22:09.4397751800 /opt/fashionerp/apps/web/src/components/purchases/create-po-modal.tsx
+2026-07-18+15:22:09.4407752260 /opt/fashionerp/apps/web/src/components/purchases/receive-items-modal.tsx
+2026-07-18+15:22:09.4417752720 /opt/fashionerp/apps/web/src/components/suppliers/add-supplier-modal.tsx
+2026-07-18+15:22:09.4427753180 /opt/fashionerp/apps/web/src/components/ui/button.tsx
+2026-07-18+15:22:09.4427753180 /opt/fashionerp/apps/web/src/components/ui/dialog.tsx
+2026-07-18+15:22:09.4427753180 /opt/fashionerp/apps/web/src/components/ui/modal-footer.tsx
+2026-07-18+15:22:09.4437753640 /opt/fashionerp/apps/web/src/components/warehouse/add-warehouse-modal.tsx
+2026-07-18+15:22:09.4437753640 /opt/fashionerp/apps/web/src/components/warehouse/warehouse-transfer-modal.tsx
+2026-07-18+15:22:09.4547758690 /opt/fashionerp/.git/index
+2026-07-18+15:22:09.4566377550 /opt/fashionerp/.git/ORIG_HEAD
+2026-07-18+15:22:09.4569979270 /opt/fashionerp/.git/logs/HEAD
+2026-07-18+15:22:09.4569979270 /opt/fashionerp/.git/refs/heads/main
+2026-07-18+15:22:09.4577760070 /opt/fashionerp/.git/logs/refs/heads/main
+
+=== 9. LISTENING PORTS / UNUSUAL PROCS ===
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                                                    
+LISTEN 0      4096         0.0.0.0:80        0.0.0.0:*    users:(("docker-proxy",pid=1731841,fd=8))                 
+LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=1388942,fd=18))             
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=2847310,fd=3),("systemd",pid=1,fd=276))
+LISTEN 0      4096         0.0.0.0:443       0.0.0.0:*    users:(("docker-proxy",pid=1731861,fd=8))                 
+LISTEN 0      4096       127.0.0.1:6379      0.0.0.0:*    users:(("docker-proxy",pid=1015809,fd=8))                 
+LISTEN 0      4096       127.0.0.1:5433      0.0.0.0:*    users:(("docker-proxy",pid=2848229,fd=8))                 
+LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=1388942,fd=20))             
+LISTEN 0      4096            [::]:80           [::]:*    users:(("docker-proxy",pid=1731846,fd=8))                 
+LISTEN 0      4096            [::]:22           [::]:*    users:(("sshd",pid=2847310,fd=4),("systemd",pid=1,fd=277))
+LISTEN 0      4096            [::]:443          [::]:*    users:(("docker-proxy",pid=1731868,fd=8))                 
+
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           2  0.0  0.0      0     0 ?        S    Jun06   0:04 [kthreadd]
+root           3  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [pool_workqueue_release]
+root           4  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-rcu_gp]
+root           5  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-sync_wq]
+root           6  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kvfree_rcu_reclaim]
+root           7  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-slub_flushwq]
+root           8  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-netns]
+root          10  0.0  0.0      0     0 ?        I<   Jun06   1:31  \_ [kworker/0:0H-kblockd]
+root          13  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-mm_percpu_wq]
+root          14  0.0  0.0      0     0 ?        S    Jun06   3:04  \_ [ksoftirqd/0]
+root          15  0.0  0.0      0     0 ?        I    Jun06  54:34  \_ [rcu_preempt]
+root          16  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [rcu_exp_par_gp_kthread_worker/0]
+root          17  0.0  0.0      0     0 ?        S    Jun06   0:52  \_ [rcu_exp_gp_kthread_worker]
+root          18  0.0  0.0      0     0 ?        S    Jun06   3:00  \_ [migration/0]
+root          19  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [kprobe-optimizer]
+root          20  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [idle_inject/0]
+root          21  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [cpuhp/0]
+root          22  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [cpuhp/1]
+root          23  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [idle_inject/1]
+root          24  0.0  0.0      0     0 ?        S    Jun06   2:59  \_ [migration/1]
+root          25  0.0  0.0      0     0 ?        S    Jun06   2:54  \_ [ksoftirqd/1]
+root          27  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/1:0H-kblockd]
+root          28  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [kdevtmpfs]
+root          29  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-inet_frag_wq]
+root          30  0.0  0.0      0     0 ?        I    Jun06   0:00  \_ [rcu_tasks_kthread]
+root          31  0.0  0.0      0     0 ?        I    Jun06   0:00  \_ [rcu_tasks_rude_kthread]
+root          32  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [kauditd]
+root          33  0.0  0.0      0     0 ?        S    Jun06   0:09  \_ [khungtaskd]
+root          35  0.0  0.0      0     0 ?        S    Jun06   0:01  \_ [oom_reaper]
+root          36  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-writeback]
+root          38  0.0  0.0      0     0 ?        S    Jun06  60:14  \_ [kcompactd0]
+root          39  0.0  0.0      0     0 ?        SN   Jun06   0:00  \_ [ksmd]
+root          40  0.0  0.0      0     0 ?        SN   Jun06   0:34  \_ [khugepaged]
+root          41  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kblockd]
+root          42  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-blkcg_punt_bio]
+root          43  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kintegrityd]
+root          44  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/9-acpi]
+root          46  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-tpm_dev_wq]
+root          47  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-ata_sff]
+root          48  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-md_bitmap]
+root          49  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-md_llbitmap_io]
+root          50  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-md_llbitmap_unplug]
+root          51  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-md]
+root          52  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-edac-poller]
+root          53  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-devfreq_wq]
+root          54  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [watchdogd]
+root          55  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-quota_events_unbound]
+root          57  0.2  0.0      0     0 ?        S    Jun06 160:35  \_ [kswapd0]
+root          58  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [ecryptfs-kthread]
+root          59  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kthrotld]
+root          60  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/24-aerdrv]
+root          61  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/25-aerdrv]
+root          62  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/26-aerdrv]
+root          63  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/27-aerdrv]
+root          64  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/28-aerdrv]
+root          65  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/29-aerdrv]
+root          66  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/30-aerdrv]
+root          67  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/31-aerdrv]
+root          68  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [irq/32-aerdrv]
+root          69  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-acpi_thermal_pm]
+root          70  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_0]
+root          71  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_0]
+root          73  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-mld]
+root          74  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-ipv6_addrconf]
+root          75  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kstrp]
+root          78  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/u9:0]
+root          89  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-charger_manager]
+root          90  0.0  0.0      0     0 ?        S    Jun06   0:02  \_ [hwrng]
+root         349  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_1]
+root         350  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_1]
+root         351  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_2]
+root         352  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_2]
+root         353  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_3]
+root         354  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_3]
+root         355  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_4]
+root         356  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_4]
+root         357  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_5]
+root         358  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_5]
+root         359  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [scsi_eh_6]
+root         360  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-scsi_tmf_6]
+root         369  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/0:1H]
+root         377  0.0  0.0      0     0 ?        I<   Jun06   1:18  \_ [kworker/1:1H-kblockd]
+root         417  0.0  0.0      0     0 ?        S    Jun06   1:42  \_ [jbd2/sda1-8]
+root         418  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-ext4-rsv-conversion]
+root         709  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kmpathd]
+root         710  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-kmpath_handlerd]
+root         817  0.0  0.0      0     0 ?        S    Jun06   0:00  \_ [card0-crtc0]
+root         839  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-nfit]
+root        1131  0.0  0.0      0     0 ?        I<   Jun06   0:00  \_ [kworker/R-cfg80211]
+root     1388955  0.0  0.0      0     0 ?        S    Jun11   0:00  \_ [psimon]
+root     2884097  0.0  0.0      0     0 ?        S    Jul18   0:00  \_ [psimon]
+root     3366797  0.0  0.0      0     0 ?        I    02:16   0:00  \_ [kworker/u8:3-events_power_efficient]
+root     3370243  0.0  0.0      0     0 ?        I    02:27   0:00  \_ [kworker/u8:2-events_power_efficient]
+root     3372107  0.0  0.0      0     0 ?        I    02:33   0:00  \_ [kworker/1:2-events]
+root     3372789  0.0  0.0      0     0 ?        I    02:35   0:00  \_ [kworker/0:0-events]
+root     3373786  0.0  0.0      0     0 ?        I    02:39   0:00  \_ [kworker/u8:0-events_power_efficient]
+root     3374470  0.0  0.0      0     0 ?        I    02:41   0:00  \_ [kworker/0:1-events]
+root     3375503  0.0  0.0      0     0 ?        I    02:44   0:00  \_ [kworker/1:1-events]
+root     3376167  0.0  0.0      0     0 ?        I    02:46   0:00  \_ [kworker/0:2-events]
+
+=== 10. DOCKER VOLUMES / MOUNTS for web ===
+[]
+docker-entrypoint.sh [node server.js]
+null
+UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+1001                3101003             3100979             1                   Jul18               ?                   00:08:48            next-server (v
+
+=== 11. NGINX CONF integrity ===
+46d2f2042ce2e46dfd1e4b97ef75c2f9  /opt/fashionerp/nginx/nginx.clothing.conf
+49:            return 301 https://$host$request_uri;
+77:            proxy_pass http://$web:3000;
+106:            proxy_pass http://$api:3001;
+117:            proxy_pass http://$api:3001;
+132:            proxy_pass http://$api:3001;
+148:            proxy_pass http://$api:3001/api/health;
+176:            proxy_pass http://$web:3000;
+189:            proxy_pass http://$web:3000;
+215:            proxy_pass http://$web:3000;
+219:            return 302 /admin;
+247:            proxy_pass http://$web:3000;
+time="2026-07-19T02:50:29Z" level=warning msg="/opt/fashionerp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+49:            return 301 https://$host$request_uri;
+219:            return 302 /admin;
+
+=== 12. WORLD-WRITABLE / suspicious binaries ===
+/tmp:
+total 572
+drwxrwxrwt  5 root root    940 Jul 19 02:50 .
+drwxr-xr-x 20 root root   4096 Jun  6 16:25 ..
+-rw-r--r--  1 root root     24 Jul 17 09:31 dash.html
+-rwxr-xr-x  1 root root   1488 Jul 14 10:38 deep_web_malware.sh
+-rw-r--r--  1 root root   3103 Jul  8 18:24 delete-invoices.bundle.cjs
+-rwxr-xr-x  1 root root   1976 Jul 18 02:37 deploy_all.sh
+-rwxr-xr-x  1 root root    863 Jul 16 14:18 deploy_backend.sh
+-rwxr-xr-x  1 root root   1014 Jul 18 03:30 deploy_fast.sh
+-rwxr-xr-x  1 root root    122 Jul  7 14:30 deploy_fonts.sh
+-rwxr-xr-x  1 root root    798 Jul  7 14:01 deploy_latest.sh
+-rwxr-xr-x  1 root root    860 Jul 17 06:22 deploy_no_ssl.sh
+-rwxr-xr-x  1 root root   1866 Jul 17 13:41 deploy_perm.sh
+-rwxr-xr-x  1 root root    756 Jul 17 07:33 deploy_pos.sh
+-rwxr-xr-x  1 root root    126 Jul  7 13:53 deploy_pos_images.sh
+-rwxr-xr-x  1 root root    602 Jul  7 13:43 deploy_storage.sh
+-rwxr-xr-x  1 root root    503 Jul 17 15:07 deploy_web.sh
+-rwxr-xr-x  1 root root    371 Jul 17 18:04 deploy_web_safe.sh
+-rwxr-xr-x  1 root root   1988 Jul 14 10:36 diag_domain_ssl.sh
+-rwxr-xr-x  1 root root   1571 Jul  7 14:16 diag_ssl.sh
+-rw-r--r--  1 root root  37149 Jul 19 02:50 fashionerp_security_scan.txt
+-rwxr-xr-x  1 root root   1428 Jul 14 10:37 find_redirect.sh
+-rwxr-xr-x  1 root root   1873 Jul 14 10:38 find_return_exact.sh
+-rwxr-xr-x  1 root root    428 Jul 18 03:02 fix_containers.sh
+-rwxr-xr-x  1 root root   2263 Jul 15 05:23 fix_hexaadmin_ssl.sh
+-rwxr-xr-x  1 root root   1764 Jul 15 05:01 fix_rebirth_hijack.sh
+-rwxr-xr-x  1 root root    937 Jul  7 14:17 fix_ssl.sh
+-rwxr-xr-x  1 root root    737 Jul 17 17:41 fix_web_container.sh
+-rwxr-xr-x  1 root root   4769 Jul 19 02:50 full_security_scan.sh
+-rw-r--r--  1 root root   1194 Jul 15 05:23 hexaadmin_server_block.conf
+-rw-r--r--  1 root root 359242 Jul  8 17:40 hexalyte-invoice-deploy.tgz
+-rwxr-xr-x  1 root root   3851 Jul 15 05:14 incident_response.sh
+-rwxr-xr-x  1 root root    692 Jul  8 07:32 issue_tenant_ssl.sh
+-rw-r--r--  1 root root  12682 Jul 17 15:29 login.html
+-rwxr-xr-x  1 root root   1019 Jul 18 06:38 oom_safe_deploy.sh
+-rwxr-xr-x  1 root root    760 Jul 15 05:23 patch_hexaadmin_nginx.py
+-rwxr-xr-x  1 root root    320 Jul 18 15:22 quick_deploy.sh
+-rwxr-xr-x  1 root root    445 Jul 18 02:54 quick_deploy_api.sh
+-rwxr-xr-x  1 root root   1263 Jul 18 14:36 quick_deploy_full.sh
+-rwxr-xr-x  1 root root    799 Jul 14 10:39 rebuild_web_clean.sh
+-rwxr-xr-x  1 root root    566 Jul  7 14:03 resume_deploy.sh
+drwx------  2 root root     40 Jun  6 16:25 snap-private-tmp
+drwx------  3 root root     60 Jun  7 01:41 systemd-private-5b65088a0b1543f18ba0461980f0ad23-polkit.service-OTFQgN
+drwx------  3 root root     60 Jun  6 16:25 systemd-private-5b65088a0b1543f18ba0461980f0ad23-systemd-logind.service-wTc00i
+-rw-r--r--  1 root root     67 Jul  7 13:47 test-logo.png
+-rwxr-xr-x  1 root root    946 Jul  7 13:47 test_upload.sh
+-rw-r--r--  1 root root    490 Jul  7 13:47 upload_resp.json
+-rwxr-xr-x  1 root root    686 Jul 17 06:40 web_hotfix.sh
+
+/tmp/oom_safe_deploy.sh
+/tmp/fix_containers.sh
+/tmp/deploy_fast.sh
+/tmp/quick_deploy_api.sh
+/tmp/deploy_web_safe.sh
+/tmp/fix_web_container.sh
+/tmp/quick_deploy_full.sh
+/tmp/quick_deploy.sh
+/tmp/deploy_perm.sh
+/tmp/dash.html
+/tmp/deploy_web.sh
+/tmp/deploy_pos.sh
+/tmp/login.html
+/tmp/web_hotfix.sh
+/tmp/deploy_backend.sh
+/tmp/deploy_no_ssl.sh
+/tmp/deploy_all.sh
+/tmp/fix_hexaadmin_ssl.sh
+/tmp/patch_hexaadmin_nginx.py
+/tmp/hexaadmin_server_block.conf
+/tmp/incident_response.sh
+/tmp/fashionerp_security_scan.txt
+/tmp/full_security_scan.sh
+/tmp/fix_rebirth_hijack.sh
+/tmp/rebuild_web_clean.sh
+/tmp/deep_web_malware.sh
+/tmp/find_return_exact.sh
+/tmp/find_redirect.sh
+/tmp/diag_domain_ssl.sh
+
+=== 13. NETWORK CONNECTIONS from web/api ===
+ESTAB     0      4496   95.217.14.198:22   112.135.78.163:45111 users:(("sshd-session",pid=3377329,fd=9),("sshd-session",pid=3377204,fd=9))
+
+=== 14. INVOICE APP check ===
+hexalyte-invoice-app 3000/tcp Up 22 hours
+{}
+
+=== 15. git status / unexpected edits on server ===
+## main...origin/main
+?? docker-compose.yml.bak-before-hexaadmin
+?? nginx/nginx.clothing.conf.bak-before-hexaadmin
+e4de6d9 style(web): standardize modal footer buttons across all pages
+79ee645 style(web): standardize page header button order and styling
+12e3d84 feat(accounting): align GL mappings, outbox sync, and commerce posting
+e3e5154 refactor(web): extract procurement Quick GRN and invoice modals
+f884977 style(web): polish outline buttons and organize Products header actions
+======== SCAN COMPLETE ========

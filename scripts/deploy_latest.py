@@ -8,7 +8,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HOST = "95.217.14.198"
 USER = "root"
-PASSWORD = r"pwrU\r*UGS£?8H2V$8]<qT"
+from _ssh_config import PASSWORD
 ROOT = r"e:\clothing shop"
 REMOTE = "/opt/fashionerp"
 

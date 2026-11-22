@@ -21,7 +21,7 @@ RUN pnpm run build
 ENV NODE_ENV=production
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
-RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
+RUN mkdir -p /app/uploads /app/private && chown -R nestjs:nodejs /app/uploads /app/private && chmod 700 /app/private
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 # Strip CR in case the build context comes from a Windows checkout (CRLF would make "#!/bin/sh\r" unresolvable).

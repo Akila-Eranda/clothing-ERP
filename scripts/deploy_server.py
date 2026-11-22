@@ -5,7 +5,7 @@ import paramiko
 
 HOST = "95.217.14.198"
 USER = "root"
-PASSWORD = r"pwrU\r*UGS£?8H2V$8]<qT"
+from _ssh_config import PASSWORD
 REPO = "https://github.com/Akila-Eranda/clothing-ERP.git"
 DEPLOY_DIR = "/opt/fashionerp"
 

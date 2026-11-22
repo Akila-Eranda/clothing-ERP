@@ -75,3 +75,15 @@ apps/web/public/downloads/*.exe
 # Seed bundle is built (pnpm seed:build / Dockerfile) from prisma/seed.ts, never tracked
 apps/api/prisma/seed.js
 apps/api/prisma/seed.js.map
+
+# Private runtime state (WhatsApp credentials) - never commit
+storage-private/
+
+# Secrets / local tooling config (never commit)
+.cursor/mcp.json
+apps/mcp-server/.env
+nginx/ssl/
+*.pem
+*.key
+.env.staging
+.staging-data/
