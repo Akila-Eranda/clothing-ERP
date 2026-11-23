@@ -358,8 +358,10 @@ export class PosService {
         where: { userId: cashierId, user: { tenantId } },
         select: { role: { select: { type: true } } },
       });
-      if (!canOverridePosPrice(roles.map((row) => row.role.type))) {
-        throw new ForbiddenException('Custom bill-only items require manager authorization.');
+      const roleTypes = roles.map((row) => row.role.type);
+      // Cashiers may sell Demo / bill-only lines too (owner decision), alongside the price-override roles.
+      if (!canOverridePosPrice(roleTypes) && !roleTypes.includes('CASHIER')) {
+        throw new ForbiddenException('Custom bill-only items require cashier or manager authorization.');
       }
     }
 
