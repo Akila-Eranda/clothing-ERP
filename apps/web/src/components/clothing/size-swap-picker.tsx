@@ -185,7 +185,7 @@ export function SizeSwapPicker({
                 <span className={cn("text-xs font-bold block", pos && "text-white")}>{o.size}</span>
                 {typeof o.stock === "number" ? (
                   <span
-                    className={cn("text-[9px] tabular-nums", !pos && (o.stock > 0 ? "text-emerald-600" : "text-red-500"))}
+                    className={cn("text-[9px] tabular-nums", !pos && (o.stock > 0 ? "text-success-text" : "text-destructive-text"))}
                     style={pos ? { color: o.stock > 0 ? "var(--pos-success-soft)" : "#f87171" } : undefined}
                   >
                     {o.stock}

@@ -38,7 +38,7 @@ const INIT: Form = {
 function F({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className={FORM_LABEL}>{label}{req && <span className="text-destructive ml-0.5">*</span>}</Label>
+      <Label className={FORM_LABEL}>{label}{req && <span className="text-destructive-text ml-0.5">*</span>}</Label>
       {children}
     </div>
   );

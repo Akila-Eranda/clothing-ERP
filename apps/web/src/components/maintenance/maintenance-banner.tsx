@@ -43,7 +43,7 @@ export function MaintenanceBanner({ className = '', compact = false }: Maintenan
       } ${className}`}
       role="alert"
     >
-      <AlertTriangle className={`shrink-0 text-amber-600 ${compact ? 'h-4 w-4 mt-0' : 'h-5 w-5 mt-0.5'}`} />
+      <AlertTriangle className={`shrink-0 text-warning-text ${compact ? 'h-4 w-4 mt-0' : 'h-5 w-5 mt-0.5'}`} />
       <div className="min-w-0">
         <p className={`font-semibold ${compact ? 'text-xs' : 'text-sm'}`}>
           Maintenance Mode is ON

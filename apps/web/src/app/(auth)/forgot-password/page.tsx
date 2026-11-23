@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
               animate={{ opacity: 1, scale: 1 }}
               className="text-center py-2"
             >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-5">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 border border-success/20 mb-5">
                 <CheckCircle2 className="h-8 w-8 text-emerald-400" />
               </div>
               <h2 className="text-xl font-semibold mb-2">Check your inbox</h2>
@@ -105,7 +105,7 @@ export default function ForgotPasswordPage() {
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-xs text-destructive">{errors.email.message}</p>
+                    <p className="text-xs text-destructive-text">{errors.email.message}</p>
                   )}
                 </div>
 

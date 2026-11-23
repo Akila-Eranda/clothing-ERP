@@ -117,9 +117,9 @@ function StatusTimeline({ status, orderDate }: { status: string; orderDate: stri
             <div
               className={cn(
                 "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all",
-                isCancel && "border-red-500 bg-red-500 text-white",
+                isCancel && "border-red-500 bg-destructive text-destructive-foreground",
                 active && !isCancel && "border-primary bg-primary text-primary-foreground shadow-[0_4px_14px_hsl(var(--primary)/0.35)]",
-                done && !active && "border-primary/40 bg-primary/10 text-primary",
+                done && !active && "border-primary/40 bg-primary/10 text-primary-text",
                 !active && !done && !isCancel && "border-border bg-card text-muted-foreground",
               )}
             >
@@ -314,7 +314,7 @@ export default function PODetailPage() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
+                    className="text-destructive-text focus:text-destructive-text"
                     disabled={acting}
                     onClick={() => updateStatus("CANCELLED")}
                   >
@@ -371,7 +371,7 @@ export default function PODetailPage() {
               />
             )}
             {po.status === "DRAFT" && !adminBypass && (
-              <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-900 dark:border-warning/30 dark:bg-warning/10 dark:text-amber-200">
                 Submit for approval before receiving goods. Branch Manager and Accountant must review.
               </div>
             )}
@@ -435,13 +435,13 @@ export default function PODetailPage() {
             <div className="rounded-xl bg-muted/40 p-3 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Paid
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success-text" /> Paid
                 </span>
-                <span className="font-semibold tabular-nums text-emerald-600">{fmt(po.paidAmount)}</span>
+                <span className="font-semibold tabular-nums text-success-text">{fmt(po.paidAmount)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold">
-                <span className="text-red-600">Due</span>
-                <span className="tabular-nums text-red-600">{fmt(totals.due)}</span>
+                <span className="text-destructive-text">Due</span>
+                <span className="tabular-nums text-destructive-text">{fmt(totals.due)}</span>
               </div>
             </div>
           </CardContent>

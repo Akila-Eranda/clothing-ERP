@@ -145,7 +145,7 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Job Card" />,
       cell: ({ row }) => (
         row.original.jobCard ? (
-          <span className="text-xs font-mono text-emerald-600">{row.original.jobCard.jobNumber}</span>
+          <span className="text-xs font-mono text-success-text">{row.original.jobCard.jobNumber}</span>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )
@@ -243,9 +243,9 @@ function AppointmentDetailDialog({
             </div>
           )}
           {appt.jobCard && (
-            <div className="rounded-lg border bg-emerald-500/5 p-3">
+            <div className="rounded-lg border bg-success/5 p-3">
               <p className="text-xs text-muted-foreground mb-1">Linked job card</p>
-              <p className="font-mono font-semibold text-emerald-700">{appt.jobCard.jobNumber}</p>
+              <p className="font-mono font-semibold text-success-text">{appt.jobCard.jobNumber}</p>
               <p className="text-xs text-muted-foreground">{appt.jobCard.status.replace(/_/g, " ")}</p>
             </div>
           )}
@@ -373,9 +373,9 @@ export default function AppointmentsPage() {
 
   const STATS = [
     { label: "Total Bookings", value: items.length, icon: Calendar, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Today", value: todayCount, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Today", value: todayCount, icon: Clock, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "Confirmed", value: items.filter((a) => a.status === "CONFIRMED").length, icon: CheckCircle2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Completed", value: items.filter((a) => a.status === "COMPLETED").length, icon: Wrench, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Completed", value: items.filter((a) => a.status === "COMPLETED").length, icon: Wrench, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(

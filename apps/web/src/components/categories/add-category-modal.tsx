@@ -96,7 +96,7 @@ export function AddCategoryModal({ open, onClose, onCreated, categories, parentI
           {/* Name */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
-              Category Name <span className="text-destructive">*</span>
+              Category Name <span className="text-destructive-text">*</span>
             </Label>
             <Input
               placeholder="e.g. Men's Wear"

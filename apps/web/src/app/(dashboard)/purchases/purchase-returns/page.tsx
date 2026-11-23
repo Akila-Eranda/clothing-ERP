@@ -76,16 +76,16 @@ export default function PurchaseReturnsPage() {
       label: "Draft",
       value: draftCount,
       icon: Clock,
-      color: "text-amber-600",
-      bg: "bg-amber-500/10",
+      color: "text-warning-text",
+      bg: "bg-warning/10",
       tint: "bg-card border-border",
     },
     {
       label: "Posted",
       value: postedCount,
       icon: CheckCircle2,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
+      color: "text-success-text",
+      bg: "bg-success/10",
       tint: "bg-card border-border",
     },
     {
@@ -207,7 +207,7 @@ export default function PurchaseReturnsPage() {
 
       <PageKpiGrid items={STATS} />
 
-      <div className="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+      <div className="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-xs text-amber-900 dark:border-warning/20 dark:bg-warning/10 dark:text-amber-200">
         <strong>Draft → Post:</strong> Save a return as draft, review items, then post to remove stock from inventory and apply supplier credit against linked PO or invoice.
       </div>
 

@@ -10,8 +10,8 @@ import { ExternalLink, Filter } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
 
 const STATUS_STYLE: Record<CapabilityStatus, string> = {
-  live: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
-  partial: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+  live: "bg-success/10 text-success-text border-success/30",
+  partial: "bg-warning/10 text-warning-text border-warning/30",
   planned: "bg-slate-500/10 text-slate-600 border-slate-500/20",
 };
 
@@ -88,16 +88,16 @@ export default function AdvancedErpPage() {
           <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${livePct}%` }} />
         </div>
         <div className="flex gap-4 text-xs text-muted-foreground">
-          <span className="text-emerald-600">{totals.live} live</span>
-          <span className="text-amber-600">{totals.partial} partial</span>
+          <span className="text-success-text">{totals.live} live</span>
+          <span className="text-warning-text">{totals.partial} partial</span>
           <span>{totals.planned} planned</span>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Live", value: totals.live, color: "text-emerald-600", key: "live" as const },
-          { label: "Partial", value: totals.partial, color: "text-amber-600", key: "partial" as const },
+          { label: "Live", value: totals.live, color: "text-success-text", key: "live" as const },
+          { label: "Partial", value: totals.partial, color: "text-warning-text", key: "partial" as const },
           { label: "Planned", value: totals.planned, color: "text-slate-500", key: "planned" as const },
         ].map((s) => (
           <button key={s.label} type="button" onClick={() => setFilter(filter === s.key ? "all" : s.key)}>

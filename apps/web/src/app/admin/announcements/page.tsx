@@ -264,7 +264,7 @@ export default function AnnouncementsPage() {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="text-red-500 hover:text-red-600"
+                className="text-destructive-text hover:text-destructive-text"
                 disabled={busy}
                 title="Delete"
                 onClick={() => void handleDelete(r)}

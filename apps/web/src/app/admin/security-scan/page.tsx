@@ -19,16 +19,16 @@ const STATUS_META: Record<
   SecurityScanSeverity,
   { label: string; className: string; Icon: typeof CheckCircle }
 > = {
-  pass: { label: 'Pass', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20', Icon: CheckCircle },
-  warn: { label: 'Warn', className: 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20', Icon: AlertTriangle },
-  fail: { label: 'Fail', className: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20', Icon: XCircle },
-  info: { label: 'Info', className: 'bg-primary/10 text-primary border-primary/20', Icon: Info },
+  pass: { label: 'Pass', className: 'bg-success/10 text-success-text border-success/20', Icon: CheckCircle },
+  warn: { label: 'Warn', className: 'bg-warning/10 text-warning-text border-warning/20', Icon: AlertTriangle },
+  fail: { label: 'Fail', className: 'bg-destructive/10 text-destructive-text border-destructive/20', Icon: XCircle },
+  info: { label: 'Info', className: 'bg-primary/10 text-primary-text border-primary/20', Icon: Info },
 }
 
 function scoreTone(score: number) {
-  if (score >= 90) return 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-  if (score >= 70) return 'text-amber-800 dark:text-amber-400 bg-amber-500/10 border-amber-500/20'
-  return 'text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/20'
+  if (score >= 90) return 'text-success-text bg-success/10 border-success/20'
+  if (score >= 70) return 'text-warning-text bg-warning/10 border-warning/20'
+  return 'text-destructive-text bg-destructive/10 border-destructive/20'
 }
 
 function CheckRow({ check }: { check: SecurityScanCheck }) {
@@ -51,7 +51,7 @@ function CheckRow({ check }: { check: SecurityScanCheck }) {
         </div>
         <p className="text-sm text-muted-foreground mt-1 break-words">{check.detail}</p>
         {check.recommendation && (
-          <p className="text-xs text-amber-800 dark:text-amber-400 mt-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5">
+          <p className="text-xs text-warning-text mt-2 bg-warning/10 border border-warning/20 rounded-lg px-2.5 py-1.5">
             {check.recommendation}
           </p>
         )}
@@ -108,7 +108,7 @@ export default function SecurityScanPage() {
       <PageKpiGrid items={kpis} loading={loading && !result} cols={4} />
 
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
           {error}
         </div>
       )}

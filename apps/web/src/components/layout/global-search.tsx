@@ -132,7 +132,7 @@ export const GlobalSearch = React.forwardRef<GlobalSearchHandle, { variant?: "in
             ) : loading && !flat.length ? (
               <p className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…</p>
             ) : error ? (
-              <p className="px-3 py-2 text-xs text-destructive" role="alert">{error}</p>
+              <p className="px-3 py-2 text-xs text-destructive-text" role="alert">{error}</p>
             ) : !flat.length ? (
               <p className="px-3 py-2 text-xs text-muted-foreground">No results for “{term}”</p>
             ) : (

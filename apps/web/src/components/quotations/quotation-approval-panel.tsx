@@ -50,7 +50,7 @@ export function QuotationApprovalPanel({
 
   if (instance.status === "REJECTED") {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-destructive-text">
         This quotation was rejected during approval. Edit and submit again from Draft status.
       </div>
     );
@@ -84,7 +84,7 @@ export function QuotationApprovalPanel({
                 <div
                   className={`flex-1 rounded-lg border px-3 py-2 text-xs ${
                     state === "done"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      ? "border-emerald-200 bg-emerald-50 text-success-text"
                       : state === "active"
                         ? "border-teal-300 bg-white text-teal-900 ring-1 ring-teal-200"
                         : "border-teal-100 bg-teal-50/50 text-teal-600"
@@ -92,7 +92,7 @@ export function QuotationApprovalPanel({
                 >
                   <div className="flex items-center gap-1.5 font-medium">
                     {state === "done" ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success-text shrink-0" />
                     ) : state === "active" ? (
                       <Clock className="h-3.5 w-3.5 text-teal-600 shrink-0 animate-pulse" />
                     ) : (
@@ -116,7 +116,7 @@ export function QuotationApprovalPanel({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1 border-red-200 text-red-700 hover:bg-red-50"
+            className="h-8 gap-1 border-red-200 text-destructive-text hover:bg-red-50"
             disabled={acting}
             onClick={() => onReject(pendingTaskId)}
           >

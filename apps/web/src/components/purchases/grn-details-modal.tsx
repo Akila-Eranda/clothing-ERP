@@ -372,7 +372,7 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
                           <td className="px-3 py-3 text-right font-medium tabular-nums text-muted-foreground">
                             {item.orderedQty || "—"}
                           </td>
-                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-emerald-700">
+                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-success-text">
                             {item.receivedQty}
                           </td>
                           <td className="px-3 py-3 text-right font-medium tabular-nums text-muted-foreground">
@@ -399,18 +399,18 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
                     </div>
                     <div className="flex justify-between items-center border-b pb-2 text-sm">
                       <p className="text-muted-foreground">Units Received</p>
-                      <p className="font-semibold tabular-nums text-emerald-700">{totals.received}</p>
+                      <p className="font-semibold tabular-nums text-success-text">{totals.received}</p>
                     </div>
                     {totals.rejected > 0 && (
                       <div className="flex justify-between items-center border-b pb-2 text-sm">
                         <p className="text-muted-foreground">Units Rejected</p>
-                        <p className="font-semibold tabular-nums text-red-600">{totals.rejected}</p>
+                        <p className="font-semibold tabular-nums text-destructive-text">{totals.rejected}</p>
                       </div>
                     )}
                     {totals.rejectedValue > 0 && (
                       <div className="flex justify-between items-center border-b pb-2 text-sm">
                         <p className="text-muted-foreground">Rejected Value</p>
-                        <p className="font-semibold tabular-nums text-red-600">{fmtMoney(totals.rejectedValue)}</p>
+                        <p className="font-semibold tabular-nums text-destructive-text">{fmtMoney(totals.rejectedValue)}</p>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-1">

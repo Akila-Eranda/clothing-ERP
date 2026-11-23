@@ -39,10 +39,10 @@ type FittingSession = {
 type SessionItemDraft = { variantId: string; quantity: number; label: string };
 
 const STATUS_ACTIONS: { status: FittingSession["status"]; label: string; tone: string }[] = [
-  { status: "SOLD", label: "Mark Sold", tone: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-  { status: "RESERVED", label: "Reserve", tone: "bg-amber-500 hover:bg-amber-600 text-white" },
+  { status: "SOLD", label: "Mark Sold", tone: "bg-success hover:bg-success-hover text-success-foreground" },
+  { status: "RESERVED", label: "Reserve", tone: "bg-warning hover:bg-warning-hover text-warning-foreground" },
   { status: "RETURNED", label: "Return", tone: "bg-slate-600 hover:bg-slate-700 text-white" },
-  { status: "CANCELLED", label: "Cancel", tone: "bg-red-600 hover:bg-red-700 text-white" },
+  { status: "CANCELLED", label: "Cancel", tone: "bg-destructive hover:bg-destructive-hover text-destructive-foreground" },
 ];
 
 export default function FittingRoomsPage() {
@@ -258,7 +258,7 @@ export default function FittingRoomsPage() {
                       <span
                         className={cn(
                           "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
-                          active.length ? "bg-amber-500/15 text-amber-700" : "bg-emerald-500/15 text-emerald-700",
+                          active.length ? "bg-warning/15 text-warning-text" : "bg-success/15 text-success-text",
                         )}
                       >
                         {active.length ? `${active.length} active` : "Free"}
@@ -418,7 +418,7 @@ export default function FittingRoomsPage() {
                           value={it.quantity}
                           onChange={(e) => setItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
                         />
-                        <button type="button" onClick={() => setItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500">
+                        <button type="button" onClick={() => setItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-destructive-text">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>

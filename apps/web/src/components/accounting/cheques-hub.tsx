@@ -250,11 +250,11 @@ export function ChequesHub() {
               <p className="text-sm font-medium font-mono">{c.chequeNumber}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {c.direction === "RECEIVED" ? (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600">
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-success-text">
                     <ArrowDownLeft className="h-3 w-3" /> In
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-warning-text">
                     <ArrowUpRight className="h-3 w-3" /> Out
                   </span>
                 )}
@@ -288,7 +288,7 @@ export function ChequesHub() {
         cell: ({ row }) => {
           const overdue = isOverdue(row.original);
           return (
-            <span className={`text-sm tabular-nums ${overdue ? "text-red-600 font-medium" : ""}`}>
+            <span className={`text-sm tabular-nums ${overdue ? "text-destructive-text font-medium" : ""}`}>
               {fmtDate(row.original.dueDate)}
               {overdue && <span className="block text-[10px]">Overdue</span>}
             </span>
@@ -356,7 +356,7 @@ export function ChequesHub() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs text-red-600"
+                  className="h-7 text-xs text-destructive-text"
                   disabled={!!busyId}
                   onClick={() => setStatus(c.id, "BOUNCED")}
                 >

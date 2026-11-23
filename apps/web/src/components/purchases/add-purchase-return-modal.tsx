@@ -187,8 +187,8 @@ export function AddPurchaseReturnModal({ open, onClose, onSaved }: Props) {
     >
       <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         <div className="flex shrink-0 items-center gap-3 border-b px-6 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
-            <RotateCcw className="h-5 w-5 text-orange-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10">
+            <RotateCcw className="h-5 w-5 text-warning-text" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold">New Purchase Return</h2>
@@ -334,7 +334,7 @@ export function AddPurchaseReturnModal({ open, onClose, onSaved }: Props) {
                             {(line.quantity * line.unitCost).toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-2 py-2">
-                            <button type="button" onClick={() => removeLine(line.variantId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                            <button type="button" onClick={() => removeLine(line.variantId)} className="rounded p-1 text-muted-foreground hover:text-destructive-text">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </td>

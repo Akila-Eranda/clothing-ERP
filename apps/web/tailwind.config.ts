@@ -33,6 +33,7 @@ const config: Config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          text: "hsl(var(--primary-text))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -41,6 +42,30 @@ const config: Config = {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          hover: "hsl(var(--destructive-hover))",
+          text: "hsl(var(--destructive-text))",
+          border: "hsl(var(--destructive-border))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+          hover: "hsl(var(--success-hover))",
+          text: "hsl(var(--success-text))",
+          border: "hsl(var(--success-border))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+          hover: "hsl(var(--warning-hover))",
+          text: "hsl(var(--warning-text))",
+          border: "hsl(var(--warning-border))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+          hover: "hsl(var(--info-hover))",
+          text: "hsl(var(--info-text))",
+          border: "hsl(var(--info-border))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

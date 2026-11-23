@@ -31,21 +31,21 @@ interface PaginatedResponse<T> {
 }
 
 const TYPE_CFG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
-  LOW_STOCK:      { icon: AlertTriangle, color: "text-amber-500",   bg: "bg-amber-500/10" },
-  REORDER:        { icon: AlertTriangle, color: "text-orange-500",  bg: "bg-orange-500/10" },
-  EXPIRY_ALERT:   { icon: AlertTriangle, color: "text-red-500",     bg: "bg-red-500/10" },
+  LOW_STOCK:      { icon: AlertTriangle, color: "text-warning-text",   bg: "bg-warning/10" },
+  REORDER:        { icon: AlertTriangle, color: "text-warning-text",  bg: "bg-warning/10" },
+  EXPIRY_ALERT:   { icon: AlertTriangle, color: "text-destructive-text",     bg: "bg-destructive/10" },
   PAYMENT_DUE:    { icon: Zap,           color: "text-violet-500",  bg: "bg-violet-500/10" },
   SUPPLIER_DUE:   { icon: Zap,           color: "text-fuchsia-500", bg: "bg-fuchsia-500/10" },
   CHEQUE_DUE:     { icon: Zap,           color: "text-sky-500",     bg: "bg-sky-500/10" },
   GRN_PENDING:    { icon: Info,          color: "text-blue-500",    bg: "bg-blue-500/10" },
   PO_PENDING:     { icon: Info,          color: "text-indigo-500",  bg: "bg-indigo-500/10" },
-  DAILY_SUMMARY:  { icon: CheckCircle,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  NEW_SALE:       { icon: CheckCircle,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  DAILY_SUMMARY:  { icon: CheckCircle,   color: "text-success-text", bg: "bg-success/10" },
+  NEW_SALE:       { icon: CheckCircle,   color: "text-success-text", bg: "bg-success/10" },
   BIRTHDAY_REMINDER: { icon: Bell,       color: "text-pink-500",    bg: "bg-pink-500/10" },
   INFO:           { icon: Info,          color: "text-blue-500",    bg: "bg-blue-500/10" },
-  WARNING:        { icon: AlertTriangle, color: "text-amber-500",   bg: "bg-amber-500/10" },
-  ERROR:          { icon: Zap,           color: "text-red-500",     bg: "bg-red-500/10" },
-  SYSTEM_ALERT:   { icon: Zap,           color: "text-red-500",     bg: "bg-red-500/10" },
+  WARNING:        { icon: AlertTriangle, color: "text-warning-text",   bg: "bg-warning/10" },
+  ERROR:          { icon: Zap,           color: "text-destructive-text",     bg: "bg-destructive/10" },
+  SYSTEM_ALERT:   { icon: Zap,           color: "text-destructive-text",     bg: "bg-destructive/10" },
 };
 const DEFAULT_CFG = { icon: Bell, color: "text-muted-foreground", bg: "bg-muted/50" };
 

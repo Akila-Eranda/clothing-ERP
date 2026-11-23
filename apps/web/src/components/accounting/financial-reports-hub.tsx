@@ -333,7 +333,7 @@ function ReportView({ reportId, data }: { reportId: ReportId; data: Record<strin
             </p>
           </div>
           {typeof data.balanced === "boolean" && (
-            <Badge className={data.balanced ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}>
+            <Badge className={data.balanced ? "bg-emerald-100 text-success-text" : "bg-amber-100 text-warning-text"}>
               {data.balanced ? "Balanced" : "Out of balance"}
             </Badge>
           )}
@@ -399,7 +399,7 @@ function ProfitLossView({ data }: { data: Record<string, unknown> }) {
       <SectionTable title="Expenses" lines={expenses?.lines ?? []} total={expenses?.total ?? 0} />
       <div className="flex justify-between items-center border-t pt-3">
         <span className="font-semibold">Net Profit / (Loss)</span>
-        <span className={`text-xl font-bold tabular-nums ${(Number(data.netProfit) || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+        <span className={`text-xl font-bold tabular-nums ${(Number(data.netProfit) || 0) >= 0 ? "text-success-text" : "text-destructive-text"}`}>
           LKR {formatNumber(Number(data.netProfit) || 0)}
         </span>
       </div>
@@ -462,8 +462,8 @@ function CashFlowView({ data }: { data: Record<string, unknown> }) {
           {rows.map((r) => (
             <tr key={r.date} className="border-b border-border/40">
               <td className="py-1.5">{r.date}</td>
-              <td className="py-1.5 text-right tabular-nums text-emerald-700">{formatNumber(r.inflow)}</td>
-              <td className="py-1.5 text-right tabular-nums text-rose-700">{formatNumber(r.outflow)}</td>
+              <td className="py-1.5 text-right tabular-nums text-success-text">{formatNumber(r.inflow)}</td>
+              <td className="py-1.5 text-right tabular-nums text-destructive-text">{formatNumber(r.outflow)}</td>
             </tr>
           ))}
         </tbody>

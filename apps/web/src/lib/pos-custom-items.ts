@@ -9,10 +9,10 @@
  * The API stays the authority; this is only early feedback.
  */
 
-export const BILL_ONLY_ROLES = ["SUPER_ADMIN", "TENANT_ADMIN", "BRANCH_MANAGER"] as const;
+export const BILL_ONLY_ROLES = ["SUPER_ADMIN", "TENANT_ADMIN", "BRANCH_MANAGER", "CASHIER"] as const;
 
 export const BILL_ONLY_MANAGER_MESSAGE =
-  "Bill-only / Demo items need a manager. Unlock the POS with a manager PIN (or sign in as a manager) and try again.";
+  "Bill-only / Demo items need a cashier or manager. Unlock the POS with a cashier / manager PIN (or sign in) and try again.";
 
 function normalizeRoleKey(role: unknown): string {
   return String(role ?? "").trim().toUpperCase().replace(/-/g, "_");

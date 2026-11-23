@@ -329,9 +329,9 @@ export default function WarrantyPage() {
 
   const STATS = [
     { label: "Total Claims", value: claims.length, icon: ShieldCheck, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Pending", value: pendingCount, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "Resolved", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Rejected", value: claims.filter((c) => c.status === "REJECTED").length, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10", tint: "bg-card border-border" },
+    { label: "Pending", value: pendingCount, icon: Clock, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
+    { label: "Resolved", value: resolvedCount, icon: CheckCircle2, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+    { label: "Rejected", value: claims.filter((c) => c.status === "REJECTED").length, icon: XCircle, color: "text-destructive-text", bg: "bg-destructive/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(

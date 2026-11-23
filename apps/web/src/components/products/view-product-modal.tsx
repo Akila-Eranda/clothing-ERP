@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { type Product } from "./add-product-modal";
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE:        "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-  DRAFT:         "bg-amber-500/10   text-amber-600   border-amber-500/30",
+  ACTIVE:        "bg-success/10 text-success-text border-success/30",
+  DRAFT:         "bg-warning/10   text-warning-text   border-warning/30",
   INACTIVE:      "bg-muted          text-muted-foreground border-border",
-  OUT_OF_STOCK:  "bg-red-500/10     text-red-600     border-red-500/30",
+  OUT_OF_STOCK:  "bg-destructive/10     text-destructive-text     border-destructive/30",
 };
 
 interface Props {
@@ -63,7 +63,7 @@ export function ViewProductModal({ product, onClose, onEdit }: Props) {
               { label: "Selling Price", value: `LKR ${product.sellingPrice.toFixed(2)}`, highlight: true },
               { label: "Cost Price",    value: `LKR ${product.costPrice.toFixed(2)}` },
               { label: "MRP",           value: `LKR ${product.mrp.toFixed(2)}` },
-              { label: "Margin",        value: `${margin}%`, color: "text-emerald-500" },
+              { label: "Margin",        value: `${margin}%`, color: "text-success-text" },
             ].map((p) => (
               <div key={p.label} className={`rounded-xl border p-3 ${p.highlight ? "bg-primary/5 border-primary/20" : "bg-card"}`}>
                 <p className="text-[10px] text-muted-foreground">{p.label}</p>

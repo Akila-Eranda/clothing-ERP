@@ -388,9 +388,9 @@ export default function JobCardsPage() {
 
   const STATS = [
     { label: "Total Jobs",     value: jobs.length,                        icon: ClipboardList, color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Open",           value: openCount,                          icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Open",           value: openCount,                          icon: Clock,         color: "text-warning-text",   bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "In Progress",    value: activeCount,                        icon: Wrench,        color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Workshop Value", value: `LKR ${formatNumber(totalValue)}`,  icon: Banknote,      color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Workshop Value", value: `LKR ${formatNumber(totalValue)}`,  icon: Banknote,      color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(

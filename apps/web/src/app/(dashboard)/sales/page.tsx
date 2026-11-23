@@ -96,11 +96,11 @@ function methodLabel(method?: string | null) {
 
 function methodTone(method?: string | null) {
   const key = (method ?? "").toUpperCase();
-  if (key === "CASH") return "bg-emerald-600 text-white border-emerald-700";
-  if (key === "CARD") return "bg-primary text-white border-primary/80";
+  if (key === "CASH") return "bg-success text-success-foreground border-success-hover";
+  if (key === "CARD") return "bg-primary text-primary-foreground border-primary/80";
   if (key === "BANK_TRANSFER") return "bg-cyan-600 text-white border-cyan-700";
   if (key === "UPI" || key === "QR") return "bg-violet-600 text-white border-violet-700";
-  if (key === "WALLET") return "bg-orange-600 text-white border-orange-700";
+  if (key === "WALLET") return "bg-warning text-warning-foreground border-warning-hover";
   return "bg-slate-600 text-white border-slate-700";
 }
 
@@ -111,28 +111,28 @@ function paymentLabel(sale: Sale): { label: string; paid: boolean; className: st
     return {
       label: remaining > 0 && (sale.amountPaid ?? 0) > 0 ? "Partial" : "Unpaid",
       paid: false,
-      className: "bg-rose-600 text-white border-rose-700",
+      className: "bg-destructive text-destructive-foreground border-destructive-hover",
     };
   }
   if (status === "REFUNDED" || sale.status === "REFUNDED") {
     return {
       label: "Refunded",
       paid: false,
-      className: "bg-rose-600 text-white border-rose-700",
+      className: "bg-destructive text-destructive-foreground border-destructive-hover",
     };
   }
   return {
     label: "Paid",
     paid: true,
-    className: "bg-emerald-600 text-white border-emerald-700",
+    className: "bg-success text-success-foreground border-success-hover",
   };
 }
 
 function statusBadgeClass(status: string) {
   const s = status?.toUpperCase();
-  if (s === "COMPLETED") return "bg-emerald-600 text-white border-emerald-700";
-  if (s === "REFUNDED") return "bg-rose-600 text-white border-rose-700";
-  if (s === "PENDING") return "bg-orange-600 text-white border-orange-700";
+  if (s === "COMPLETED") return "bg-success text-success-foreground border-success-hover";
+  if (s === "REFUNDED") return "bg-destructive text-destructive-foreground border-destructive-hover";
+  if (s === "PENDING") return "bg-warning text-warning-foreground border-warning-hover";
   return "bg-slate-600 text-white border-slate-700";
 }
 
@@ -178,7 +178,7 @@ function SaleDetailModal({
         <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b shrink-0 bg-card/40">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary-text">
                 <Receipt className="h-4 w-4" />
               </span>
               <h2 className="font-bold text-lg sm:text-xl tracking-tight">Sale details</h2>
@@ -305,13 +305,13 @@ function SaleDetailModal({
                   </div>
 
                   <div className="rounded-xl border overflow-hidden">
-                    <div className="bg-emerald-600 text-white px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between gap-2">
+                    <div className="bg-success text-success-foreground px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5">
                         <ClipboardList className="h-3.5 w-3.5" />
                         Payments
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border border-white/30 ${
-                        pay?.paid ? "bg-white/20" : "bg-rose-500/80"
+                        pay?.paid ? "bg-white/20" : "bg-destructive/80"
                       }`}>
                         {pay?.label?.toUpperCase() ?? "—"}
                       </span>
@@ -441,7 +441,7 @@ function TotRow({
   accent?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between gap-3 text-sm ${bold ? "font-bold" : ""} ${muted ? "text-emerald-600 dark:text-emerald-400" : ""} ${accent ? "text-rose-600 dark:text-rose-400 font-semibold" : ""}`}>
+    <div className={`flex items-center justify-between gap-3 text-sm ${bold ? "font-bold" : ""} ${muted ? "text-success-text" : ""} ${accent ? "text-destructive-text font-semibold" : ""}`}>
       <span className={bold || accent ? "" : "text-muted-foreground"}>{label}</span>
       <span className="tabular-nums whitespace-nowrap">{value}</span>
     </div>

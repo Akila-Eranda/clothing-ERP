@@ -18,9 +18,9 @@ const SEV_ICON = {
 }
 
 const SEV_COLOR = {
-  error: 'text-red-600 dark:text-red-400 bg-red-500/10',
-  warning: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
-  info: 'text-primary bg-primary/10',
+  error: 'text-destructive-text bg-destructive/10',
+  warning: 'text-warning-text bg-warning/10',
+  info: 'text-primary-text bg-primary/10',
 }
 
 function normalizeSeverity(s?: string): PlatformAlert['severity'] {
@@ -84,7 +84,7 @@ export default function AdminAlertsPanel() {
       >
         <Bell size={16} />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
             {count > 9 ? '9+' : count}
           </span>
         )}

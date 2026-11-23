@@ -99,8 +99,8 @@ const DISCOUNT_CFG = {
     icon: DollarSign,
     stripe: "from-emerald-500 to-teal-600",
     badge: "softSuccess" as const,
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-600",
+    bg: "bg-success/10",
+    text: "text-success-text",
   },
   BUY_X_GET_Y: {
     label: "Buy X Get Y",
@@ -383,7 +383,7 @@ export function PromotionsHub() {
             <button
               type="button"
               onClick={() => void copyCode(code)}
-              className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md hover:bg-primary/15 transition-colors"
+              className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-primary-text bg-primary/10 px-2 py-1 rounded-md hover:bg-primary/15 transition-colors"
             >
               {code}
               <Copy className="h-3 w-3 opacity-60" />
@@ -669,7 +669,7 @@ export function PromotionsHub() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive-text"
                           onClick={() => void handleDelete(promo.id)}
                           title="Delete"
                         >

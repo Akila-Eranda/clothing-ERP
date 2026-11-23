@@ -19,8 +19,8 @@ type AuditRow = {
 
 function StatusIcon({ ok }: { ok: boolean }) {
   return ok
-    ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-    : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />;
+    ? <CheckCircle2 className="h-4 w-4 text-success-text shrink-0" />
+    : <AlertTriangle className="h-4 w-4 text-warning-text shrink-0" />;
 }
 
 export default function VerticalAuditPage() {
@@ -137,7 +137,7 @@ export default function VerticalAuditPage() {
       <Card className="border-amber-200 bg-amber-50/50">
         <CardContent className="pt-4 text-xs space-y-2">
           <p className="font-semibold text-amber-900">Production checklist (manual)</p>
-          <ul className="list-disc pl-4 text-amber-800 space-y-1">
+          <ul className="list-disc pl-4 text-warning-text space-y-1">
             <li>Login as each demo tenant (clothing, grocery, hardware, agri) and open this page</li>
             <li>Add a product — confirm variant fields match business (size/color vs weight/grade)</li>
             <li>POS: hold bill, checkout — stock should reserve/release correctly</li>

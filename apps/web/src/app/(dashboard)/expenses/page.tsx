@@ -186,7 +186,7 @@ export default function ExpensesPage() {
     }},
     { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,     cell: ({ row }) => <span className="text-xs text-muted-foreground capitalize">{row.original.paymentMethod?.replace(/_/g, " ") ?? "—"}</span> },
     { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}</span> },
-    { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,     cell: ({ row }) => <span className="font-bold text-red-500">LKR {formatNumber(row.original.amount)}</span> },
+    { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,     cell: ({ row }) => <span className="font-bold text-destructive-text">LKR {formatNumber(row.original.amount)}</span> },
     { id: "actions", cell: ({ row }) => <TableActionsRow
       editAction={{ action: () => setEditItem(row.original) }}
       deleteAction={{ action: () => deleteExpense(row.original.id) }}
@@ -219,7 +219,7 @@ export default function ExpensesPage() {
         <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setRange({ start: p.start, end: p.end })}
-              className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-background text-muted-foreground hover:bg-muted border"}`}>
+              className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-destructive text-destructive-foreground border-destructive-hover" : "bg-background text-muted-foreground hover:bg-muted border"}`}>
               {p.label}
             </button>
           ))}
@@ -319,7 +319,7 @@ export default function ExpensesPage() {
           <div className="h-40 flex flex-col items-center justify-center text-muted-foreground rounded-xl border bg-card">
             <TrendingDown className="h-10 w-10 mb-2 opacity-20" />
             <p className="text-sm font-medium text-muted-foreground">No expenses for this period</p>
-            <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-red-500 hover:underline">Record the first one →</button>
+            <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-destructive-text hover:underline">Record the first one →</button>
           </div>
         ) : (
           <ClientSideTable

@@ -68,9 +68,9 @@ interface Payroll {
 const LEAVE_TYPES = ["CASUAL","SICK","ANNUAL","MATERNITY","PATERNITY","OTHER"];
 
 const ATTN_STATUS: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  PRESENT:  { label: "Present",   color: "text-emerald-600", bg: "bg-emerald-500/10", icon: CheckCircle2 },
-  ABSENT:   { label: "Absent",    color: "text-red-600",     bg: "bg-red-500/10",     icon: XCircle },
-  HALF_DAY: { label: "Half Day",  color: "text-amber-600",   bg: "bg-amber-500/10",   icon: AlertCircle },
+  PRESENT:  { label: "Present",   color: "text-success-text", bg: "bg-success/10", icon: CheckCircle2 },
+  ABSENT:   { label: "Absent",    color: "text-destructive-text",     bg: "bg-destructive/10",     icon: XCircle },
+  HALF_DAY: { label: "Half Day",  color: "text-warning-text",   bg: "bg-warning/10",   icon: AlertCircle },
   ON_LEAVE: { label: "Leave",     color: "text-violet-600",  bg: "bg-violet-500/10",  icon: CalendarDays },
   LEAVE:    { label: "Leave",     color: "text-violet-600",  bg: "bg-violet-500/10",  icon: CalendarDays },
   LATE:     { label: "Late",      color: "text-blue-600",    bg: "bg-blue-500/10",    icon: Clock },
@@ -108,7 +108,7 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center"><DollarSign className="h-4 w-4 text-success-text" /></div>
           <div><h2 className="font-bold text-base">Generate All Payrolls</h2><p className="text-xs text-muted-foreground">{MONTHS[month-1]} {year} · All active employees</p></div>
           <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
@@ -124,7 +124,7 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
             </div>
             {deductAbsent && <div className="space-y-1.5"><Label className="text-xs font-semibold">Deduction per Absent Day (LKR)</Label><Input type="number" min={0} value={perDay} onChange={(e) => setPerDay(e.target.value)} /></div>}
           </div>
-          <p className="text-xs text-amber-600 bg-amber-500/10 rounded-lg px-3 py-2">Existing payroll entries for this month will be overwritten.</p>
+          <p className="text-xs text-warning-text bg-warning/10 rounded-lg px-3 py-2">Existing payroll entries for this month will be overwritten.</p>
         </div>
         <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
@@ -312,9 +312,9 @@ function buildAttnSummaryColumns(): ColumnDef<AttnSummaryRow>[] {
   return [
     { id: "employee", header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
       cell: ({ row }) => <div><p className="font-medium text-sm">{row.original.firstName} {row.original.lastName}</p><p className="text-[10px] text-muted-foreground">{row.original.designation ?? row.original.department ?? "—"}</p></div> },
-    { id: "present",  header: ({ column }) => <DataTableColumnHeader column={column} title="Present" />,  cell: ({ row }) => <span className="text-sm font-bold text-emerald-600">{row.original.summary.PRESENT ?? 0}</span> },
-    { id: "absent",   header: ({ column }) => <DataTableColumnHeader column={column} title="Absent" />,   cell: ({ row }) => <span className="text-sm font-bold text-red-500">{row.original.summary.ABSENT ?? 0}</span> },
-    { id: "halfday",  header: ({ column }) => <DataTableColumnHeader column={column} title="Half Day" />, cell: ({ row }) => <span className="text-sm text-amber-600">{row.original.summary.HALF_DAY ?? 0}</span> },
+    { id: "present",  header: ({ column }) => <DataTableColumnHeader column={column} title="Present" />,  cell: ({ row }) => <span className="text-sm font-bold text-success-text">{row.original.summary.PRESENT ?? 0}</span> },
+    { id: "absent",   header: ({ column }) => <DataTableColumnHeader column={column} title="Absent" />,   cell: ({ row }) => <span className="text-sm font-bold text-destructive-text">{row.original.summary.ABSENT ?? 0}</span> },
+    { id: "halfday",  header: ({ column }) => <DataTableColumnHeader column={column} title="Half Day" />, cell: ({ row }) => <span className="text-sm text-warning-text">{row.original.summary.HALF_DAY ?? 0}</span> },
     { id: "leave",    header: ({ column }) => <DataTableColumnHeader column={column} title="On Leave" />, cell: ({ row }) => <span className="text-sm text-violet-600">{(row.original.summary.ON_LEAVE ?? 0) + (row.original.summary.LEAVE ?? 0)}</span> },
     { id: "late",     header: ({ column }) => <DataTableColumnHeader column={column} title="Late" />,     cell: ({ row }) => <span className="text-sm text-blue-500">{row.original.summary.LATE ?? 0}</span> },
     { id: "pct", header: ({ column }) => <DataTableColumnHeader column={column} title="Att. %" />,
@@ -322,7 +322,7 @@ function buildAttnSummaryColumns(): ColumnDef<AttnSummaryRow>[] {
         const s = row.original.summary;
         const total = (s.PRESENT??0)+(s.ABSENT??0)+(s.HALF_DAY??0)+(s.ON_LEAVE??0)+(s.LATE??0)+(s.LEAVE??0);
         const pct = total > 0 ? Math.round(((s.PRESENT??0)+(s.LATE??0))/total*100) : 0;
-        return <span className={`text-sm font-bold ${pct>=90?"text-emerald-600":pct>=75?"text-amber-600":"text-red-500"}`}>{pct}%</span>;
+        return <span className={`text-sm font-bold ${pct>=90?"text-success-text":pct>=75?"text-warning-text":"text-destructive-text"}`}>{pct}%</span>;
       },
     },
   ];
@@ -362,8 +362,8 @@ function buildLeaveColumns(onUpdate: (id: string, status: string) => void): Colu
         if (row.original.status !== "PENDING") return null;
         return (
           <div className="flex gap-1.5">
-            <Button size="sm" variant="outline" className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1" onClick={() => onUpdate(row.original.id,"APPROVED")}><CheckCircle2 className="h-3 w-3" /> Approve</Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-200 hover:bg-red-50 gap-1" onClick={() => onUpdate(row.original.id,"REJECTED")}><XCircle className="h-3 w-3" /> Reject</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs text-success-text border-emerald-200 hover:bg-emerald-50 gap-1" onClick={() => onUpdate(row.original.id,"APPROVED")}><CheckCircle2 className="h-3 w-3" /> Approve</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs text-destructive-text border-red-200 hover:bg-red-50 gap-1" onClick={() => onUpdate(row.original.id,"REJECTED")}><XCircle className="h-3 w-3" /> Reject</Button>
           </div>
         );
       },
@@ -483,7 +483,7 @@ function buildPayrollColumns(
       id: "bonusAllowances",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Bonus + Allow." />,
       cell: ({ row }) => (
-        <span className="text-sm text-emerald-600">
+        <span className="text-sm text-success-text">
           +LKR {((row.original.bonus ?? 0) + (row.original.allowances ?? 0)).toLocaleString()}
         </span>
       ),
@@ -491,7 +491,7 @@ function buildPayrollColumns(
     {
       accessorKey: "deductions",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Deductions" />,
-      cell: ({ row }) => <span className="text-sm text-red-500">-LKR {(row.original.deductions ?? 0).toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm text-destructive-text">-LKR {(row.original.deductions ?? 0).toLocaleString()}</span>,
     },
     {
       accessorKey: "netSalary",
@@ -543,7 +543,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
         const initials = `${e.firstName?.[0] ?? ""}${e.lastName?.[0] ?? ""}`.toUpperCase() || "?";
         return (
           <Link href={`/hr/employees/${e.id}`} className="flex items-center gap-2.5 hover:opacity-80">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary-text shrink-0">
               {initials}
             </div>
             <div>
@@ -1110,9 +1110,9 @@ export function HrHub({ section }: { section: HrSection }) {
 
           {/* Unpaid / missing payroll */}
           {!payLoading && unpaidEmployees.length > 0 ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="rounded-xl border border-warning/30 bg-warning/5 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <UserX className="h-4 w-4 text-amber-600" />
+                <UserX className="h-4 w-4 text-warning-text" />
                 <p className="text-sm font-semibold">{unpaidEmployees.length} active employee{unpaidEmployees.length > 1 ? "s" : ""} without payroll for {MONTHS[payMonth - 1]} {payYear}</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1155,8 +1155,8 @@ export function HrHub({ section }: { section: HrSection }) {
               {/* Totals summary */}
               <div className="rounded-xl border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Total Basic</p><p className="font-bold">LKR {payrolls.reduce((s,p) => s+p.basicSalary, 0).toLocaleString()}</p></div>
-                <div><p className="text-xs text-muted-foreground">Total Bonus + Allow.</p><p className="font-bold text-emerald-600">+LKR {payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</p></div>
-                <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="font-bold text-red-500">-LKR {payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total Bonus + Allow.</p><p className="font-bold text-success-text">+LKR {payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="font-bold text-destructive-text">-LKR {payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Total Net Pay</p><p className="font-bold text-primary">LKR {payrolls.reduce((s,p) => s+p.netSalary, 0).toLocaleString()}</p></div>
                 <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Paid</p><p className="font-bold">{payrolls.filter((p) => p.isPaid).length}/{payrolls.length}</p></div>
               </div>
@@ -1208,9 +1208,9 @@ export function HrHub({ section }: { section: HrSection }) {
               />
               <div className="rounded-xl border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Showing</p><p className="font-bold">{filteredLeaves.length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{filteredLeaves.filter((l)=>l.status==="PENDING").length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{filteredLeaves.filter((l)=>l.status==="APPROVED").length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Rejected</p><p className="font-bold text-red-500">{filteredLeaves.filter((l)=>l.status==="REJECTED").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-warning-text">{filteredLeaves.filter((l)=>l.status==="PENDING").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-success-text">{filteredLeaves.filter((l)=>l.status==="APPROVED").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Rejected</p><p className="font-bold text-destructive-text">{filteredLeaves.filter((l)=>l.status==="REJECTED").length}</p></div>
               </div>
             </>
           )}

@@ -277,8 +277,8 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Database connection is managed via environment variables on the server.</p>
+              <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
+                <p className="text-xs text-warning-text font-medium">Database connection is managed via environment variables on the server.</p>
               </div>
             </div>
           )}
@@ -384,7 +384,7 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Status</span>
-                  <span className={cn('font-semibold', waStatus?.connected ? 'text-green-600' : 'text-foreground')}>
+                  <span className={cn('font-semibold', waStatus?.connected ? 'text-success-text' : 'text-foreground')}>
                     {waLoading ? 'Loading…' : waStatus?.connected ? 'Connected' : 'Disconnected'}
                   </span>
                 </div>

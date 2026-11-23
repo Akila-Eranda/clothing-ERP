@@ -101,27 +101,27 @@ export default function SystemHealthPage() {
       <div className={cn(
         'rounded-xl border p-5 flex items-center gap-4',
         allOk
-          ? 'bg-emerald-500/10 border-emerald-500/20'
-          : 'bg-red-500/10 border-red-500/20',
+          ? 'bg-success/10 border-success/20'
+          : 'bg-destructive/10 border-destructive/20',
       )}>
         {loading ? (
           <Activity size={20} className="text-muted-foreground animate-spin" />
         ) : allOk ? (
-          <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <CheckCircle size={28} className="text-success-text flex-shrink-0" />
         ) : (
-          <AlertTriangle size={28} className="text-red-500 flex-shrink-0" />
+          <AlertTriangle size={28} className="text-destructive-text flex-shrink-0" />
         )}
         <div>
-          <p className={cn('text-base font-bold', allOk ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300')}>
+          <p className={cn('text-base font-bold', allOk ? 'text-success-text' : 'text-destructive-text')}>
             {loading ? 'Checking…' : allOk ? 'All Systems Operational' : 'Service Disruption Detected'}
           </p>
-          <p className={cn('text-sm', allOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>
+          <p className={cn('text-sm', allOk ? 'text-success-text' : 'text-destructive-text')}>
             {loading ? 'Running health checks…' : allOk ? `${APP_NAME} platform is running normally.` : 'One or more services are experiencing issues.'}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <StatusDot ok={!loading && allOk} />
-          <span className={cn('text-xs font-semibold', allOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+          <span className={cn('text-xs font-semibold', allOk ? 'text-success-text' : 'text-destructive-text')}>
             {loading ? 'Checking' : allOk ? 'Healthy' : 'Degraded'}
           </span>
         </div>
@@ -136,9 +136,9 @@ export default function SystemHealthPage() {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'w-10 h-10 rounded-xl flex items-center justify-center',
-                    svc.ok ? 'bg-emerald-500/10' : 'bg-red-500/10',
+                    svc.ok ? 'bg-success/10' : 'bg-destructive/10',
                   )}>
-                    <Icon size={18} className={svc.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'} />
+                    <Icon size={18} className={svc.ok ? 'text-success-text' : 'text-destructive-text'} />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">{svc.name}</p>
@@ -148,16 +148,16 @@ export default function SystemHealthPage() {
                 {loading ? (
                   <Activity size={14} className="text-muted-foreground animate-spin" />
                 ) : svc.ok ? (
-                  <CheckCircle size={16} className="text-emerald-500" />
+                  <CheckCircle size={16} className="text-success-text" />
                 ) : (
-                  <XCircle size={16} className="text-red-500" />
+                  <XCircle size={16} className="text-destructive-text" />
                 )}
               </div>
               <div className={cn(
                 'px-3 py-2 rounded-lg text-xs',
                 svc.ok
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-red-500/10 text-red-600 dark:text-red-400',
+                  ? 'bg-success/10 text-success-text'
+                  : 'bg-destructive/10 text-destructive-text',
               )}>
                 {loading ? 'Checking…' : svc.detail}
               </div>

@@ -59,7 +59,7 @@ export function BankDetailsFields({
         aria-describedby={errors[key] ? `${idPrefix}-${key}-error` : undefined}
         onChange={(e) => onChange({ ...value, [key]: e.target.value })}
       />
-      {errors[key] && <p id={`${idPrefix}-${key}-error`} className="text-xs text-red-600" role="alert">{errors[key]}</p>}
+      {errors[key] && <p id={`${idPrefix}-${key}-error`} className="text-xs text-destructive-text" role="alert">{errors[key]}</p>}
     </div>
   );
   return (

@@ -376,7 +376,7 @@ function LoginContent() {
                     />
                   </div>
                   {totpErrors.code && (
-                    <p className="text-xs text-destructive">{totpErrors.code.message}</p>
+                    <p className="text-xs text-destructive-text">{totpErrors.code.message}</p>
                   )}
                 </div>
 
@@ -424,12 +424,12 @@ function LoginContent() {
                       {...register("email")}
                     />
                   </div>
-                  {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                  {errors.email && <p className="text-xs text-destructive-text">{errors.email.message}</p>}
                   {canResolveWorkspaceByEmail && emailLookupLoading && (
                     <p className="text-xs text-slate-500">Finding your shop…</p>
                   )}
                   {canResolveWorkspaceByEmail && !emailLookupLoading && watchedEmail?.includes("@") && emailWorkspaces.length === 0 && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-xs text-destructive-text">
                       No shop found for this email.
                     </p>
                   )}
@@ -497,7 +497,7 @@ function LoginContent() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                  {errors.password && <p className="text-xs text-destructive-text">{errors.password.message}</p>}
                 </div>
 
                 <Button

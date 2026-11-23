@@ -314,7 +314,7 @@ function QuoteDetailDialog({
                 <Button size="sm" variant="outline" className="gap-1" onClick={() => { onStatus(quote.id, "ACCEPTED"); onClose(); }}>
                   <CheckCircle2 className="h-3.5 w-3.5" /> Accept
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1 text-destructive" onClick={() => { onStatus(quote.id, "REJECTED"); onClose(); }}>
+                <Button size="sm" variant="outline" className="gap-1 text-destructive-text" onClick={() => { onStatus(quote.id, "REJECTED"); onClose(); }}>
                   <XCircle className="h-3.5 w-3.5" /> Reject
                 </Button>
               </>
@@ -569,9 +569,9 @@ export default function QuotationsPage() {
 
   const STATS = [
     { label: "Total Quotes",  value: quotes.length,  icon: FileText,     color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Draft",         value: draftCount,     icon: Clock,        color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Draft",         value: draftCount,     icon: Clock,        color: "text-warning-text",   bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "Sent",          value: sentCount,      icon: Send,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Pipeline Value", value: `LKR ${formatNumber(totalValue)}`, icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Pipeline Value", value: `LKR ${formatNumber(totalValue)}`, icon: Banknote, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(
@@ -745,7 +745,7 @@ export default function QuotationsPage() {
               )}
               {selectedVariant && !items.some((i) => i.variantId === selectedVariant.variantId) && (
                 <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
-                  <span className="text-amber-800">
+                  <span className="text-warning-text">
                     {selectedVariant.variantName !== selectedVariant.productName
                       ? `${selectedVariant.variantName} · `
                       : ""}
@@ -801,7 +801,7 @@ export default function QuotationsPage() {
                         </td>
                         <td className="px-3 py-2">
                           <button type="button" onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4 text-destructive-text" />
                           </button>
                         </td>
                       </tr>

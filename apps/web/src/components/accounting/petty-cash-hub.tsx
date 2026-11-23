@@ -308,7 +308,7 @@ function BookPanel() {
         accessorFn: (l) => (l.signedAmount > 0 ? l.signedAmount : 0),
         header: ({ column }) => <DataTableColumnHeader column={column} title="In" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-emerald-700">
+          <span className="tabular-nums text-success-text">
             {row.original.signedAmount > 0 ? formatNumber(row.original.signedAmount) : "—"}
           </span>
         ),
@@ -318,7 +318,7 @@ function BookPanel() {
         accessorFn: (l) => (l.signedAmount < 0 ? Math.abs(l.signedAmount) : 0),
         header: ({ column }) => <DataTableColumnHeader column={column} title="Out" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-rose-700">
+          <span className="tabular-nums text-destructive-text">
             {row.original.signedAmount < 0 ? formatNumber(Math.abs(row.original.signedAmount)) : "—"}
           </span>
         ),

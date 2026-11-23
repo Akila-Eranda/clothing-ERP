@@ -309,7 +309,7 @@ export default function ProcurementHubPage() {
       accessorKey: "paidAmount",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Paid" />,
       cell: ({ row }) => (
-        <span className="text-sm text-emerald-600">LKR {formatNumber(row.original.paidAmount)}</span>
+        <span className="text-sm text-success-text">LKR {formatNumber(row.original.paidAmount)}</span>
       ),
     },
     {
@@ -319,7 +319,7 @@ export default function ProcurementHubPage() {
       cell: ({ row }) => {
         const due = Math.max(0, row.original.total - row.original.paidAmount);
         return (
-          <span className={`text-sm font-semibold ${due > 0.01 ? "text-amber-600" : "text-muted-foreground"}`}>
+          <span className={`text-sm font-semibold ${due > 0.01 ? "text-warning-text" : "text-muted-foreground"}`}>
             LKR {formatNumber(due)}
           </span>
         );
@@ -364,8 +364,8 @@ export default function ProcurementHubPage() {
 
   const STATS = [
     { label: "Purchase Requests", value: String(prs.length), icon: ClipboardList, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Goods Receipts", value: String(grns.length), icon: PackageCheck, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Payables Due", value: `LKR ${formatNumber(totalDue)}`, icon: Wallet, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Goods Receipts", value: String(grns.length), icon: PackageCheck, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+    { label: "Payables Due", value: `LKR ${formatNumber(totalDue)}`, icon: Wallet, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "Pending Actions", value: String(openDrafts), icon: AlertCircle, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "bg-card border-border" },
   ];
 
@@ -390,7 +390,7 @@ export default function ProcurementHubPage() {
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
             <Button variant="outline" onClick={() => setQuickGrnOpen(true)} className="gap-1.5">
-              <Zap className="h-[18px] w-[18px] text-amber-500" /> Quick GRN
+              <Zap className="h-[18px] w-[18px] text-warning-text" /> Quick GRN
             </Button>
             <Button variant="outline" onClick={() => setInvoiceOpen(true)} className="gap-1.5">
               <FileText className="h-[18px] w-[18px]" /> Post Invoice
@@ -481,7 +481,7 @@ export default function ProcurementHubPage() {
               Formal GRN documents from PO receive, Direct GRN, or Quick GRN.
             </p>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setQuickGrnOpen(true)}>
-              <Zap className="h-3.5 w-3.5 text-amber-500" /> Quick GRN
+              <Zap className="h-3.5 w-3.5 text-warning-text" /> Quick GRN
             </Button>
           </div>
           {loading ? (

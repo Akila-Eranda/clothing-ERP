@@ -144,8 +144,8 @@ export default function RegisterPage() {
           className="max-w-md mx-4 w-full text-center"
         >
           <div className="glass-card rounded-2xl p-10 shadow-glass">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6 mx-auto">
-              <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-success/10 border border-success/20 mb-6 mx-auto">
+              <CheckCircle2 className="h-10 w-10 text-success-text" />
             </div>
             <h1 className="text-2xl font-bold mb-2">You&apos;re all set! 🎉</h1>
             <p className="text-muted-foreground mb-2">
@@ -154,7 +154,7 @@ export default function RegisterPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Your {STARTER_TRIAL_DAYS}-day free trial has started.
             </p>
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+            <p className="text-xs text-warning-text bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
               Your secure workspace URL is being prepared. HTTPS usually works within 1–3 minutes after signup.
             </p>
             <div className="rounded-xl bg-muted/50 border border-border px-4 py-3 text-left text-sm mb-6 space-y-2">
@@ -233,9 +233,9 @@ export default function RegisterPage() {
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                   step === s.id
-                    ? "bg-primary text-white"
+                    ? "bg-primary text-primary-foreground"
                     : step > s.id
-                    ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                    ? "bg-success/10 text-success-text border border-success/20"
                     : "bg-muted text-muted-foreground",
                 )}>
                   {step > s.id
@@ -245,7 +245,7 @@ export default function RegisterPage() {
                   {s.label}
                 </div>
                 {i < STEPS.length - 1 && (
-                  <div className={cn("h-px w-6", step > s.id ? "bg-emerald-500/30" : "bg-border")} />
+                  <div className={cn("h-px w-6", step > s.id ? "bg-success/30" : "bg-border")} />
                 )}
               </React.Fragment>
             ))}
@@ -289,7 +289,7 @@ export default function RegisterPage() {
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="FashionHub Pvt Ltd" className="pl-9" {...register("companyName")} />
                       </div>
-                      {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
+                      {errors.companyName && <p className="text-xs text-destructive-text">{errors.companyName.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Workspace subdomain *</Label>
@@ -310,7 +310,7 @@ export default function RegisterPage() {
                           Your URL: <span className="text-primary font-mono">{subPreview}.shop.hexalyte.com</span>
                         </p>
                       )}
-                      {errors.subdomain && <p className="text-xs text-destructive">{errors.subdomain.message}</p>}
+                      {errors.subdomain && <p className="text-xs text-destructive-text">{errors.subdomain.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Phone number</Label>
@@ -336,12 +336,12 @@ export default function RegisterPage() {
                       <div className="space-y-2">
                         <Label>First name *</Label>
                         <Input placeholder="Akila" {...register("adminFirstName")} />
-                        {errors.adminFirstName && <p className="text-xs text-destructive">{errors.adminFirstName.message}</p>}
+                        {errors.adminFirstName && <p className="text-xs text-destructive-text">{errors.adminFirstName.message}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label>Last name *</Label>
                         <Input placeholder="Perera" {...register("adminLastName")} />
-                        {errors.adminLastName && <p className="text-xs text-destructive">{errors.adminLastName.message}</p>}
+                        {errors.adminLastName && <p className="text-xs text-destructive-text">{errors.adminLastName.message}</p>}
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -350,7 +350,7 @@ export default function RegisterPage() {
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input type="email" placeholder="you@company.com" className="pl-9" {...register("adminEmail")} />
                       </div>
-                      {errors.adminEmail && <p className="text-xs text-destructive">{errors.adminEmail.message}</p>}
+                      {errors.adminEmail && <p className="text-xs text-destructive-text">{errors.adminEmail.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Password *</Label>
@@ -366,7 +366,7 @@ export default function RegisterPage() {
                           {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                      {errors.adminPassword && <p className="text-xs text-destructive">{errors.adminPassword.message}</p>}
+                      {errors.adminPassword && <p className="text-xs text-destructive-text">{errors.adminPassword.message}</p>}
                     </div>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" className="flex-1 h-10" onClick={() => setStep(1)}>

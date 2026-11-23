@@ -233,7 +233,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
           {STEPS.map((label, i) => (
             <div key={i} className="flex items-center flex-1">
               <div className={`flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold border-2 transition-all ${
-                i < step ? (isExchange ? "bg-violet-600 border-violet-600 text-white" : "bg-primary border-primary text-white")
+                i < step ? (isExchange ? "bg-violet-600 border-violet-600 text-primary-foreground" : "bg-primary border-primary text-white")
                 : i === step ? (isExchange ? "border-violet-600 text-violet-600" : "border-primary text-primary")
                 : "border-muted-foreground/30 text-muted-foreground/40"
               }`}>{i < step ? "✓" : i + 1}</div>
@@ -276,7 +276,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
           {/* ── STEP 1: Find invoice ── */}
           {step === 1 && (
             <div className="space-y-4">
-              <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium ${isExchange ? "bg-violet-500/10 text-violet-700" : "bg-primary/10 text-primary"}`}>
+              <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium ${isExchange ? "bg-violet-500/10 text-violet-700" : "bg-primary/10 text-primary-text"}`}>
                 {isExchange ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
                 {isExchange ? "Exchange — Enter the original invoice number" : "Return — Enter the original invoice number"}
               </div>
@@ -294,8 +294,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                 <p className="text-[10px] text-muted-foreground">You can also navigate here directly from the Sales page using the "Process Return" action.</p>
               </div>
               {foundSale && (
-                <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/30 text-xs space-y-1">
-                  <div className="flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5 text-emerald-600" /><span className="font-bold text-emerald-700">{foundSale.invoiceNumber}</span></div>
+                <div className="p-3 rounded-xl border bg-success/5 border-success/30 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5 text-success-text" /><span className="font-bold text-success-text">{foundSale.invoiceNumber}</span></div>
                   <p className="text-muted-foreground">{foundSale.customer ? `${foundSale.customer.firstName} ${foundSale.customer.lastName ?? ""}`.trim() : "Walk-in"} · LKR {formatNumber(foundSale.total)}</p>
                   <p className="text-muted-foreground">{foundSale.items.length} item(s)</p>
                 </div>
@@ -309,7 +309,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
               {/* Returned items */}
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-5 w-5 rounded-md bg-red-500/10 flex items-center justify-center"><RotateCcw className="h-3 w-3 text-red-600" /></div>
+                  <div className="h-5 w-5 rounded-md bg-destructive/10 flex items-center justify-center"><RotateCcw className="h-3 w-3 text-destructive-text" /></div>
                   <p className="text-xs font-bold">Items Customer is Returning</p>
                 </div>
                 <div className="rounded-xl border overflow-hidden divide-y">
@@ -428,7 +428,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                             onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseQty(e.target.value, 1) || 1 } : x))}
                             className="w-14 h-7 text-xs text-center px-1 shrink-0" />
                           <span className="text-xs font-bold text-violet-700 w-20 text-right shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
-                          <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500 shrink-0">
+                          <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-destructive-text shrink-0">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -445,9 +445,9 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                         <p className="text-muted-foreground">Exchange</p>
                         <p className="font-bold mt-0.5 text-violet-700">LKR {formatNumber(exchangeTotal)}</p>
                       </div>
-                      <div className={`p-2.5 rounded-xl border text-center text-xs ${balanceDue > 0 ? "bg-red-500/10" : "bg-emerald-500/10"}`}>
+                      <div className={`p-2.5 rounded-xl border text-center text-xs ${balanceDue > 0 ? "bg-destructive/10" : "bg-success/10"}`}>
                         <p className="text-muted-foreground">{balanceDue > 0 ? "Collect" : "Refund"}</p>
-                        <p className={`font-bold mt-0.5 ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        <p className={`font-bold mt-0.5 ${balanceDue > 0 ? "text-destructive-text" : "text-success-text"}`}>
                           LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}
                         </p>
                       </div>
@@ -470,7 +470,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                 {isExchange && <>
                   <div className="flex justify-between"><span className="text-muted-foreground">Exchange items</span><span>{exchangeItems.length}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Exchange value</span><span className="font-bold text-violet-700">LKR {formatNumber(exchangeTotal)}</span></div>
-                  <div className={`flex justify-between font-bold border-t pt-2 ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  <div className={`flex justify-between font-bold border-t pt-2 ${balanceDue > 0 ? "text-destructive-text" : "text-success-text"}`}>
                     <span>{balanceDue > 0 ? "Collect from customer" : "Refund to customer"}</span>
                     <span>LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}</span>
                   </div>
@@ -507,7 +507,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
                   )}
                 </>}
                 {!isExchange && (
-                  <div className="flex justify-between font-bold border-t pt-2 text-emerald-600">
+                  <div className="flex justify-between font-bold border-t pt-2 text-success-text">
                     <span>Refund to customer</span>
                     <span>LKR {formatNumber(returnTotal)}</span>
                   </div>
@@ -631,8 +631,8 @@ export default function ReturnsPage() {
       label: "Pending",
       value: returns.filter((r) => r.status === "INITIATED").length,
       icon: Clock,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/10",
+      color: "text-warning-text",
+      bg: "bg-warning/10",
       tint: "bg-card border-border",
     },
     {
@@ -653,7 +653,7 @@ export default function ReturnsPage() {
         const isExchange = row.original.returnType === "EXCHANGE";
         return (
           <div className="flex items-center gap-1.5">
-            <span className={`inline-flex items-center justify-center h-5 w-5 rounded-md text-[9px] font-bold ${isExchange ? "bg-violet-500/10 text-violet-600" : "bg-primary/10 text-primary"}`}>
+            <span className={`inline-flex items-center justify-center h-5 w-5 rounded-md text-[9px] font-bold ${isExchange ? "bg-violet-500/10 text-violet-600" : "bg-primary/10 text-primary-text"}`}>
               {isExchange ? "EX" : "RT"}
             </span>
             <OpenRecordButton
@@ -707,10 +707,10 @@ export default function ReturnsPage() {
           <div>
             <p className="text-sm font-bold">LKR {formatNumber(row.original.totalAmount)}</p>
             {isExchange && excDue > 0 && (
-              <p className="text-[10px] text-amber-600">collect LKR {formatNumber(excDue)}</p>
+              <p className="text-[10px] text-warning-text">collect LKR {formatNumber(excDue)}</p>
             )}
             {isExchange && netRef > 0 && (
-              <p className="text-[10px] text-emerald-600">refund LKR {formatNumber(netRef)}</p>
+              <p className="text-[10px] text-success-text">refund LKR {formatNumber(netRef)}</p>
             )}
           </div>
         );

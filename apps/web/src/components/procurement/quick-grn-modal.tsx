@@ -105,8 +105,8 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg border overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b">
-          <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-            <Zap className="h-4 w-4 text-amber-500" />
+          <div className="h-9 w-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+            <Zap className="h-4 w-4 text-warning-text" />
           </div>
           <div>
             <h2 className="text-base font-bold">Quick GRN</h2>
@@ -121,7 +121,7 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
 
         <div className="px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Supplier <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Supplier <span className="text-destructive-text">*</span></Label>
             <select
               className="w-full h-10 rounded-md border bg-background px-3 text-sm"
               value={supplierId}
@@ -133,7 +133,7 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Product <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Product <span className="text-destructive-text">*</span></Label>
             <div className="flex gap-2">
               <Input
                 placeholder="Scan / enter SKU or barcode"
@@ -148,8 +148,8 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
               </Button>
             </div>
             {variant && (
-              <div className="rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
-                <p className="text-xs font-semibold text-emerald-600">
+              <div className="rounded-lg border bg-success/5 border-success/30 px-3 py-2">
+                <p className="text-xs font-semibold text-success-text">
                   {variant.product.name} — {variant.name}
                 </p>
                 <p className="text-[11px] text-muted-foreground font-mono">{variant.sku}</p>
@@ -159,11 +159,11 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Quantity <span className="text-destructive">*</span></Label>
+              <Label className="text-xs font-semibold">Quantity <span className="text-destructive-text">*</span></Label>
               <Input type="number" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Unit Cost <span className="text-destructive">*</span></Label>
+              <Label className="text-xs font-semibold">Unit Cost <span className="text-destructive-text">*</span></Label>
               <Input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} />
             </div>
             {showExpiry && (

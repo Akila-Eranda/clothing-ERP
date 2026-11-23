@@ -364,12 +364,12 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {isMaintenance && maintenance && (
-                  <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-default bg-amber-50/80 focus:bg-amber-50 dark:bg-amber-500/10 dark:focus:bg-amber-500/10">
+                  <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-default bg-amber-50/80 focus:bg-amber-50 dark:bg-warning/10 dark:focus:bg-warning/10">
                     <div className="flex items-center gap-2 w-full">
                       <span className="text-sm font-semibold text-amber-900 dark:text-amber-200">Maintenance Mode ON</span>
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 ml-auto">Now</span>
+                      <span className="text-[10px] text-warning-text ml-auto">Now</span>
                     </div>
-                    <span className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">{maintenance.message}</span>
+                    <span className="text-xs text-warning-text dark:text-amber-300/90 leading-relaxed">{maintenance.message}</span>
                   </DropdownMenuItem>
                 )}
                 {[
@@ -451,7 +451,7 @@ export function Header() {
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-destructive-text focus:text-destructive-text"
                 onSelect={() => { void handleLogout(); }}
               >
                 <LogOut className="mr-2 h-4 w-4" />

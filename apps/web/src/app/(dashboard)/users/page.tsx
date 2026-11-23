@@ -44,11 +44,11 @@ interface AppUser { id: string; firstName: string; lastName: string; email: stri
 interface PaginatedUsers { data: AppUser[]; meta: { total: number } }
 
 const ROLE_COLORS: Record<string, string> = {
-  SUPER_ADMIN:    "bg-red-500/10 text-red-600 border-red-500/20",
+  SUPER_ADMIN:    "bg-destructive/10 text-destructive-text border-destructive/20",
   TENANT_ADMIN:   "bg-purple-500/10 text-purple-600 border-purple-500/20",
   BRANCH_MANAGER: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  CASHIER:        "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  STAFF:          "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  CASHIER:        "bg-success/10 text-success-text border-success/20",
+  STAFF:          "bg-warning/10 text-warning-text border-warning/20",
   CUSTOM:         "bg-slate-500/10 text-slate-600 border-slate-500/20",
 };
 
@@ -297,7 +297,7 @@ export default function UsersPage() {
           const initials = `${u.firstName[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase();
           return (
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary-text shrink-0">
                 {initials}
               </div>
               <div>
@@ -423,7 +423,7 @@ export default function UsersPage() {
                     </>
                   )}
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={() => void handleDeleteUser(u.id)}>
+                <DropdownMenuItem className="text-destructive-text" onClick={() => void handleDeleteUser(u.id)}>
                   <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>

@@ -16,9 +16,9 @@
   --dp-secondary: #1f2937;
   --dp-teal: #2563EB;
   --dp-info: #2563EB;
-  --dp-orange: #ef4444;
-  --dp-success: #10b981;
-  --dp-danger: #ef4444;
+  --dp-orange: hsl(var(--destructive-text, 0 56% 47%)); /* AA text + AA fill for white labels */
+  --dp-success: hsl(var(--success-text, 160 84% 25%));
+  --dp-danger: hsl(var(--destructive-text, 0 56% 47%));
   --dp-border: #e6eaed;
   --dp-text: #212b36;
   --dp-muted: #646b72;
@@ -1011,4 +1011,16 @@
 
 .dark .dreams-pos-dash .dp-skeleton {
   background: linear-gradient(90deg, #1f2228 25%, #2f343c 50%, #1f2228 75%);
+}
+
+/* Dark mode: status fills keep the AA fill/foreground pair instead of the (light) status text colour. */
+.dark .dreams-pos-dash .badge.badge-success { background: hsl(var(--success)); color: hsl(var(--success-foreground)); }
+.dark .dreams-pos-dash .badge.badge-danger { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+
+/* Dark mode: blue TEXT (links, teal/info labels) uses the AA text token; fills (bg-primary) keep the brand blue. */
+.dark .dreams-pos-dash .text-primary,
+.dark .dreams-pos-dash .text-teal,
+.dark .dreams-pos-dash .text-info,
+.dark .dreams-pos-dash .link-primary {
+  color: hsl(var(--primary-text)) !important;
 }

@@ -177,8 +177,8 @@ export function WarehouseTransferModal({ open, onClose, onCreated, warehouses, d
     >
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg border overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-            <ArrowRightLeft className="h-4 w-4 text-amber-600" />
+          <div className="h-9 w-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+            <ArrowRightLeft className="h-4 w-4 text-warning-text" />
           </div>
           <div>
             <h2 className="text-base font-bold">Warehouse Transfer</h2>
@@ -309,7 +309,7 @@ export function WarehouseTransferModal({ open, onClose, onCreated, warehouses, d
                         <td className="px-2 py-2">
                           <button
                             type="button"
-                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text"
                             onClick={() => setItems((prev) => prev.filter((x) => x.variantId !== item.variantId))}
                           >
                             <Trash2 className="h-3.5 w-3.5" />

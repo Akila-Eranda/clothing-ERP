@@ -162,8 +162,8 @@ export default function GrnPage() {
   }).length;
 
   const STATS = [
-    { label: "Total GRNs", value: grns.length, icon: PackageCheck, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Today", value: today, icon: Zap, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Total GRNs", value: grns.length, icon: PackageCheck, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+    { label: "Today", value: today, icon: Zap, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "From PO", value: fromPo, icon: ShoppingBag, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Quick / Direct", value: quickOrDirect, icon: PackageCheck, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
   ];

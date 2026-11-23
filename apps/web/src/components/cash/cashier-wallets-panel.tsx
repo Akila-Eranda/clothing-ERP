@@ -119,8 +119,8 @@ export function CashierWalletsPanel() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-              <Landmark className="h-5 w-5 text-emerald-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10">
+              <Landmark className="h-5 w-5 text-success-text" />
             </div>
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">{data?.mainCash.name ?? "Main Cash"}</p>
@@ -205,8 +205,8 @@ export function CashierWalletsPanel() {
                             variant="secondary"
                             className={cn(
                               "text-[10px]",
-                              w.status === "OPEN" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-                              w.status === "PENDING_APPROVAL" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+                              w.status === "OPEN" && "bg-success/10 text-success-text",
+                              w.status === "PENDING_APPROVAL" && "bg-warning/10 text-warning-text",
                             )}
                           >
                             {w.status === "OPEN" ? "Open" : w.status === "CLOSED" ? "Closed" : "Pending approval"}
@@ -214,7 +214,7 @@ export function CashierWalletsPanel() {
                         </td>
                         <td className="px-3 py-3 text-right tabular-nums">{formatNumber(w.openingCash)}</td>
                         <td className="px-3 py-3 text-right tabular-nums">{formatNumber(w.summary.cashSales + w.summary.cashReceived)}</td>
-                        <td className="px-3 py-3 text-right tabular-nums text-rose-600">{out > 0 ? `−${formatNumber(out)}` : "0.00"}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-destructive-text">{out > 0 ? `−${formatNumber(out)}` : "0.00"}</td>
                         <td className="px-3 py-3 text-right font-bold tabular-nums">{formatNumber(w.amountToClear)}</td>
                         <td className="px-3 py-3 text-right">
                           <Input

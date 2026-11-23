@@ -501,32 +501,32 @@ export default function ServicesPage() {
     if (tab === "services") {
       return [
         { label: "Total Services", value: services.length, icon: Wrench, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-        { label: "Active", value: services.filter((s) => s.isActive).length, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+        { label: "Active", value: services.filter((s) => s.isActive).length, icon: CheckCircle2, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
         { label: "Categories", value: new Set(services.map((s) => s.category)).size, icon: Package, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-        { label: "Avg. Price", value: `LKR ${formatNumber(Math.round(avgPrice))}`, icon: Banknote, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+        { label: "Avg. Price", value: `LKR ${formatNumber(Math.round(avgPrice))}`, icon: Banknote, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
       ];
     }
     if (tab === "reminders") {
       return [
         { label: "Total Reminders", value: reminders.length, icon: Bell, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-        { label: "Pending", value: pendingReminders, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
-        { label: "Sent", value: reminders.filter((r) => r.status === "SENT").length, icon: Send, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-        { label: "Failed", value: reminders.filter((r) => r.status === "FAILED").length, icon: Bell, color: "text-red-600", bg: "bg-red-500/10", tint: "bg-card border-border" },
+        { label: "Pending", value: pendingReminders, icon: Clock, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
+        { label: "Sent", value: reminders.filter((r) => r.status === "SENT").length, icon: Send, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+        { label: "Failed", value: reminders.filter((r) => r.status === "FAILED").length, icon: Bell, color: "text-destructive-text", bg: "bg-destructive/10", tint: "bg-card border-border" },
       ];
     }
     if (tab === "fleet") {
       return [
         { label: "Fleet Accounts", value: fleetCustomers.length, icon: Users, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
         { label: "Retail Customers", value: customers.length - fleetCustomers.length, icon: Users, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-        { label: "Total Customers", value: customers.length, icon: Users, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-        { label: "Fleet %", value: customers.length ? `${Math.round((fleetCustomers.length / customers.length) * 100)}%` : "0%", icon: Banknote, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+        { label: "Total Customers", value: customers.length, icon: Users, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+        { label: "Fleet %", value: customers.length ? `${Math.round((fleetCustomers.length / customers.length) * 100)}%` : "0%", icon: Banknote, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
       ];
     }
     return [
       { label: "Total Serials", value: serials.length, icon: Hash, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-      { label: "In Stock", value: inStockSerials, icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+      { label: "In Stock", value: inStockSerials, icon: Package, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
       { label: "Sold", value: serials.filter((s) => s.status === "SOLD").length, icon: CheckCircle2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-      { label: "Claimed", value: serials.filter((s) => s.status === "CLAIMED").length, icon: Hash, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+      { label: "Claimed", value: serials.filter((s) => s.status === "CLAIMED").length, icon: Hash, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
     ];
   }, [tab, services, reminders, customers, fleetCustomers, serials, avgPrice, pendingReminders, inStockSerials]);
 

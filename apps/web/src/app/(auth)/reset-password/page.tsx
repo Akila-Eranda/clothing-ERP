@@ -90,7 +90,7 @@ function ResetPasswordForm() {
               animate={{ opacity: 1, scale: 1 }}
               className="text-center py-2"
             >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-5">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 border border-success/20 mb-5">
                 <CheckCircle2 className="h-8 w-8 text-emerald-400" />
               </div>
               <h2 className="text-xl font-semibold mb-2">Password updated!</h2>
@@ -116,14 +116,14 @@ function ResetPasswordForm() {
               </div>
 
               {!token && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive-text text-sm mb-4">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>Reset link is missing or invalid. Please request a new one.</span>
                 </div>
               )}
 
               {apiError && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive-text text-sm mb-4">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{apiError}</span>
                 </div>
@@ -164,7 +164,7 @@ function ResetPasswordForm() {
                     </div>
                   )}
                   {errors.newPassword && (
-                    <p className="text-xs text-destructive">{errors.newPassword.message}</p>
+                    <p className="text-xs text-destructive-text">{errors.newPassword.message}</p>
                   )}
                 </div>
 
@@ -177,7 +177,7 @@ function ResetPasswordForm() {
                     {...register("confirm")}
                   />
                   {errors.confirm && (
-                    <p className="text-xs text-destructive">{errors.confirm.message}</p>
+                    <p className="text-xs text-destructive-text">{errors.confirm.message}</p>
                   )}
                 </div>
 

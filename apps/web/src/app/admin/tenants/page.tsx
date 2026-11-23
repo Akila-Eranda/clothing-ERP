@@ -339,7 +339,7 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onCl
             </select>
           </div>
         </div>
-        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+        {error && <p className="text-xs text-destructive-text mt-3">{error}</p>}
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button variant="default" onClick={save} disabled={loading}>

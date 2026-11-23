@@ -131,7 +131,7 @@ export default function CategoriesPage() {
   const STATS = [
     { label: "Categories", value: categories.length, icon: Tag, color: "text-slate-600 dark:text-slate-300", bg: "bg-slate-500/15", tint: "bg-card border-border" },
     { label: "Subcategories", value: subCount, icon: FolderTree, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Products", value: productCount, icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Products", value: productCount, icon: Package, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
     { label: "Active roots", value: categories.filter((c) => c.isActive).length, icon: Layers, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
   ];
 

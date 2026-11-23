@@ -251,7 +251,7 @@ export function PaymentQrSettingsTab({ showBankAccounts = true }: { showBankAcco
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
           ) : loadError ? (
-            <p className="text-sm text-destructive">{loadError}. Managing QR codes needs accounting permissions.</p>
+            <p className="text-sm text-destructive-text">{loadError}. Managing QR codes needs accounting permissions.</p>
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No QR codes yet. Add one, then upload its image.</p>
           ) : (
@@ -306,7 +306,7 @@ export function PaymentQrSettingsTab({ showBankAccounts = true }: { showBankAcco
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2 text-xs text-destructive"
+                          className="h-7 px-2 text-xs text-destructive-text"
                           onClick={() => void removeImage(r)}
                           disabled={uploadingId === r.id}
                         >

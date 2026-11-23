@@ -174,7 +174,7 @@ export default function SubscriptionsPage() {
               size="icon-sm"
               onClick={() => setInvoiceTenant(t)}
               title="Generate invoice"
-              className="text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10"
+              className="text-muted-foreground hover:text-success-text hover:bg-success/10"
             >
               <FileText size={13} />
             </Button>
@@ -183,7 +183,7 @@ export default function SubscriptionsPage() {
               variant="ghost"
               size="icon-sm"
               onClick={() => setEditTenant(t)}
-              className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+              className="text-muted-foreground hover:text-primary-text hover:bg-primary/10"
             >
               <Edit2 size={13} />
             </Button>
@@ -221,7 +221,7 @@ export default function SubscriptionsPage() {
       />
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 text-sm text-red-700 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="flex items-center gap-2 px-4 py-3 text-sm text-destructive-text bg-destructive/10 border border-destructive/20 rounded-xl">
           <AlertCircle size={16} /> {error}
         </div>
       )}
@@ -342,7 +342,7 @@ function EditPlanModal({
         </div>
         {done ? (
           <div className="text-center py-4">
-            <CheckCircle size={32} className="text-emerald-500 mx-auto mb-2" />
+            <CheckCircle size={32} className="text-success-text mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">Plan updated to <strong className="text-foreground">{plan}</strong></p>
           </div>
         ) : (
@@ -361,7 +361,7 @@ function EditPlanModal({
                 </label>
               ))}
             </div>
-            {error && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{error}</p>}
+            {error && <p className="text-xs text-destructive-text mb-3">{error}</p>}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button variant="default" onClick={save} disabled={loading || plan === tenant.plan}>

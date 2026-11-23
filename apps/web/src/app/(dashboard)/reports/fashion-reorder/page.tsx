@@ -224,8 +224,8 @@ export default function FashionReorderPage() {
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                d === "HIGH" && "bg-red-100 text-red-700",
-                d === "MEDIUM" && "bg-amber-100 text-amber-700",
+                d === "HIGH" && "bg-red-100 text-destructive-text",
+                d === "MEDIUM" && "bg-amber-100 text-warning-text",
                 d === "LOW" && "bg-slate-100 text-slate-600",
               )}
             >

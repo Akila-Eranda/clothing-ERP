@@ -93,7 +93,7 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand, copy }: Props
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">{copy.nameLabel} <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">{copy.nameLabel} <span className="text-destructive-text">*</span></Label>
             <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()} autoFocus />
           </div>

@@ -36,7 +36,7 @@ export function AccountingMenuHub({
           <Link key={link.href} href={link.href} className="group">
             <Card className="h-full rounded-xl transition-colors hover:border-primary/40">
               <CardContent className="p-5 flex gap-3 items-start">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary-text shrink-0">
                   <link.icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">

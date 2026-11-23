@@ -136,19 +136,19 @@ function saleItemsSummary(sale: SaleItem) {
 const HISTORY_CATEGORY_STYLES: Record<string, { label: string; className: string }> = {
   SALE: { label: "Sale / invoice", className: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
   POS_CREDIT_WALLET_PURCHASE: { label: "POS Credit / Wallet purchase", className: "bg-indigo-500/10 text-indigo-700 border-indigo-500/20" },
-  CREDIT: { label: "Credit charge", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
-  CREDIT_SETTLEMENT: { label: "Credit settlement", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
-  CREDIT_SETTLEMENT_FROM_WALLET: { label: "Wallet credit settlement", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  CREDIT: { label: "Credit charge", className: "bg-warning/10 text-warning-text border-warning/20" },
+  CREDIT_SETTLEMENT: { label: "Credit settlement", className: "bg-success/10 text-success-text border-success/20" },
+  CREDIT_SETTLEMENT_FROM_WALLET: { label: "Wallet credit settlement", className: "bg-success/10 text-success-text border-success/20" },
   CUSTOMER_OVERPAYMENT: { label: "Customer payment / overpayment", className: "bg-teal-500/10 text-teal-700 border-teal-500/20" },
   CUSTOMER_ADVANCE: { label: "Customer advance", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
   WALLET_TOP_UP: { label: "Wallet top-up", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
   AUTHORIZED_ADJUSTMENT: { label: "Authorized adjustment", className: "bg-slate-500/10 text-slate-700 border-slate-500/20" },
-  REVERSAL: { label: "Reversal", className: "bg-red-500/10 text-red-700 border-red-500/20" },
+  REVERSAL: { label: "Reversal", className: "bg-destructive/10 text-destructive-text border-destructive/20" },
   WALLET: { label: "Wallet top-up / advance", className: "bg-violet-500/10 text-violet-700 border-violet-500/20" },
   WALLET_PAYMENT: { label: "Wallet payment", className: "bg-indigo-500/10 text-indigo-700 border-indigo-500/20" },
-  REFUND_CREDIT: { label: "Refund / credit", className: "bg-rose-500/10 text-rose-700 border-rose-500/20" },
+  REFUND_CREDIT: { label: "Refund / credit", className: "bg-destructive/10 text-destructive-text border-destructive/20" },
   EXCHANGE: { label: "Exchange", className: "bg-cyan-500/10 text-cyan-700 border-cyan-500/20" },
-  RETURN_REFUND: { label: "Return / refund", className: "bg-red-500/10 text-red-700 border-red-500/20" },
+  RETURN_REFUND: { label: "Return / refund", className: "bg-destructive/10 text-destructive-text border-destructive/20" },
   CREDIT_ADJUSTMENT: { label: "Credit adjustment", className: "bg-slate-500/10 text-slate-700 border-slate-500/20" },
 };
 
@@ -179,7 +179,7 @@ function InfoRow({ icon: Icon, label, value, valueClass }: {
 
 function SectionTableHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-t-xl">
+    <div className="flex items-center gap-2 bg-success text-success-foreground px-4 py-2.5 rounded-t-xl">
       <Icon className="h-4 w-4 shrink-0" />
       <span className="text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
@@ -618,7 +618,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
                       tab === t.id
-                        ? "bg-primary/10 text-primary border border-primary/20"
+                        ? "bg-primary/10 text-primary-text border border-primary/20"
                         : "text-muted-foreground hover:bg-muted",
                     )}
                   >
@@ -664,7 +664,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                     icon={Wallet}
                     label="Credit status"
                     value={hasOutstanding ? "Has outstanding" : "Clear"}
-                    valueClass={hasOutstanding ? "text-red-600 font-semibold" : "text-emerald-600"}
+                    valueClass={hasOutstanding ? "text-destructive-text font-semibold" : "text-success-text"}
                   />
                 </div>
 
@@ -679,7 +679,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                     <div className="flex justify-between"><span className="text-muted-foreground">Sales value</span><span className="font-semibold tabular-nums">{fmtMoney(stats.salesValue)}</span></div>
                     <div className="flex justify-between pt-2 border-t font-bold">
                       <span>Outstanding</span>
-                      <span className={cn("tabular-nums", hasOutstanding && "text-red-600")}>{fmtMoney(stats.outstanding)}</span>
+                      <span className={cn("tabular-nums", hasOutstanding && "text-destructive-text")}>{fmtMoney(stats.outstanding)}</span>
                     </div>
                   </div>
                 </div>
@@ -759,7 +759,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 <div className="rounded-xl border bg-card p-4 h-fit space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold">Summary</p>
-                    <p className={cn("font-bold tabular-nums", hasOutstanding && "text-red-600")}>{fmtMoney(stats.outstanding)}</p>
+                    <p className={cn("font-bold tabular-nums", hasOutstanding && "text-destructive-text")}>{fmtMoney(stats.outstanding)}</p>
                   </div>
                   <div className="space-y-2 text-sm border-t pt-3">
                     <div className="flex justify-between"><span className="text-muted-foreground">Purchases</span><span>{stats.purchases}</span></div>
@@ -768,7 +768,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                     <div className="flex justify-between"><span className="text-muted-foreground">Repair value</span><span className="tabular-nums">{fmtMoney(stats.repairValue)}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Loyalty points</span><span>{formatNumber(customer.loyaltyPoints)} pts</span></div>
                   </div>
-                  <p className="text-sm font-bold text-red-600 border-t pt-3">
+                  <p className="text-sm font-bold text-destructive-text border-t pt-3">
                     Outstanding: {fmtMoney(stats.outstanding)}
                   </p>
                   {hasOutstanding && (
@@ -811,15 +811,15 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                       Historical opening balances are shown only when an opening transaction exists; no synthetic opening entry is inferred.
                     </p>
                     {historyBranchScope?.walletAndCreditEntriesOmitted && (
-                      <p className="text-xs text-amber-700 mt-2">
+                      <p className="text-xs text-warning-text mt-2">
                         This branch-filtered history omits wallet and credit transactions because those records do not store branch attribution. The displayed wallet and credit balances are current all-branch balances.
                       </p>
                     )}
                   </div>
                   <div className="flex gap-4 text-sm">
                     <div><p className="text-[10px] text-muted-foreground uppercase">Wallet</p><p className="font-bold text-violet-700">{fmtMoney(historyTotals?.wallet ?? customer.walletBalance)}</p></div>
-                    <div><p className="text-[10px] text-muted-foreground uppercase">Outstanding credit</p><p className="font-bold text-amber-700">{fmtMoney(historyTotals?.credit ?? customer.creditBalance)}</p></div>
-                    <div><p className="text-[10px] text-muted-foreground uppercase">Available credit</p><p className="font-bold text-emerald-700">{fmtMoney(Math.max(0, (historyTotals?.creditLimit ?? customer.creditLimit) - (historyTotals?.credit ?? customer.creditBalance)))}</p></div>
+                    <div><p className="text-[10px] text-muted-foreground uppercase">Outstanding credit</p><p className="font-bold text-warning-text">{fmtMoney(historyTotals?.credit ?? customer.creditBalance)}</p></div>
+                    <div><p className="text-[10px] text-muted-foreground uppercase">Available credit</p><p className="font-bold text-success-text">{fmtMoney(Math.max(0, (historyTotals?.creditLimit ?? customer.creditLimit) - (historyTotals?.credit ?? customer.creditBalance)))}</p></div>
                   </div>
                 </div>
               </div>
@@ -849,7 +849,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                       ) : historyError ? (
                         <tr>
                           <td colSpan={7} className="px-4 py-8 text-center">
-                            <p className="text-sm text-destructive mb-3">Customer transaction history could not be loaded.</p>
+                            <p className="text-sm text-destructive-text mb-3">Customer transaction history could not be loaded.</p>
                             <Button variant="outline" size="sm" onClick={() => void loadHistory(customer.id)}>Retry</Button>
                           </td>
                         </tr>
@@ -867,7 +867,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                               ? entry.paymentAmounts.map((payment) => `${payment.method}: ${fmtMoney(payment.amount)}`).join(", ")
                               : entry.paymentMethod ?? "—"}</td>
                             <td className="px-3 py-3 font-mono text-[11px] max-w-[160px] truncate" title={entry.reference ?? undefined}>{entry.reference ?? "—"}</td>
-                            <td className={cn("px-3 py-3 text-right font-bold tabular-nums whitespace-nowrap", amount < 0 ? "text-emerald-600" : "text-foreground")}>{amount > 0 ? "+" : ""}{fmtMoney(amount)}</td>
+                            <td className={cn("px-3 py-3 text-right font-bold tabular-nums whitespace-nowrap", amount < 0 ? "text-success-text" : "text-foreground")}>{amount > 0 ? "+" : ""}{fmtMoney(amount)}</td>
                             <td className="px-3 py-3 text-right text-xs tabular-nums whitespace-nowrap">
                               {[
                                 entry.creditBalanceAfter !== null && entry.creditBalanceAfter !== undefined ? `Credit ${fmtMoney(entry.creditBalanceAfter)}` : null,
@@ -882,7 +882,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 </div>
               </div>
               {historyMoreError && (
-                <p className="text-sm text-destructive text-center">More customer transactions could not be loaded.</p>
+                <p className="text-sm text-destructive-text text-center">More customer transactions could not be loaded.</p>
               )}
               {historyPageInfo?.hasMore && historyPageInfo.nextCursor && (
                 <div className="flex justify-center">
@@ -934,10 +934,10 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
 
           {customer && showLoyalty && tab === "loyalty" && (
             <div className="p-5 sm:p-6 space-y-4">
-              <div className="rounded-xl border bg-amber-500/5 p-4 flex items-center justify-between">
+              <div className="rounded-xl border bg-warning/5 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Current Points</p>
-                  <p className="text-3xl font-black text-amber-500">{formatNumber(customer.loyaltyPoints)}</p>
+                  <p className="text-3xl font-black text-warning-text">{formatNumber(customer.loyaltyPoints)}</p>
                 </div>
                 <Gift className="h-10 w-10 text-amber-500/30" />
               </div>
@@ -956,7 +956,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
                       <p className="text-[10px] text-muted-foreground">{fmtDate(txn.createdAt)}</p>
                     </div>
-                    <span className={`font-bold text-sm ${txn.points > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                    <span className={`font-bold text-sm ${txn.points > 0 ? "text-success-text" : "text-destructive-text"}`}>
                       {txn.points > 0 ? "+" : ""}{txn.points}
                     </span>
                   </div>
@@ -972,11 +972,11 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Available wallet balance</p>
-                    <p className="text-2xl font-black text-emerald-600">{fmtMoney(customer.walletBalance)}</p>
+                    <p className="text-2xl font-black text-success-text">{fmtMoney(customer.walletBalance)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Outstanding credit (customer debt)</p>
-                    <p className="text-2xl font-black text-amber-600">{fmtMoney(customer.creditBalance)}</p>
+                    <p className="text-2xl font-black text-warning-text">{fmtMoney(customer.creditBalance)}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       Credit limit {fmtMoney(customer.creditLimit)} · Available {fmtMoney(Math.max(0, customer.creditLimit - customer.creditBalance))}
                     </p>
@@ -1033,7 +1033,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
                       <p className="text-[10px] text-muted-foreground">{fmtDate(txn.createdAt)}</p>
                     </div>
-                    <span className={`font-bold text-sm ${txn.amount > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                    <span className={`font-bold text-sm ${txn.amount > 0 ? "text-success-text" : "text-destructive-text"}`}>
                       {txn.amount > 0 ? "+" : ""}{fmtMoney(txn.amount)}
                     </span>
                   </div>
@@ -1118,7 +1118,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                         {txn.status ? ` · ${txn.status}` : ""}
                       </p>
                     </div>
-                    <span className={`font-bold text-sm ${txn.type === "PAYMENT" ? "text-emerald-500" : "text-amber-500"}`}>
+                    <span className={`font-bold text-sm ${txn.type === "PAYMENT" ? "text-success-text" : "text-warning-text"}`}>
                       {txn.type === "PAYMENT" ? "-" : "+"}{fmtMoney(txn.amount)}
                     </span>
                   </div>
@@ -1164,7 +1164,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
             {hasOutstanding && (
               <Button
                 variant="outline"
-                className="gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10"
+                className="gap-1.5 text-success-text border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-success/10"
                 onClick={() => { setTab("account"); setCreditPayInput(String(customer.creditBalance)); }}
               >
                 <Wallet className="h-3.5 w-3.5" /> Pay Outstanding

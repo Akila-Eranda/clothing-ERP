@@ -107,7 +107,7 @@ function InfoRow({ icon: Icon, label, value, valueClass }: {
 
 function SectionTableHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-t-xl">
+    <div className="flex items-center gap-2 bg-success text-success-foreground px-4 py-2.5 rounded-t-xl">
       <Icon className="h-4 w-4 shrink-0" />
       <span className="text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
@@ -215,7 +215,7 @@ export function ViewPOModal({
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
                       tab === t.id
-                        ? "bg-primary/10 text-primary border border-primary/20"
+                        ? "bg-primary/10 text-primary-text border border-primary/20"
                         : "text-muted-foreground hover:bg-muted",
                     )}
                   >
@@ -267,8 +267,8 @@ export function ViewPOModal({
                       <span>Total</span>
                       <span className="tabular-nums text-primary">{fmtMoney(data.total)}</span>
                     </div>
-                    <div className="flex justify-between text-emerald-600"><span>Paid</span><span className="tabular-nums">{fmtMoney(data.paidAmount ?? 0)}</span></div>
-                    <div className="flex justify-between text-red-600 font-bold"><span>Amount due</span><span className="tabular-nums">{fmtMoney(totals.due)}</span></div>
+                    <div className="flex justify-between text-success-text"><span>Paid</span><span className="tabular-nums">{fmtMoney(data.paidAmount ?? 0)}</span></div>
+                    <div className="flex justify-between text-destructive-text font-bold"><span>Amount due</span><span className="tabular-nums">{fmtMoney(totals.due)}</span></div>
                   </div>
                 </div>
               </div>
@@ -319,7 +319,7 @@ export function ViewPOModal({
                               <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{barcode}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums font-semibold">{item.orderedQty}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums text-muted-foreground">{item.freeQty ?? 0}</td>
-                              <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
+                              <td className="px-3 py-3 text-xs text-right tabular-nums text-success-text">{item.receivedQty}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>
                               <td className="px-3 py-3 text-xs text-right font-bold tabular-nums">{fmtMoney(item.total)}</td>
                             </tr>
@@ -339,8 +339,8 @@ export function ViewPOModal({
                   <div className="space-y-2 text-sm border-t pt-3">
                     <div className="flex justify-between"><span className="text-muted-foreground">Line items</span><span>{totals.items}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Qty ordered</span><span className="tabular-nums">{totals.ordered}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Qty received</span><span className="tabular-nums text-emerald-600">{totals.received}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Amount due</span><span className="tabular-nums text-red-600 font-bold">{fmtMoney(totals.due)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Qty received</span><span className="tabular-nums text-success-text">{totals.received}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Amount due</span><span className="tabular-nums text-destructive-text font-bold">{fmtMoney(totals.due)}</span></div>
                   </div>
                 </div>
               </div>
@@ -410,7 +410,7 @@ export function ViewPOModal({
                           <td className="px-3 py-3 text-xs text-right tabular-nums">
                             {item.mrp != null && item.mrp > 0 ? fmtMoney(item.mrp) : "—"}
                           </td>
-                          <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
+                          <td className="px-3 py-3 text-xs text-right tabular-nums text-success-text">{item.receivedQty}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{item.rejectedQty || "—"}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.discount ?? 0)}</td>
@@ -461,7 +461,7 @@ export function ViewPOModal({
           {canCancel && onStatusUpdate && (
             <Button
               variant="outline"
-              className="gap-1.5 text-red-700 border-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-500/10"
+              className="gap-1.5 text-destructive-text border-red-300 bg-red-50 hover:bg-red-100 dark:bg-destructive/10"
               onClick={() => { onStatusUpdate(data, "CANCELLED"); onClose(); }}
             >
               <Ban className="h-3.5 w-3.5" /> Cancel PO

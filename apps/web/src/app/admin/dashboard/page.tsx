@@ -178,9 +178,9 @@ export default function AdminDashboardPage() {
             <Link key={i} href={a.href ?? '/admin/dashboard'}
               className={cn(
                 'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border',
-                a.severity === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400' :
-                a.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400' :
-                'bg-primary/10 border-primary/20 text-primary',
+                a.severity === 'error' ? 'bg-destructive/10 border-destructive/20 text-destructive-text' :
+                a.severity === 'warning' ? 'bg-warning/10 border-warning/20 text-warning-text' :
+                'bg-primary/10 border-primary/20 text-primary-text',
               )}>
               <AlertTriangle size={12} /> {a.message}
             </Link>
@@ -225,7 +225,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <span className={cn(
                     'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                    t.daysLeft <= 2 ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                    t.daysLeft <= 2 ? 'bg-destructive/10 text-destructive-text' : 'bg-warning/10 text-warning-text',
                   )}>{t.daysLeft}d left</span>
                 </Link>
               ))}

@@ -271,9 +271,9 @@ export function PosCountersPanel() {
                         title={row.isActive ? "Deactivate" : "Activate"}
                       >
                         {row.isActive ? (
-                          <PowerOff className="h-3.5 w-3.5 text-amber-600" />
+                          <PowerOff className="h-3.5 w-3.5 text-warning-text" />
                         ) : (
-                          <Power className="h-3.5 w-3.5 text-emerald-600" />
+                          <Power className="h-3.5 w-3.5 text-success-text" />
                         )}
                       </Button>
                     </div>

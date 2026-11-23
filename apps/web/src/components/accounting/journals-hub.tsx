@@ -84,10 +84,10 @@ type FormLine = {
 
 const STATUS_META: Record<JournalStatus, { label: string; className: string }> = {
   DRAFT: { label: "Draft", className: "bg-slate-100 text-slate-700" },
-  PENDING_APPROVAL: { label: "Pending", className: "bg-amber-100 text-amber-800" },
-  APPROVED: { label: "Approved", className: "bg-primary/15 text-primary" },
-  POSTED: { label: "Posted", className: "bg-emerald-100 text-emerald-800" },
-  VOID: { label: "Void", className: "bg-red-100 text-red-800" },
+  PENDING_APPROVAL: { label: "Pending", className: "bg-amber-100 text-warning-text" },
+  APPROVED: { label: "Approved", className: "bg-primary/15 text-primary-text" },
+  POSTED: { label: "Posted", className: "bg-emerald-100 text-success-text" },
+  VOID: { label: "Void", className: "bg-red-100 text-destructive-text" },
 };
 
 function fmtDate(d?: string | null) {
@@ -302,7 +302,7 @@ function JournalFormModal({
                     />
                   </div>
                   <button
-                    className="col-span-1 flex justify-center hover:text-red-500"
+                    className="col-span-1 flex justify-center hover:text-destructive-text"
                     onClick={() => setLines((p) => p.filter((_, j) => j !== i))}
                     disabled={lines.length <= 2}
                   >
@@ -312,7 +312,7 @@ function JournalFormModal({
               ))}
             </div>
             <div className="flex justify-between text-xs">
-              <span className={balanced ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
+              <span className={balanced ? "text-success-text font-medium" : "text-destructive-text font-medium"}>
                 {balanced ? "Balanced" : "Out of balance"} — Dr {formatNumber(debitTotal)} / Cr{" "}
                 {formatNumber(creditTotal)}
               </span>
@@ -458,7 +458,7 @@ function JournalViewModal({
           </div>
 
           {entry.voidReason && (
-            <p className="text-xs text-red-600">Void reason: {entry.voidReason}</p>
+            <p className="text-xs text-destructive-text">Void reason: {entry.voidReason}</p>
           )}
         </div>
 

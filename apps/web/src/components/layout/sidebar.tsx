@@ -22,6 +22,7 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { isDefaultLightSidebar, SIDEBAR_SKIN_SWATCHES } from "@/lib/theme-layout";
+import { resolveSidebarSkin } from "@/lib/sidebar-skin-palette";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -356,13 +357,15 @@ function Collapse({ open, id, children }: { open: boolean; id?: string; children
 }
 
 /* ── Badge components ────────────────────────────────────── */
-function NavBadge({ text }: { text: string }) {
+function NavBadge({ text, onSkin }: { text: string; onSkin?: boolean }) {
   const isPOS = text === "POS";
   return (
     <span
       className={cn(
         "ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none",
-        isPOS ? "bg-primary/15 text-primary" : "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
+        onSkin
+          ? "bg-[var(--sb-active-bg)] text-[var(--sb-fg)]"
+          : isPOS ? "bg-primary/15 text-primary-text" : "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
       )}
     >
       {text}
@@ -443,9 +446,15 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
   };
 
   /* ── Colors (skin-aware; exposed as CSS variables so hover/focus use classes) ── */
-  const coloredSkinCss = !isDefaultLightSidebar(sidebarSkin)
-    ? SIDEBAR_SKIN_SWATCHES.find((s) => s.id === sidebarSkin)?.css
-    : undefined;
+  // Coloured skins: foreground/muted/hover/active are derived from the skin's actual gradient (WCAG AA), never forced white.
+  const skinPalette = React.useMemo(() => {
+    if (isDefaultLightSidebar(sidebarSkin)) return undefined;
+    const css = SIDEBAR_SKIN_SWATCHES.find((s) => s.id === sidebarSkin)?.css;
+    return css ? resolveSidebarSkin(css) : undefined;
+  }, [sidebarSkin]);
+  const coloredSkinCss = skinPalette?.css;
+  // Logo follows the resolved foreground on coloured skins (white logo only where text is light).
+  const brandOnDark = skinPalette ? skinPalette.tone === "light-text" : logoOnDark;
   const chrome = {
     bg: "var(--chrome-bg, #0F172A)",
     border: "var(--chrome-border, #334155)",
@@ -462,31 +471,33 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
       : (coloredSkinCss ?? `var(--retail-sidebar-bg, ${isDark ? "#0F172A" : "#ffffff"})`),
     border: dreamsDarkChrome
       ? chrome.border
-      : `var(--retail-sidebar-border, ${isDark ? "#334155" : "#E2E8F0"})`,
+      : (skinPalette ? skinPalette.border : `var(--retail-sidebar-border, ${isDark ? "#334155" : "#E2E8F0"})`),
     // Dark chrome muted (#6B7280 by default) is ~4.0:1 on #0D0D0D; lift it toward slate-300 for AA text contrast.
     muted: dreamsDarkChrome
       ? `color-mix(in srgb, ${chrome.muted} 50%, #CBD5E1)`
-      : (coloredSkinCss ? "rgba(255,255,255,0.72)" : `var(--retail-sidebar-muted, ${isDark ? "#94A3B8" : "#64748B"})`),
+      : (skinPalette ? skinPalette.muted : `var(--retail-sidebar-muted, ${isDark ? "#94A3B8" : "#64748B"})`),
     fg: dreamsDarkChrome
       ? chrome.fg
-      : (coloredSkinCss ? "#ffffff" : `var(--retail-sidebar-fg, ${isDark ? "#F8FAFC" : "#0F172A"})`),
+      : (skinPalette ? skinPalette.fg : `var(--retail-sidebar-fg, ${isDark ? "#F8FAFC" : "#0F172A"})`),
     hover: dreamsDarkChrome
       ? chrome.hover
-      : (coloredSkinCss ? "rgba(255,255,255,0.08)" : `var(--retail-sidebar-hover, ${isDark ? "rgba(255,255,255,0.05)" : "#F1F5F9"})`),
+      : (skinPalette ? skinPalette.hover : `var(--retail-sidebar-hover, ${isDark ? "rgba(255,255,255,0.05)" : "#F1F5F9"})`),
     activeBg: dreamsDarkChrome
       ? chrome.activeBg
-      : (coloredSkinCss ? "rgba(255,255,255,0.16)" : "var(--retail-sidebar-active-bg, #EFF6FF)"),
+      : (skinPalette ? skinPalette.activeBg : "var(--retail-sidebar-active-bg, #EFF6FF)"),
     activeFg: dreamsDarkChrome
       ? chrome.activeFg
-      : (coloredSkinCss
-          ? "#ffffff"
+      : (skinPalette
+          ? skinPalette.activeFg
           : isDark
             ? "var(--retail-sidebar-active-fg, #93C5FD)"
             // Accent text on its pale tint: unchanged-looking brand blue, darkened only if an accent needs it.
             : accentForWhiteText(accentHsl, 5.3)),
     // White text on the solid pill: the brand blue (#2563EB) already passes and is left untouched.
-    solidBg: coloredSkinCss ? "rgba(255,255,255,0.22)" : accentForWhiteText(accentHsl, 4.6),
-    surface: isDark ? "rgba(30,41,59,0.55)" : coloredSkinCss ? "rgba(255,255,255,0.08)" : "rgba(241,245,249,0.5)",
+    solidBg: skinPalette ? skinPalette.activeBg : accentForWhiteText(accentHsl, 4.6),
+    // Label colour on the solid active pill: skin foreground on coloured skins, white on the accent pill otherwise.
+    solidFg: skinPalette ? skinPalette.activeFg : "#ffffff",
+    surface: skinPalette ? skinPalette.hover : isDark ? "rgba(30,41,59,0.55)" : "rgba(241,245,249,0.5)",
   };
   const cssVars = {
     "--sb-bg": theme.bg,
@@ -497,6 +508,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
     "--sb-active-bg": theme.activeBg,
     "--sb-active-fg": theme.activeFg,
     "--sb-solid-bg": theme.solidBg,
+    "--sb-solid-fg": theme.solidFg,
     "--sb-surface": theme.surface,
     background: theme.bg,
     borderRight: `1px solid ${theme.border}`,
@@ -621,7 +633,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
       active
         ? nested
           ? "bg-[var(--sb-active-bg)] font-semibold text-[var(--sb-active-fg)]"
-          : "bg-[var(--sb-solid-bg)] font-semibold text-white shadow-sm"
+          : "bg-[var(--sb-solid-bg)] font-semibold text-[var(--sb-solid-fg)] shadow-sm"
         : "font-medium text-[var(--sb-muted)] hover:bg-[var(--sb-hover)] hover:text-[var(--sb-fg)]",
     );
 
@@ -645,7 +657,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
               {item.label}
             </span>
             {count > 0 && <CountBadge count={count} />}
-            {item.badge && <NavBadge text={item.badge} />}
+            {item.badge && <NavBadge text={item.badge} onSkin={Boolean(skinPalette)} />}
           </>
         )}
       </>
@@ -705,7 +717,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
           className={cn(
             "mx-auto flex h-10 w-10 items-center justify-center rounded-[10px] transition-colors",
             childActive
-              ? "bg-[var(--sb-solid-bg)] text-white shadow-sm"
+              ? "bg-[var(--sb-solid-bg)] text-[var(--sb-solid-fg)] shadow-sm"
               : "text-[var(--sb-muted)] hover:bg-[var(--sb-hover)] hover:text-[var(--sb-fg)]",
           )}
         >
@@ -786,7 +798,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
             aria-expanded={open}
             aria-controls={panelId}
             aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
-            className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10", FOCUS_RING)}
+            className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-[var(--sb-hover)]", FOCUS_RING)}
           >
             <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} strokeWidth={2} />
           </button>
@@ -851,7 +863,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
           className={cn(
             "mx-auto flex h-10 w-10 items-center justify-center rounded-[10px] text-[var(--sb-muted)] transition-colors",
             FOCUS_RING,
-            danger ? "hover:bg-red-500/10 hover:text-red-500" : "hover:bg-[var(--sb-hover)] hover:text-[var(--sb-fg)]",
+            danger ? "hover:bg-destructive/10 hover:text-destructive-text" : "hover:bg-[var(--sb-hover)] hover:text-[var(--sb-fg)]",
           )}
         >
           {icon}
@@ -881,12 +893,12 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
         >
           {!collapsed ? (
             <Link href="/dashboard" onClick={closeMobile} className="flex min-w-0 flex-1 items-center" aria-label="HEXALYTE dashboard">
-              <AppLogo variant="sidebar" theme={logoOnDark ? "dark" : "light"} className="!w-auto !items-start" />
+              <AppLogo variant="sidebar" theme={brandOnDark ? "dark" : "light"} className="!w-auto !items-start" />
             </Link>
           ) : (
             <Link href="/dashboard" onClick={closeMobile} className="flex items-center justify-center" aria-label="Dashboard">
               <img
-                src={logoOnDark ? "/brand/hexalyte-white.png?v=20260903" : "/brand/hexalyte-innovation.png?v=20260903"}
+                src={brandOnDark ? "/brand/hexalyte-white.png?v=20260903" : "/brand/hexalyte-innovation.png?v=20260903"}
                 alt="HEXALYTE"
                 // The brand file is the wide wordmark; crop to its left-hand globe mark (no new artwork).
                 className="h-8 w-8 object-cover object-left"
@@ -965,7 +977,7 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
                 </button>
               ) : (
                 <kbd
-                  className="pointer-events-none absolute right-2.5 hidden rounded-md border px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-[var(--sb-muted)] md:block"
+                  className="pointer-events-none absolute right-2.5 hidden rounded-md border px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-[var(--sb-fg)] md:block"
                   style={{ borderColor: theme.border }}
                 >
                   Alt M
@@ -1067,10 +1079,16 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
                   aria-label="Dark mode"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className={cn("relative h-[22px] w-10 shrink-0 rounded-full transition-colors duration-200", FOCUS_RING)}
-                  style={{ background: isDark ? "hsl(var(--primary))" : "#CBD5E1" }}
+                  style={{
+                    // Track and thumb keep >=3:1 against each other and the panel (WCAG 1.4.11) on every skin.
+                    background: skinPalette
+                      ? isDark ? "var(--sb-fg)" : "color-mix(in srgb, var(--sb-fg) 55%, transparent)"
+                      : isDark ? "hsl(var(--primary-text))" : "var(--sb-muted)",
+                  }}
                 >
                   <motion.span
-                    className="absolute top-[3px] h-4 w-4 rounded-full bg-white shadow-sm"
+                    className="absolute top-[3px] h-4 w-4 rounded-full shadow-sm"
+                    style={{ background: skinPalette ? "var(--sb-bg)" : isDark ? "#0d0d0d" : "#ffffff" }}
                     animate={{ left: isDark ? "calc(100% - 19px)" : "3px" }}
                     transition={{ type: "spring", stiffness: 500, damping: 40 }}
                   />
@@ -1080,9 +1098,9 @@ export function Sidebar({ mobile = false, forceCollapsed = false }: SidebarProps
               <button
                 type="button"
                 onClick={handleLogout}
-                className={cn(footerRow, FOCUS_RING, "hover:!bg-red-500/10 hover:!text-red-500")}
+                className={cn(footerRow, FOCUS_RING, "hover:!bg-destructive/10 hover:!text-destructive-text")}
               >
-                <LogOut className={cn(iconSize, "shrink-0 text-red-500")} strokeWidth={1.75} />
+                <LogOut className={cn(iconSize, "shrink-0", skinPalette ? "text-[var(--sb-fg)]" : "text-destructive-text")} strokeWidth={1.75} />
                 <span>Logout</span>
               </button>
             </div>

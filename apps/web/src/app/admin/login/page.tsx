@@ -82,7 +82,7 @@ export default function AdminLoginPage() {
             </div>
 
             {error && (
-              <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+              <p className="text-xs text-destructive-text bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>
             )}
 
             <Button

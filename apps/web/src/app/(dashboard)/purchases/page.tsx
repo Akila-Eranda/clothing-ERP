@@ -88,7 +88,7 @@ function buildColumns(
               {new Date(d).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
             </p>
             {due > 0.01 && (
-              <p className="font-semibold text-rose-600 tabular-nums">LKR {due.toFixed(0)}</p>
+              <p className="font-semibold text-destructive-text tabular-nums">LKR {due.toFixed(0)}</p>
             )}
           </div>
         );
@@ -172,9 +172,9 @@ export default function PurchasesPage() {
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Pending",     value: pending,                                 icon: FileText,      color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Pending",     value: pending,                                 icon: FileText,      color: "text-warning-text",   bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "Ordered",     value: ordered,                                 icon: Truck,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
   ];
 
   const columns = buildColumns(openViewPO, loadReceive, handleUpdateStatus);

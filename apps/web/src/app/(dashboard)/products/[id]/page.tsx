@@ -197,12 +197,12 @@ export default function ProductDetailPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg sm:text-2xl font-bold leading-tight break-words">{product.name}</h1>
                   <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                    product.status === "ACTIVE"   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" :
-                    product.status === "DRAFT"    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                    product.status === "ACTIVE"   ? "bg-success/10 text-success-text border border-success/20" :
+                    product.status === "DRAFT"    ? "bg-warning/10 text-warning-text border border-warning/20" :
                                                     "bg-muted text-muted-foreground border border-border"
                   }`}>{product.status}</span>
                   {product.isFeatured && (
-                    <span className="text-xs bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-semibold">
+                    <span className="text-xs bg-warning/10 text-warning-text border border-warning/20 px-2.5 py-0.5 rounded-full font-semibold">
                       ★ Featured
                     </span>
                   )}
@@ -225,7 +225,7 @@ export default function ProductDetailPage() {
                     </span>
                   )}
                   {profile.modules.collections && product.collections.map((c) => (
-                    <span key={c.collection.id} className="flex items-center gap-1.5 text-xs bg-orange-500/10 border border-orange-500/20 text-orange-700 dark:text-orange-400 rounded-lg px-2.5 py-1">
+                    <span key={c.collection.id} className="flex items-center gap-1.5 text-xs bg-warning/10 border border-warning/20 text-warning-text rounded-lg px-2.5 py-1">
                       <Layers className="h-3 w-3" /> {c.collection.name}
                     </span>
                   ))}
@@ -256,9 +256,9 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total Stock",    value: `${totalStock} ${stockUnit}`,     icon: Package,      color: "text-blue-600 dark:text-blue-400",       iconBg: "bg-blue-500/10" },
-              { label: "Available",      value: `${availStock} ${stockUnit}`,     icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
+              { label: "Available",      value: `${availStock} ${stockUnit}`,     icon: CheckCircle2, color: "text-success-text", iconBg: "bg-success/10" },
               { label: "Reserved",       value: `${reservedStock} ${stockUnit}`,  icon: Box,          color: "text-violet-600 dark:text-violet-400",   iconBg: "bg-violet-500/10" },
-              { label: "Gross Margin",   value: `${margin.toFixed(1)}%`, icon: TrendingUp,   color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
+              { label: "Gross Margin",   value: `${margin.toFixed(1)}%`, icon: TrendingUp,   color: "text-success-text", iconBg: "bg-success/10" },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-border bg-background p-4 flex items-center gap-3 ">
                 <div className={`p-2 rounded-lg ${s.iconBg}`}>
@@ -316,13 +316,13 @@ export default function ProductDetailPage() {
                           <td className="px-3 py-3 text-xs">{fmt(v.costPrice)}</td>
                           <td className="px-3 py-3 text-xs font-semibold text-blue-600 dark:text-blue-400">{fmt(v.sellingPrice)}</td>
                           <td className="px-3 py-3 text-xs text-muted-foreground">{fmt(v.mrp)}</td>
-                          <td className="px-3 py-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400">{vMargin}%</td>
+                          <td className="px-3 py-3 text-xs font-semibold text-success-text">{vMargin}%</td>
                           <td className="px-3 py-3">
-                            <span className={`font-bold text-sm ${vStock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{vStock}</span>
+                            <span className={`font-bold text-sm ${vStock > 0 ? "text-success-text" : "text-destructive-text"}`}>{vStock}</span>
                           </td>
                           <td className="px-3 py-3">
                             {v.isActive
-                              ? <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Active</span>
+                              ? <span className="flex items-center gap-1 text-xs text-success-text font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Active</span>
                               : <span className="flex items-center gap-1 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Inactive</span>}
                           </td>
                         </tr>
@@ -358,14 +358,14 @@ export default function ProductDetailPage() {
                         <td className="px-6 py-3 font-medium">{b.name}</td>
                         <td className="px-6 py-3 text-right font-semibold">{b.qty}</td>
                         <td className="px-6 py-3 text-right text-violet-600 dark:text-violet-400">{b.reserved}</td>
-                        <td className="px-6 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">{b.qty - b.reserved}</td>
+                        <td className="px-6 py-3 text-right font-bold text-success-text">{b.qty - b.reserved}</td>
                       </tr>
                     ))}
                     <tr className="border-t-2 bg-muted/20 font-bold text-sm">
                       <td className="px-6 py-3">Total</td>
                       <td className="px-6 py-3 text-right">{totalStock}</td>
                       <td className="px-6 py-3 text-right text-violet-600 dark:text-violet-400">{reservedStock}</td>
-                      <td className="px-6 py-3 text-right text-emerald-600 dark:text-emerald-400">{availStock}</td>
+                      <td className="px-6 py-3 text-right text-success-text">{availStock}</td>
                     </tr>
                   </>
                 )}
@@ -392,14 +392,14 @@ export default function ProductDetailPage() {
               <span className="font-semibold">Final Price</span>
               <span className="text-lg font-bold text-primary">LKR {fmt(finalPrice)}</span>
             </div>
-            <div className="mt-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex justify-between">
+            <div className="mt-3 rounded-xl bg-success/10 border border-success/20 p-3 flex justify-between">
               <div>
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">Profit</p>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">LKR {fmt(profit)}</p>
+                <p className="text-[10px] text-success-text">Profit</p>
+                <p className="text-sm font-bold text-success-text">LKR {fmt(profit)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">Margin</p>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{margin.toFixed(1)}%</p>
+                <p className="text-[10px] text-success-text">Margin</p>
+                <p className="text-sm font-bold text-success-text">{margin.toFixed(1)}%</p>
               </div>
             </div>
           </div>
@@ -426,7 +426,7 @@ export default function ProductDetailPage() {
             ].map(({ label, value, ok }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
-                <span className={`font-semibold ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>{value}</span>
+                <span className={`font-semibold ${ok ? "text-success-text" : "text-muted-foreground"}`}>{value}</span>
               </div>
             ))}
           </div>

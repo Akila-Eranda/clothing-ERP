@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const PLAN_RING: Record<string, string> = {
   STARTER: 'border-border',
   PROFESSIONAL: 'border-primary/40',
-  ENTERPRISE: 'border-amber-500/40',
+  ENTERPRISE: 'border-warning/40',
   CUSTOM: 'border-violet-500/40',
 }
 
@@ -63,7 +63,7 @@ export default function PlansPage() {
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setEditPlan(plan)}
-                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                className="text-muted-foreground hover:text-primary-text hover:bg-primary/10"
               >
                 <Edit2 size={13} />
               </Button>
@@ -214,7 +214,7 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
               {form.features.map((feat, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="flex-1 px-2.5 py-1.5 text-xs bg-muted border border-border rounded-lg text-foreground">{feat}</div>
-                  <Button variant="ghost" size="icon-sm" onClick={() => removeFeature(i)} className="h-7 w-7 text-muted-foreground hover:text-red-500">
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeFeature(i)} className="h-7 w-7 text-muted-foreground hover:text-destructive-text">
                     <X size={12} />
                   </Button>
                 </div>
@@ -235,7 +235,7 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
           </div>
         </div>
 
-        {error && <p className="mt-4 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-4 text-xs text-destructive-text">{error}</p>}
 
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={onClose}>Cancel</Button>

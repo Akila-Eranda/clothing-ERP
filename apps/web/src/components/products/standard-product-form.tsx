@@ -383,7 +383,7 @@ export function StandardAddProductPage({ embedded }: { embedded?: EmbeddedProduc
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive">*</span></Label>
+                <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive-text">*</span></Label>
                 <Input placeholder={formCopy.namePlaceholder} value={form.name} maxLength={120}
                   onChange={(e) => set("name", e.target.value)} />
               </div>
@@ -509,21 +509,21 @@ export function StandardAddProductPage({ embedded }: { embedded?: EmbeddedProduc
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      Selling Price <span className="text-destructive">*</span>
+                      Selling Price <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
                       onChange={(e) => set("sellingPrice", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      Cost Price <span className="text-destructive">*</span>
+                      Cost Price <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
                       onChange={(e) => set("costPrice", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      MRP <span className="text-destructive">*</span>
+                      MRP <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.mrp}
                       onChange={(e) => set("mrp", e.target.value)} />
@@ -540,8 +540,8 @@ export function StandardAddProductPage({ embedded }: { embedded?: EmbeddedProduc
                 </div>
                 {form.sellingPrice && form.costPrice && (
                   <div className="flex gap-6 pt-1 text-sm border-t mt-2">
-                    <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
-                    <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+                    <span className="text-muted-foreground">Gross Margin: <strong className="text-success-text">LKR {(sp - cp).toFixed(2)}</strong></span>
+                    <span className="text-muted-foreground">Margin %: <strong className="text-success-text">{margin}%</strong></span>
                   </div>
                 )}
               </>
@@ -855,7 +855,7 @@ export function StandardAddProductPage({ embedded }: { embedded?: EmbeddedProduc
                                 <button
                                   type="button"
                                   onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                                  className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                  className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -873,7 +873,7 @@ export function StandardAddProductPage({ embedded }: { embedded?: EmbeddedProduc
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs text-destructive hover:text-destructive gap-1"
+                        className="h-7 text-xs text-destructive-text hover:text-destructive-text gap-1"
                         onClick={() => setVariantRows([])}
                       >
                         <Trash2 className="h-3 w-3" /> Clear All

@@ -112,7 +112,7 @@ function ReceiptPrintLogCard() {
   React.useEffect(() => { load(); }, [load]);
 
   const statusColor = (s: string) =>
-    s === "SUCCESS" ? "text-emerald-600" : s === "FAILED" ? "text-destructive" : "text-amber-600";
+    s === "SUCCESS" ? "text-success-text" : s === "FAILED" ? "text-destructive-text" : "text-warning-text";
 
   return (
     <Card>
@@ -272,7 +272,7 @@ function AuditLogTab() {
   React.useEffect(() => { load(1); }, [load]);
 
   const totalPages = Math.ceil(total / 25);
-  const ACTION_COLORS: Record<string,string> = { CREATE:"bg-emerald-500/10 text-emerald-500", UPDATE:"bg-primary/10 text-blue-500", DELETE:"bg-red-500/10 text-red-500", DAY_END:"bg-slate-500/10 text-violet-500" };
+  const ACTION_COLORS: Record<string,string> = { CREATE:"bg-success/10 text-success-text", UPDATE:"bg-primary/10 text-blue-500", DELETE:"bg-destructive/10 text-destructive-text", DAY_END:"bg-slate-500/10 text-violet-500" };
 
   return (
     <TabsContent value="audit-log" className="mt-0">
@@ -905,7 +905,7 @@ export default function SettingsPage() {
                 </div>
               ))}
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-3">
-                {posSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-emerald-500" />}
+                {posSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success-text" />}
                 {posSaving ? "Saving…" : "Changes save automatically"}
               </p>
             </CardContent>
@@ -1293,7 +1293,7 @@ export default function SettingsPage() {
                 );
               })}
               {pwForm.newPassword && pwForm.confirmPassword && pwForm.newPassword !== pwForm.confirmPassword && (
-                <p className="text-xs text-destructive flex items-center gap-1"><X className="h-3 w-3" />Passwords do not match</p>
+                <p className="text-xs text-destructive-text flex items-center gap-1"><X className="h-3 w-3" />Passwords do not match</p>
               )}
               <Separator />
               <Button size="sm" onClick={changePassword} disabled={pwSaving || !pwForm.currentPassword || !pwForm.newPassword}>
@@ -1343,7 +1343,7 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         {b._count && <span className="mr-3">{b._count.users} users · {b._count.inventory} items</span>}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openBranchModal(b)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        {!b.isDefault && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteBranch(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
+                        {!b.isDefault && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive-text hover:text-destructive-text" onClick={() => deleteBranch(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
                       </div>
                     </div>
                   </CardContent>
@@ -1450,7 +1450,7 @@ export default function SettingsPage() {
                     key={t}
                     type="button"
                     onClick={() => setTheme(t)}
-                    className={`p-4 rounded-xl border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+                    className={`p-4 rounded-xl border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${active ? "border-primary bg-primary/10 text-primary-text" : "border-border hover:border-primary/50"}`}
                   >
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-[#080C14]" : "bg-white border"}`} />
                     {t.charAt(0).toUpperCase() + t.slice(1)}

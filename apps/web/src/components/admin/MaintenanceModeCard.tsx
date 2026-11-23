@@ -87,9 +87,9 @@ export default function MaintenanceModeCard({ config, onUpdate }: Props) {
       </div>
 
       {isOn && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
           <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-xs font-semibold text-red-600 dark:text-red-400">Maintenance Mode ACTIVE — visible to all users</span>
+          <span className="text-xs font-semibold text-destructive-text">Maintenance Mode ACTIVE — visible to all users</span>
         </div>
       )}
 

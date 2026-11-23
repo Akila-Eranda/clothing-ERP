@@ -74,7 +74,7 @@ export function SupplierInvoiceModal({ open, onClose, onPosted, suppliers }: Pro
 
         <div className="px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Supplier <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Supplier <span className="text-destructive-text">*</span></Label>
             <select
               className="w-full h-10 rounded-md border bg-background px-3 text-sm"
               value={supplierId}
@@ -85,11 +85,11 @@ export function SupplierInvoiceModal({ open, onClose, onPosted, suppliers }: Pro
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Invoice # <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Invoice # <span className="text-destructive-text">*</span></Label>
             <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="INV-001" autoFocus />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Total (LKR) <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Total (LKR) <span className="text-destructive-text">*</span></Label>
             <Input type="number" min="0.01" value={total} onChange={(e) => setTotal(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="0.00" />
           </div>

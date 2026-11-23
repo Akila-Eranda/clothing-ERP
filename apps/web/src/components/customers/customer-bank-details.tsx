@@ -55,7 +55,7 @@ export function CustomerBankDetails({ customerId }: { customerId: string }) {
 
   const field = (id: string, label: string, key: keyof CustomerBankForm, required = false, extra: { inputMode?: "text" | "numeric"; maxLength?: number } = {}) => (
     <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs">{label}{required && <span className="text-red-500"> *</span>}</Label>
+      <Label htmlFor={id} className="text-xs">{label}{required && <span className="text-destructive-text"> *</span>}</Label>
       <Input id={id} value={form[key]} onChange={set(key)} disabled={saving} maxLength={extra.maxLength ?? 100} inputMode={extra.inputMode} autoComplete="off" />
     </div>
   );
@@ -73,7 +73,7 @@ export function CustomerBankDetails({ customerId }: { customerId: string }) {
         {field("bank-branch", "Branch", "branchName")}
         {field("bank-branch-code", "Branch code", "branchCode", false, { maxLength: 20 })}
       </div>
-      {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
+      {error && <p role="alert" className="text-sm text-destructive-text">{error}</p>}
       <div className="flex items-center gap-3">
         <Button size="sm" onClick={() => void save()} disabled={saving} className="gap-1.5">
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save bank details

@@ -106,7 +106,7 @@ export function SizeGroupPicker({
             className={cn(
               "h-8 rounded-lg border px-2.5 text-xs font-medium transition-colors",
               active.id === g.id
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary/10 text-primary-text"
                 : "border-border bg-card text-muted-foreground hover:bg-muted/40",
             )}
           >

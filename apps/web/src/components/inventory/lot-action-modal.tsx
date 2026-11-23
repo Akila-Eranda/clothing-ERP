@@ -109,13 +109,13 @@ export function LotActionModal({ open, mode, lot, onClose, onDone }: Props) {
         <div className="flex items-center gap-3 px-5 py-4 border-b">
           <div
             className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
-              mode === "dispose" ? "bg-red-500/10" : "bg-amber-500/10"
+              mode === "dispose" ? "bg-destructive/10" : "bg-warning/10"
             }`}
           >
             {mode === "dispose" ? (
-              <Skull className="h-4 w-4 text-red-500" />
+              <Skull className="h-4 w-4 text-destructive-text" />
             ) : (
-              <RotateCcw className="h-4 w-4 text-amber-500" />
+              <RotateCcw className="h-4 w-4 text-warning-text" />
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export function LotActionModal({ open, mode, lot, onClose, onDone }: Props) {
           </div>
 
           {mode === "dispose" && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning-text">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <p>
                 Removes stock as Damage write-off from this lot and branch inventory.

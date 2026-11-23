@@ -146,12 +146,12 @@ export type ReportKpiItem = {
 };
 
 const KPI_TONES: Record<NonNullable<ReportKpiItem["tone"]>, { icon: string; bg: string }> = {
-  emerald: { icon: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
+  emerald: { icon: "text-success-text", bg: "bg-success/10" },
   blue: { icon: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
   violet: { icon: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10" },
-  amber: { icon: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
-  red: { icon: "text-red-600 dark:text-red-400", bg: "bg-red-500/10" },
-  orange: { icon: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10" },
+  amber: { icon: "text-warning-text", bg: "bg-warning/10" },
+  red: { icon: "text-destructive-text", bg: "bg-destructive/10" },
+  orange: { icon: "text-warning-text", bg: "bg-warning/10" },
   teal: { icon: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10" },
   slate: { icon: "text-slate-600 dark:text-slate-400", bg: "bg-slate-500/10" },
 };
@@ -428,7 +428,7 @@ export function ReportsPageHeader({
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">{title}</h1>
             {branchName && (
-              <span className="text-[10px] font-bold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-primary-text bg-primary/10 px-2 py-0.5 rounded-full">
                 {branchName}
               </span>
             )}

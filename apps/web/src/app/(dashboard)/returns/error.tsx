@@ -10,7 +10,7 @@ export default function ReturnsError({ error, reset }: { error: Error & { digest
   return (
     <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4">
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-bold text-red-500">Returns Page Error</h2>
+        <h2 className="text-xl font-bold text-destructive-text">Returns Page Error</h2>
         <p className="text-sm font-mono bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded p-3 max-w-2xl text-left whitespace-pre-wrap">
           {error.message || String(error)}
         </p>

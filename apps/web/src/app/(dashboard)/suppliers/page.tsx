@@ -95,7 +95,7 @@ function buildColumns(
       cell: ({ row }) => {
         const bal = row.original.balance ?? 0;
         return (
-          <span className={`text-sm font-semibold ${bal > 0 ? "text-amber-500" : "text-emerald-500"}`}>
+          <span className={`text-sm font-semibold ${bal > 0 ? "text-warning-text" : "text-success-text"}`}>
             {bal > 0 ? `LKR ${formatNumber(bal)}` : "Clear"}
           </span>
         );
@@ -158,9 +158,9 @@ export default function SuppliersPage() {
 
   const STATS = [
     { label: `Total ${copy.plural}`, value: suppliers.length, icon: Truck,       color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Active",               value: activeCount,      icon: Users,       color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Active",               value: activeCount,      icon: Users,       color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
     { label: "Credit Limit",         value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Outstanding",          value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Outstanding",          value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
   ];
 
   const columns = buildColumns(
@@ -197,7 +197,7 @@ export default function SuppliersPage() {
               key={tip}
               className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium text-muted-foreground max-w-full"
             >
-              <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" strokeWidth={1.75} />
+              <Lightbulb className="h-3.5 w-3.5 text-warning-text shrink-0" strokeWidth={1.75} />
               <span className="truncate">{tip}</span>
             </div>
           ))}

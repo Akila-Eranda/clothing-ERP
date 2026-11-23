@@ -198,7 +198,7 @@ export default function AdminCommandPalette({ open, onClose }: Props) {
               >
                 <div className={cn(
                   'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                  item.type === 'tenant' ? 'bg-foreground text-background' : 'bg-primary/10 text-primary',
+                  item.type === 'tenant' ? 'bg-foreground text-background' : 'bg-primary/10 text-primary-text',
                 )}>
                   {item.type === 'tenant' ? <Building2 size={14} /> : <Users size={14} />}
                 </div>

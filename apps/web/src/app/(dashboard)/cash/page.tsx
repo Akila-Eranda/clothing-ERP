@@ -531,7 +531,7 @@ export default function CashManagementPage() {
         const v = row.original.variance;
         if (v == null) return <span className="text-xs text-muted-foreground">—</span>;
         return (
-          <span className={cn("text-sm font-bold tabular-nums", v < 0 ? "text-red-600" : v > 0 ? "text-emerald-600" : "")}>
+          <span className={cn("text-sm font-bold tabular-nums", v < 0 ? "text-destructive-text" : v > 0 ? "text-success-text" : "")}>
             {v >= 0 ? "+" : ""}{formatNumber(v)}
           </span>
         );
@@ -655,11 +655,11 @@ export default function CashManagementPage() {
 
           {/* Pending approval banner */}
           {pendingItems.length > 0 && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-xl border border-warning/40 bg-warning/5 p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-warning-text shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  <p className="text-sm font-semibold text-warning-text">
                     {pendingItems.length} shift{pendingItems.length > 1 ? "s" : ""} pending approval
                   </p>
                   <p className="text-xs text-muted-foreground">Variance exceeds LKR {VARIANCE_THRESHOLD} — manager action required</p>
@@ -744,7 +744,7 @@ export default function CashManagementPage() {
                     ))}
                     <div className="flex justify-between pt-2 font-bold text-base">
                       <span>Expected in drawer</span>
-                      <span className="text-emerald-600 tabular-nums">LKR {formatNumber(expected)}</span>
+                      <span className="text-success-text tabular-nums">LKR {formatNumber(expected)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                       <RefreshCw className="h-3 w-3" /> Auto-refreshes every 30s · POS sales recorded automatically
@@ -791,8 +791,8 @@ export default function CashManagementPage() {
                     <Button className="mt-4 h-10 px-5 rounded-xl" variant="secondary" onClick={() => setTab("overview")}>Go to Overview</Button>
                   </div>
                 ) : shiftPending ? (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3">
-                    <p className="font-semibold text-amber-700 dark:text-amber-400">Previous shift pending manager approval</p>
+                  <div className="rounded-xl border border-warning/30 bg-warning/5 p-5 space-y-3">
+                    <p className="font-semibold text-warning-text">Previous shift pending manager approval</p>
                     <p className="text-sm text-muted-foreground">
                       Close variance must be approved before opening a new shift
                       {active?.variance != null && (
@@ -959,7 +959,7 @@ export default function CashManagementPage() {
                     ))}
                     <div className="flex justify-between py-2 font-bold text-base">
                       <span>Expected Cash</span>
-                      <span className="text-emerald-600 tabular-nums">LKR {formatNumber(expected)}</span>
+                      <span className="text-success-text tabular-nums">LKR {formatNumber(expected)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -982,7 +982,7 @@ export default function CashManagementPage() {
                         </div>
                         <div className={cn(
                           "flex justify-between font-bold pt-1 border-t",
-                          variancePreview < 0 ? "text-red-600" : variancePreview > 0 ? "text-emerald-600" : "",
+                          variancePreview < 0 ? "text-destructive-text" : variancePreview > 0 ? "text-success-text" : "",
                         )}>
                           <span>Variance</span>
                           <span className="tabular-nums">
@@ -1065,8 +1065,8 @@ export default function CashManagementPage() {
                   {[
                     { label: "Total Shifts", value: varianceReport.totalShifts, color: "text-blue-600", bg: "bg-blue-500/10" },
                     { label: "Net Variance", value: varianceReport.totalVariance, color: "text-foreground", bg: "bg-muted" },
-                    { label: "Over Count", value: varianceReport.overCount, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-                    { label: "Short Count", value: varianceReport.shortCount, color: "text-red-600", bg: "bg-red-500/10" },
+                    { label: "Over Count", value: varianceReport.overCount, color: "text-success-text", bg: "bg-success/10" },
+                    { label: "Short Count", value: varianceReport.shortCount, color: "text-destructive-text", bg: "bg-destructive/10" },
                   ].map((s) => (
                     <Card key={s.label} className="card-hover">
                       <CardContent className="p-5">
@@ -1124,7 +1124,7 @@ export default function CashManagementPage() {
                           <div className="flex items-center gap-2">
                             <span className={cn(
                               "font-bold tabular-nums",
-                              (r.variance ?? 0) < 0 ? "text-red-600" : "text-emerald-600",
+                              (r.variance ?? 0) < 0 ? "text-destructive-text" : "text-success-text",
                             )}>
                               {(r.variance ?? 0) >= 0 ? "+" : ""}{formatNumber(r.variance ?? 0)}
                             </span>

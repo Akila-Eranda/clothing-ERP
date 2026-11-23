@@ -330,7 +330,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       {/* Row 1 */}
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-1.5 col-span-1">
-          <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive">*</span></Label>
+          <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive-text">*</span></Label>
           <Input placeholder={formCopy.namePlaceholder} value={form.name} maxLength={120}
             onChange={(e) => set("name", e.target.value)}
             onBlur={() => form.name && mark("basic")} />
@@ -348,7 +348,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       {/* Row 2 */}
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">Category <span className="text-destructive">*</span></Label>
+          <Label className="text-xs font-semibold">Category <span className="text-destructive-text">*</span></Label>
           <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
             <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
@@ -590,7 +590,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                           </td>
                           <td className="px-2 py-2">
                             <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </td>
@@ -644,21 +644,21 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             <h4 className="font-semibold text-sm">Price Details</h4>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">
-                Selling Price (LKR) <span className="text-destructive">*</span>
+                Selling Price (LKR) <span className="text-destructive-text">*</span>
               </Label>
               <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
                 onChange={(e) => set("sellingPrice", e.target.value)} onBlur={() => form.sellingPrice && mark("pricing")} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">
-                Cost Price (LKR) <span className="text-destructive">*</span>
+                Cost Price (LKR) <span className="text-destructive-text">*</span>
               </Label>
               <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
                 onChange={(e) => set("costPrice", e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">
-                MRP (LKR) <span className="text-destructive">*</span>
+                MRP (LKR) <span className="text-destructive-text">*</span>
               </Label>
               <Input type="number" min="0" placeholder="0.00" value={form.mrp}
                 onChange={(e) => set("mrp", e.target.value)} />
@@ -680,8 +680,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                 {[
                   { label: "Selling Price", val: `LKR ${parseFloat(form.sellingPrice || "0").toFixed(2)}`, bold: true },
                   { label: "Cost Price",    val: `LKR ${parseFloat(form.costPrice    || "0").toFixed(2)}`, bold: false },
-                  { label: "Gross Margin",  val: `LKR ${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-emerald-500" },
-                  { label: "Margin %",      val: `${((parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")) / Math.max(parseFloat(form.sellingPrice || "1"), 0.01) * 100).toFixed(1)}%`, bold: true, color: "text-emerald-500" },
+                  { label: "Gross Margin",  val: `LKR ${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-success-text" },
+                  { label: "Margin %",      val: `${((parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")) / Math.max(parseFloat(form.sellingPrice || "1"), 0.01) * 100).toFixed(1)}%`, bold: true, color: "text-success-text" },
                 ].map((r) => (
                   <div key={r.label} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{r.label}</span>
@@ -832,7 +832,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                   }`}>
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1 text-left">{t.label}</span>
-                  {isDone && !active && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                  {isDone && !active && <CheckCircle2 className="h-3.5 w-3.5 text-success-text shrink-0" />}
                 </button>
               );
             })}

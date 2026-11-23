@@ -29,15 +29,15 @@ function toneFor(type?: string | null) {
   const t = String(type || 'INFO').toUpperCase()
   if (t === 'CRITICAL' || t === 'ERROR') {
     return {
-      wrap: 'border-red-300 bg-red-50 text-red-950 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-100',
-      icon: 'text-red-600 dark:text-red-400',
+      wrap: 'border-red-300 bg-red-50 text-red-950 dark:border-destructive/40 dark:bg-destructive/10 dark:text-red-100',
+      icon: 'text-destructive-text',
       Icon: AlertTriangle,
     }
   }
   if (t === 'WARNING' || t === 'MAINTENANCE') {
     return {
-      wrap: 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100',
-      icon: 'text-amber-600 dark:text-amber-400',
+      wrap: 'border-amber-300 bg-amber-50 text-amber-950 dark:border-warning/40 dark:bg-warning/10 dark:text-amber-100',
+      icon: 'text-warning-text',
       Icon: AlertTriangle,
     }
   }

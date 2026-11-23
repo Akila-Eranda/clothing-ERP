@@ -41,10 +41,10 @@ interface WorkflowTask {
 const WORKFLOW_CFG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   purchase_order:   { label: "Purchase Order",   icon: ShoppingBag,    color: "text-blue-500",    bg: "bg-blue-500/10" },
   quotation:        { label: "Quotation",        icon: FileText,       color: "text-teal-500",    bg: "bg-teal-500/10" },
-  stock_adjustment: { label: "Stock Adjustment", icon: Package,        color: "text-amber-500",   bg: "bg-amber-500/10" },
+  stock_adjustment: { label: "Stock Adjustment", icon: Package,        color: "text-warning-text",   bg: "bg-warning/10" },
   discount_request: { label: "Discount Request", icon: Tag,            color: "text-violet-500",  bg: "bg-violet-500/10" },
-  stock_transfer:   { label: "Stock Transfer",   icon: ArrowLeftRight, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  cash_variance:    { label: "Cash Variance",    icon: Banknote,       color: "text-emerald-600", bg: "bg-emerald-500/10" },
+  stock_transfer:   { label: "Stock Transfer",   icon: ArrowLeftRight, color: "text-success-text", bg: "bg-success/10" },
+  cash_variance:    { label: "Cash Variance",    icon: Banknote,       color: "text-success-text", bg: "bg-success/10" },
 };
 
 const GUIDE = [
@@ -184,7 +184,7 @@ function buildColumns(
             <Button
               size="sm"
               variant="outline"
-              className="h-8 gap-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+              className="h-8 gap-1 text-destructive-text border-red-200 hover:bg-red-50 hover:text-destructive-text"
               disabled={busy}
               onClick={() => onAct(id, "reject")}
             >
@@ -262,10 +262,10 @@ export default function WorkflowsPage() {
     : tasks.filter((t) => t.instance.definition.key === typeFilter);
 
   const STATS = [
-    { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-warning-text",   bg: "bg-warning/10", tint: "bg-card border-border" },
     { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(() => buildColumns(acting, act), [acting]);
@@ -300,14 +300,14 @@ export default function WorkflowsPage() {
 
       {/* System status */}
       {catalog?.operational && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <Card className="border-success/30 bg-success/5">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3 flex-1">
-              <div className="p-2.5 rounded-xl bg-emerald-500/10">
-                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+              <div className="p-2.5 rounded-xl bg-success/10">
+                <CheckCircle2 className="h-6 w-6 text-success-text" />
               </div>
               <div>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                <p className="text-sm font-bold text-success-text">
                   All approval workflows are active and working
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -315,7 +315,7 @@ export default function WorkflowsPage() {
                 </p>
               </div>
             </div>
-            <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white shrink-0 w-fit">
+            <Badge className="bg-emerald-500 hover:bg-success text-success-foreground shrink-0 w-fit">
               System Operational
             </Badge>
           </CardContent>
@@ -352,8 +352,8 @@ export default function WorkflowsPage() {
       ) : displayed.length === 0 ? (
         <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="p-4 rounded-2xl bg-emerald-500/10">
-              <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+            <div className="p-4 rounded-2xl bg-success/10">
+              <CheckCircle2 className="h-10 w-10 text-success-text" />
             </div>
             <p className="text-base font-semibold">All caught up</p>
             <p className="text-sm text-muted-foreground text-center max-w-sm">

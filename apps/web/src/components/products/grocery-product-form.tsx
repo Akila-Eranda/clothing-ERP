@@ -180,8 +180,8 @@ function ChoiceCard({
       className={cn(
         "rounded-xl border p-3.5 text-left transition-all h-full",
         selected
-          ? "border-orange-500 bg-orange-500/10"
-          : "border-border bg-muted/30 hover:border-orange-500/40 hover:bg-muted/50",
+          ? "border-orange-500 bg-warning/10"
+          : "border-border bg-muted/30 hover:border-warning/40 hover:bg-muted/50",
       )}
     >
       <div className="flex items-start gap-3">
@@ -190,7 +190,7 @@ function ChoiceCard({
             className={cn(
               "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 border",
               selected
-                ? "bg-orange-500 text-white border-orange-500"
+                ? "bg-warning text-warning-foreground border-warning-hover"
                 : "bg-muted text-muted-foreground border-border",
             )}
           >
@@ -315,7 +315,7 @@ function SearchableBrandSelect({
                   }}
                 >
                   <span>{b.name}</span>
-                  {b.id === value ? <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : null}
+                  {b.id === value ? <Check className="h-3.5 w-3.5 text-success-text" /> : null}
                 </button>
               ))}
               {filtered.length === 0 && !q.trim() ? (
@@ -327,7 +327,7 @@ function SearchableBrandSelect({
                 type="button"
                 disabled={creating}
                 onClick={createBrand}
-                className="w-full border-t px-3 py-2.5 text-sm text-left text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2 font-medium"
+                className="w-full border-t px-3 py-2.5 text-sm text-left text-success-text hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2 font-medium"
               >
                 {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Create brand “{q.trim()}”
@@ -953,7 +953,7 @@ return (
                 </Field>
                 <Field label="Profit Margin" hint="Auto from buying & selling">
                   <div className={cn("h-10 rounded-lg px-3 flex items-center justify-between text-sm", FORM_INNER_PANEL)}>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
+                    <span className="font-semibold text-success-text tabular-nums">{profitMargin.pct}%</span>
                     <span className="text-muted-foreground tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
                   </div>
                 </Field>
@@ -1034,7 +1034,7 @@ return (
                             <td className="px-3 py-2"><Input type="number" min={0} step="0.01" value={row.mrp} onChange={(e) => updateVariant(row.key, "mrp", e.target.value)} className="h-9 text-sm text-right tabular-nums" /></td>
                             <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateVariant(row.key, "active", v)} /></td>
                             <td className="px-2 py-2">
-                              <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                              <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </td>
@@ -1135,7 +1135,7 @@ return (
                             <Switch checked={row.active} onCheckedChange={(v) => setSupplierRows((rows) => rows.map((r) => r.supplierId === row.supplierId ? { ...r, active: v } : r))} />
                           </td>
                           <td className="px-2 py-2">
-                            <button type="button" onClick={() => setSupplierRows((rows) => rows.filter((r) => r.supplierId !== row.supplierId))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                            <button type="button" onClick={() => setSupplierRows((rows) => rows.filter((r) => r.supplierId !== row.supplierId))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </td>

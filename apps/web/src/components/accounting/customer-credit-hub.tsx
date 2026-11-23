@@ -378,7 +378,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       accessorKey: "amount",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
       cell: ({ row }) => (
-        <span className="text-sm font-medium tabular-nums text-emerald-600">
+        <span className="text-sm font-medium tabular-nums text-success-text">
           LKR {formatNumber(row.original.amount)}
         </span>
       ),
@@ -407,7 +407,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       accessorKey: "amount",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
       cell: ({ row }) => (
-        <span className="text-sm font-medium tabular-nums text-amber-600">
+        <span className="text-sm font-medium tabular-nums text-warning-text">
           LKR {formatNumber(row.original.amount)}
         </span>
       ),
@@ -554,7 +554,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
                       {s.status === "ACTIVE" && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => cancelSchedule(s.id)}>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive-text" onClick={() => cancelSchedule(s.id)}>
                           Cancel
                         </Button>
                       )}

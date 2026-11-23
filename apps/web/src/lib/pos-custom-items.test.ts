@@ -6,11 +6,12 @@ import { canSellBillOnlyItems, cartHasBillOnlyItems, rolesFromToken } from "./po
 
 const tokenWith = (payload: object) => `h.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.s`;
 
-test("managers and admins may sell bill-only lines; cashiers may not", () => {
+test("managers, admins and cashiers may sell bill-only lines; other roles may not", () => {
   assert.equal(canSellBillOnlyItems({ tokenRoles: ["TENANT_ADMIN"] }), true);
   assert.equal(canSellBillOnlyItems({ tokenRoles: ["branch-manager"] }), true);
-  assert.equal(canSellBillOnlyItems({ tokenRoles: ["CASHIER"] }), false);
-  assert.equal(canSellBillOnlyItems({ tokenRoles: [], userRole: "cashier" }), false);
+  assert.equal(canSellBillOnlyItems({ tokenRoles: ["CASHIER"] }), true);
+  assert.equal(canSellBillOnlyItems({ tokenRoles: [], userRole: "cashier" }), true);
+  assert.equal(canSellBillOnlyItems({ tokenRoles: ["VIEWER"] }), false);
 });
 
 test("a user with several roles qualifies if ANY role qualifies (the old check only looked at the first role)", () => {
@@ -18,8 +19,8 @@ test("a user with several roles qualifies if ANY role qualifies (the old check o
 });
 
 test("the PIN-unlocked operator decides, not the terminal login", () => {
-  // manager signed in, cashier unlocked with PIN -> the API attributes the sale to the cashier -> refused
-  assert.equal(canSellBillOnlyItems({ pinCashierRole: "CASHIER", tokenRoles: ["TENANT_ADMIN"] }), false);
+  // viewer unlocked with PIN -> the API attributes the sale to that operator -> refused
+  assert.equal(canSellBillOnlyItems({ pinCashierRole: "VIEWER", tokenRoles: ["TENANT_ADMIN"] }), false);
   // cashier terminal, manager unlocked with PIN -> allowed
   assert.equal(canSellBillOnlyItems({ pinCashierRole: "branch_manager", tokenRoles: ["CASHIER"] }), true);
 });

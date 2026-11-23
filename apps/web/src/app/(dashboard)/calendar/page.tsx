@@ -191,8 +191,8 @@ export default function BusinessCalendarPage() {
       value: `LKR ${formatNumber(day.sales.net)}`,
       sub: `${day.sales.count} orders`,
       icon: TrendingUp,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/10",
+      color: "text-success-text",
+      bg: "bg-success/10",
       tint: "bg-card border-border",
     },
     {
@@ -200,8 +200,8 @@ export default function BusinessCalendarPage() {
       value: `LKR ${formatNumber(day.profit.netProfit)}`,
       sub: `${day.profit.netMarginPct}% margin`,
       icon: Wallet,
-      color: day.profit.netProfit >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-red-600 dark:text-red-400",
-      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/15" : "bg-red-500/10",
+      color: day.profit.netProfit >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-destructive-text",
+      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/15" : "bg-destructive/10",
       tint: day.profit.netProfit >= 0
         ? "bg-card border-border"
         : "bg-card border-border",
@@ -211,8 +211,8 @@ export default function BusinessCalendarPage() {
       value: `LKR ${formatNumber(day.expenses.total)}`,
       sub: `${day.expenses.items.length} items`,
       icon: Banknote,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/10",
+      color: "text-warning-text",
+      bg: "bg-warning/10",
       tint: "bg-card border-border",
     },
     {
@@ -220,8 +220,8 @@ export default function BusinessCalendarPage() {
       value: `LKR ${formatNumber(day.customerDue.reduce((s, c) => s + c.amount, 0))}`,
       sub: `${day.customerDue.length} due`,
       icon: AlertTriangle,
-      color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-500/10",
+      color: "text-destructive-text",
+      bg: "bg-destructive/10",
       tint: "bg-card border-border",
     },
   ] : [];

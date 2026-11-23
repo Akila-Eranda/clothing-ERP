@@ -222,7 +222,7 @@ function DashboardPanel() {
         accessorKey: "daysPastDue",
         header: ({ column }) => <DataTableColumnHeader column={column} title="DPD" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-amber-600">{row.original.daysPastDue}</span>
+          <span className="tabular-nums text-warning-text">{row.original.daysPastDue}</span>
         ),
       },
     ],
@@ -257,7 +257,7 @@ function DashboardPanel() {
           <Card key={card.label}>
             <CardContent className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{card.label}</p>
-              <p className={`text-xl font-bold tabular-nums mt-1 ${card.warn ? "text-amber-600" : ""}`}>
+              <p className={`text-xl font-bold tabular-nums mt-1 ${card.warn ? "text-warning-text" : ""}`}>
                 LKR {formatNumber(card.value)}
               </p>
             </CardContent>
@@ -307,7 +307,7 @@ function DashboardPanel() {
                   {p.supplier.name}
                   <span className="text-muted-foreground text-xs ml-2">{fmt(p.paidAt)}</span>
                 </span>
-                <span className="font-medium tabular-nums text-emerald-600">{formatNumber(p.amount)}</span>
+                <span className="font-medium tabular-nums text-success-text">{formatNumber(p.amount)}</span>
               </div>
             ))}
             {!data?.recentPayments?.length && (

@@ -34,7 +34,7 @@ function buildColumns(
                   {b.name}
                 </OpenRecordButton>
                 {b.isDefault && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary-text">
                     <Star className="h-2 w-2" />HQ
                   </span>
                 )}
@@ -144,9 +144,9 @@ export default function BranchesPage() {
 
   const STATS = [
     { label: "Total Branches",  value: branches.length,          icon: Building2, color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Active Branches", value: activeCount,              icon: Building2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Active Branches", value: activeCount,              icon: Building2, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
     { label: "Total Staff",     value: totalStaff,               icon: Users,     color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Stock Items",     value: totalStock.toLocaleString(), icon: Package, color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Stock Items",     value: totalStock.toLocaleString(), icon: Package, color: "text-warning-text",   bg: "bg-warning/10", tint: "bg-card border-border" },
   ];
 
   const columns = buildColumns(

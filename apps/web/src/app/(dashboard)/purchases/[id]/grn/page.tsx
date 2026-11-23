@@ -68,13 +68,13 @@ export default function GRNPage() {
     {
       label: "Units Received",
       value: totalReceived,
-      className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 dark:text-emerald-300 dark:border-emerald-400/30",
+      className: "bg-success/10 text-success-text border-success/25 dark:border-success/30",
     },
     {
       label: "Units Rejected",
       value: totalRejected,
       className: totalRejected > 0
-        ? "bg-red-500/10 text-red-700 border-red-500/25 dark:text-red-300 dark:border-red-400/30"
+        ? "bg-destructive/10 text-destructive-text border-destructive/25 dark:border-destructive/30"
         : "bg-muted text-muted-foreground border-border",
     },
   ];
@@ -211,14 +211,14 @@ export default function GRNPage() {
                         <td className="px-4 py-2.5 text-right tabular-nums">
                           <span className={cn(
                             "font-semibold",
-                            item.receivedQty > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
+                            item.receivedQty > 0 ? "text-success-text" : "text-muted-foreground",
                           )}>
                             {item.receivedQty}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums">
                           <span className={cn(
-                            item.rejectedQty > 0 ? "text-red-600 dark:text-red-400 font-semibold" : "text-muted-foreground",
+                            item.rejectedQty > 0 ? "text-destructive-text font-semibold" : "text-muted-foreground",
                           )}>
                             {item.rejectedQty}
                           </span>
@@ -233,8 +233,8 @@ export default function GRNPage() {
                   <tfoot className="bg-muted/40 border-t border-border text-sm font-semibold">
                     <tr>
                       <td colSpan={5} className="px-4 py-2.5 text-muted-foreground">Totals</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{totalReceived}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-red-600 dark:text-red-400">{totalRejected}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-success-text">{totalReceived}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-destructive-text">{totalRejected}</td>
                       <td />
                       <td className="px-4 py-2.5 text-right tabular-nums text-foreground">LKR {fmt(receivedTotal)}</td>
                     </tr>
@@ -263,7 +263,7 @@ export default function GRNPage() {
             {/* Status watermark */}
             {po.status === "RECEIVED" && (
               <div className="flex justify-center pt-2">
-                <div className="flex items-center gap-2 border-2 border-emerald-500/60 text-emerald-700 dark:text-emerald-400 rounded-lg px-4 py-2 bg-emerald-500/5">
+                <div className="flex items-center gap-2 border-2 border-success/60 text-success-text rounded-lg px-4 py-2 bg-success/5">
                   <CheckCircle2 className="h-4 w-4" />
                   <span className="font-bold text-sm tracking-wide">FULLY RECEIVED</span>
                 </div>
@@ -271,7 +271,7 @@ export default function GRNPage() {
             )}
             {po.status === "PARTIALLY_RECEIVED" && (
               <div className="flex justify-center pt-2">
-                <div className="flex items-center gap-2 border-2 border-amber-500/60 text-amber-700 dark:text-amber-400 rounded-lg px-4 py-2 bg-amber-500/5">
+                <div className="flex items-center gap-2 border-2 border-warning/60 text-warning-text rounded-lg px-4 py-2 bg-warning/5">
                   <Package className="h-4 w-4" />
                   <span className="font-bold text-sm tracking-wide">PARTIALLY RECEIVED</span>
                 </div>

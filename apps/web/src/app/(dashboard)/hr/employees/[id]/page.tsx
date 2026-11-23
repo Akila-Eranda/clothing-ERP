@@ -156,7 +156,7 @@ export default function EmployeeDetailPage() {
               <DetailCard title="Basic Information" description="Contact and personal details">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 pb-4 border-b">
-                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary-text">
                       {initials}
                     </div>
                     <div>

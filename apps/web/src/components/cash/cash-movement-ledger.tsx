@@ -56,8 +56,8 @@ export function CashMovementLedger({
             <div
               className={cn(
                 "rounded-full p-1.5 shrink-0",
-                cfg.dir === "in" && "bg-emerald-500/10 text-emerald-600",
-                cfg.dir === "out" && "bg-red-500/10 text-red-600",
+                cfg.dir === "in" && "bg-success/10 text-success-text",
+                cfg.dir === "out" && "bg-destructive/10 text-destructive-text",
                 cfg.dir === "neutral" && "bg-blue-500/10 text-blue-600",
               )}
             >
@@ -82,8 +82,8 @@ export function CashMovementLedger({
             <span
               className={cn(
                 "font-bold tabular-nums shrink-0",
-                cfg.dir === "in" && "text-emerald-600",
-                cfg.dir === "out" && "text-red-600",
+                cfg.dir === "in" && "text-success-text",
+                cfg.dir === "out" && "text-destructive-text",
               )}
             >
               {cfg.dir === "out" ? "−" : cfg.dir === "in" ? "+" : ""}

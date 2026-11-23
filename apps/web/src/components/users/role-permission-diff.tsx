@@ -90,12 +90,12 @@ export function RolePermissionDiff({ currentRole, newRole, className }: RolePerm
         <div className="p-3 space-y-3 text-sm">
           {currentRole && diff.added.length > 0 && (
             <section>
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-success-text mb-1.5">
                 Will be granted
               </p>
               <ul className="space-y-1">
                 {diff.added.map((key) => (
-                  <li key={key} className="flex items-start gap-2 text-emerald-700 dark:text-emerald-400">
+                  <li key={key} className="flex items-start gap-2 text-success-text">
                     <Plus className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span>{keyToLabel(key)}</span>
                   </li>
@@ -106,12 +106,12 @@ export function RolePermissionDiff({ currentRole, newRole, className }: RolePerm
 
           {currentRole && diff.removed.length > 0 && (
             <section>
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-destructive-text mb-1.5">
                 Will be removed
               </p>
               <ul className="space-y-1">
                 {diff.removed.map((key) => (
-                  <li key={key} className="flex items-start gap-2 text-red-600 dark:text-red-400">
+                  <li key={key} className="flex items-start gap-2 text-destructive-text">
                     <Minus className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span>{keyToLabel(key)}</span>
                   </li>

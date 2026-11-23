@@ -67,7 +67,7 @@ export default function AdminHeader({ title, onMenuClick, onLogout }: Props) {
             onClick={onLogout}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors",
-              "text-muted-foreground hover:text-red-600 hover:bg-red-500/10 dark:hover:text-red-400",
+              "text-muted-foreground hover:text-destructive-text hover:bg-destructive/10",
             )}
           >
             <LogOut size={13} />

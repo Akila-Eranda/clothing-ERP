@@ -220,7 +220,7 @@ function buildLotColumns(onAction: (lot: LotRow, mode: LotActionMode) => void): 
       accessorKey: "availableQty",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
       cell: ({ row }) => (
-        <span className="font-semibold text-emerald-600">{row.original.availableQty}</span>
+        <span className="font-semibold text-success-text">{row.original.availableQty}</span>
       ),
     },
     {
@@ -296,7 +296,7 @@ function buildTxnColumns(): ColumnDef<BatchTxn>[] {
       cell: ({ row }) => {
         const q = row.original.quantityChange;
         return (
-          <span className={`font-bold text-sm ${q < 0 ? "text-red-600" : "text-emerald-600"}`}>
+          <span className={`font-bold text-sm ${q < 0 ? "text-destructive-text" : "text-success-text"}`}>
             {q > 0 ? `+${q}` : q}
           </span>
         );

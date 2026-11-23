@@ -200,7 +200,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
           {/* Top bar: Supplier + Date + Notes — stays fixed */}
           <div className="px-6 py-4 border-b shrink-0 space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Supplier <span className="text-destructive">*</span></Label>
+              <Label className="text-xs font-semibold">Supplier <span className="text-destructive-text">*</span></Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger><SelectValue placeholder="Select supplier…" /></SelectTrigger>
                 <SelectContent>
@@ -291,7 +291,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                         <button key={v.variantId} onClick={() => addItem(v)}
                           disabled={added}
                           className={`w-full text-left px-3 py-2.5 border-b flex items-center gap-2 transition-colors
-                            ${added ? "opacity-50 cursor-default bg-emerald-500/5" : "hover:bg-muted/50"}`}>
+                            ${added ? "opacity-50 cursor-default bg-success/5" : "hover:bg-muted/50"}`}>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium leading-tight">
                               {v.variantName === "Default" ? v.productName : v.variantName}
@@ -302,7 +302,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                             </div>
                           </div>
                           {added
-                            ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            ? <CheckCircle2 className="h-3.5 w-3.5 text-success-text shrink-0" />
                             : <Plus className="h-3.5 w-3.5 text-primary shrink-0" />}
                         </button>
                       );
@@ -361,7 +361,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                             LKR {(item.unitCost * item.orderedQty).toFixed(0)}
                           </td>
                           <td className="px-2 py-1.5">
-                            <button onClick={() => removeItem(idx)} className="p-0.5 rounded hover:bg-destructive/10 text-destructive">
+                            <button onClick={() => removeItem(idx)} className="p-0.5 rounded hover:bg-destructive/10 text-destructive-text">
                               <Trash2 className="h-3 w-3" />
                             </button>
                           </td>
@@ -392,7 +392,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                   }}
                   className="h-3.5 w-3.5 rounded border-border"
                 />
-                <Banknote className="h-3.5 w-3.5 text-emerald-600" />
+                <Banknote className="h-3.5 w-3.5 text-success-text" />
                 Pay supplier now
                 <span className="ml-auto text-[10px] font-normal text-muted-foreground">
                   Total LKR {grandTotal.toFixed(2)}

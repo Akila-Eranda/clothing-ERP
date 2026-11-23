@@ -352,7 +352,7 @@ function SupportPageInner() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="gap-1.5 text-amber-700 dark:text-amber-400"
+                      className="gap-1.5 text-warning-text"
                       disabled={busy === "revoke"}
                       onClick={() => void handleRevokeSessions()}
                     >
@@ -407,7 +407,7 @@ function SupportPageInner() {
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          className="text-red-500"
+                          className="text-destructive-text"
                           disabled={busy === `note-${n.id}`}
                           onClick={() => void handleDeleteNote(n)}
                         >

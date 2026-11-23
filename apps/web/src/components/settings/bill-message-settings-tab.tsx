@@ -134,7 +134,7 @@ export function BillMessageSettingsTab() {
         </CardHeader>
         <CardContent>
           {previewError ? (
-            <p role="alert" className="text-sm text-red-500">{previewError}</p>
+            <p role="alert" className="text-sm text-destructive-text">{previewError}</p>
           ) : (
             <pre data-testid="bill-message-preview" className="whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed">{preview}</pre>
           )}

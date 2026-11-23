@@ -78,8 +78,8 @@ export function ViewPurchaseReturnModal({ returnId, onClose, onPosted }: Props) 
     >
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         <div className="flex items-center gap-3 border-b px-6 py-4 shrink-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
-            <RotateCcw className="h-5 w-5 text-orange-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10">
+            <RotateCcw className="h-5 w-5 text-warning-text" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

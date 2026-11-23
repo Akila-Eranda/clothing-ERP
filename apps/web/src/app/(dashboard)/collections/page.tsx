@@ -373,8 +373,8 @@ export default function CollectionsPage() {
       label: "Active",
       value: activeCount,
       icon: CheckCircle2,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
+      color: "text-success-text",
+      bg: "bg-success/10",
       tint: "bg-card border-border",
     },
     {
@@ -598,7 +598,7 @@ export default function CollectionsPage() {
                       <span className="text-sm truncate">{cp.product?.name ?? cp.productId}</span>
                       <button
                         type="button"
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive-text hover:bg-destructive/10"
                         onClick={() => void removeProduct(cp.productId)}
                         title="Remove"
                       >

@@ -227,7 +227,7 @@ export default function OutfitsPage() {
           if (v === undefined) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />;
           if (v === null) return <span className="text-xs text-muted-foreground">n/a</span>;
           return (
-            <span className={`text-sm font-medium tabular-nums ${v > 0 ? "text-emerald-600" : "text-red-500"}`}>
+            <span className={`text-sm font-medium tabular-nums ${v > 0 ? "text-success-text" : "text-destructive-text"}`}>
               {v}
             </span>
           );
@@ -345,7 +345,7 @@ export default function OutfitsPage() {
                           value={c.quantity}
                           onChange={(e) => setComponents((p) => p.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 1 } : x))}
                         />
-                        <button type="button" onClick={() => setComponents((p) => p.filter((_, i) => i !== idx))} className="p-1 text-muted-foreground hover:text-red-500">
+                        <button type="button" onClick={() => setComponents((p) => p.filter((_, i) => i !== idx))} className="p-1 text-muted-foreground hover:text-destructive-text">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>

@@ -48,7 +48,7 @@ export function CounterHistoryDialog({ counterId, onClose }: { counterId: string
           </DialogDescription>
         </DialogHeader>
         {!data && !error && <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
-        {error && <p className="py-4 text-sm text-destructive" role="alert">{error}</p>}
+        {error && <p className="py-4 text-sm text-destructive-text" role="alert">{error}</p>}
         {data && (
           <div className="space-y-5">
             <section>
@@ -72,7 +72,7 @@ export function CounterHistoryDialog({ counterId, onClose }: { counterId: string
                           <td className="px-2 py-1.5">{h.fromCashierName ?? "—"} → {h.toCashierName ?? "—"}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(h.expectedCash)}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(h.countedCash)}{h.counted ? "" : " (not counted)"}</td>
-                          <td className={`px-2 py-1.5 text-right tabular-nums ${h.variance < 0 ? "text-rose-600" : h.variance > 0 ? "text-emerald-600" : ""}`}>{formatNumber(h.variance)}</td>
+                          <td className={`px-2 py-1.5 text-right tabular-nums ${h.variance < 0 ? "text-destructive-text" : h.variance > 0 ? "text-success-text" : ""}`}>{formatNumber(h.variance)}</td>
                           <td className="px-2 py-1.5">{h.performedByName ?? "—"}{h.authorizedByName ? ` / ${h.authorizedByName}` : ""}</td>
                         </tr>
                       ))}

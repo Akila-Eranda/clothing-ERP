@@ -375,8 +375,8 @@ export function FinancialPeriodsHub() {
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                 <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <CardContent className="h-[72px] p-4 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
-                      <Unlock className="h-[18px] w-[18px] text-emerald-600" />
+                    <div className="h-9 w-9 rounded-[12px] bg-success/10 flex items-center justify-center shrink-0">
+                      <Unlock className="h-[18px] w-[18px] text-success-text" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-lg font-bold leading-none tabular-nums">{openCount}</p>
@@ -386,8 +386,8 @@ export function FinancialPeriodsHub() {
                 </Card>
                 <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <CardContent className="h-[72px] p-4 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-[12px] bg-amber-500/10 flex items-center justify-center shrink-0">
-                      <Lock className="h-[18px] w-[18px] text-amber-600" />
+                    <div className="h-9 w-9 rounded-[12px] bg-warning/10 flex items-center justify-center shrink-0">
+                      <Lock className="h-[18px] w-[18px] text-warning-text" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-lg font-bold leading-none tabular-nums">{closedCount}</p>
@@ -512,7 +512,7 @@ export function FinancialPeriodsHub() {
                 <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
                   <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b bg-muted/30">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded-[10px] bg-red-500/10 text-red-600 flex items-center justify-center shrink-0">
+                      <div className="h-8 w-8 rounded-[10px] bg-destructive/10 text-destructive-text flex items-center justify-center shrink-0">
                         <ShieldCheck className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -541,11 +541,11 @@ export function FinancialPeriodsHub() {
                   {preview && (
                     <CardContent className="p-4 space-y-3">
                       {preview.rules.ok ? (
-                        <p className="text-emerald-600 text-xs font-semibold flex items-center gap-1.5">
+                        <p className="text-success-text text-xs font-semibold flex items-center gap-1.5">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Ready for year-end close
                         </p>
                       ) : (
-                        <div className="text-amber-600 text-xs space-y-1">
+                        <div className="text-warning-text text-xs space-y-1">
                           <p className="font-semibold flex items-center gap-1.5">
                             <AlertTriangle className="h-3.5 w-3.5" /> Not ready
                           </p>
@@ -565,7 +565,7 @@ export function FinancialPeriodsHub() {
                         </div>
                         <div className="rounded-[14px] border bg-muted/20 p-3">
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Net income</p>
-                          <p className={`text-sm font-bold tabular-nums mt-1 ${preview.closing.netIncome < 0 ? "text-red-500" : "text-emerald-600"}`}>
+                          <p className={`text-sm font-bold tabular-nums mt-1 ${preview.closing.netIncome < 0 ? "text-destructive-text" : "text-success-text"}`}>
                             LKR {formatNumber(preview.closing.netIncome)}
                           </p>
                         </div>

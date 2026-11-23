@@ -163,7 +163,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
               {item && item.quantity < 0 && movementType === "ADJUSTMENT" && (
                 <button
                   type="button"
-                  className="ml-2 text-[11px] font-semibold text-red-600 underline"
+                  className="ml-2 text-[11px] font-semibold text-destructive-text underline"
                   onClick={() => setQuantity("0")}
                 >
                   Set to 0 (clear minus {item.quantity})

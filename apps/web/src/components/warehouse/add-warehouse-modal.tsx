@@ -50,7 +50,7 @@ function Field({ label, req, children }: { label: string; req?: boolean; childre
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-semibold">
-        {label}{req && <span className="text-destructive ml-0.5">*</span>}
+        {label}{req && <span className="text-destructive-text ml-0.5">*</span>}
       </Label>
       {children}
     </div>

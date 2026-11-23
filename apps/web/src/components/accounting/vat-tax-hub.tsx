@@ -269,7 +269,7 @@ function ConfigPanel() {
         cell: ({ row }) => (
           <Badge
             className={`text-[10px] ${
-              row.original.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+              row.original.isActive ? "bg-emerald-100 text-success-text" : "bg-slate-100 text-slate-600"
             }`}
           >
             {row.original.isActive ? "Active" : "Inactive"}
@@ -458,7 +458,7 @@ function ReportsPanel() {
               <Card key={c.label}>
                 <CardContent className="p-4">
                   <p className="text-[10px] uppercase text-muted-foreground">{c.label}</p>
-                  <p className={`text-xl font-bold tabular-nums mt-1 ${c.warn ? "text-amber-600" : ""}`}>
+                  <p className={`text-xl font-bold tabular-nums mt-1 ${c.warn ? "text-warning-text" : ""}`}>
                     {typeof c.value === "number" ? `LKR ${formatNumber(c.value)}` : c.value}
                   </p>
                 </CardContent>

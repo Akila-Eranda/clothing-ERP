@@ -152,7 +152,7 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
           <button
             onClick={handleSend}
             disabled={sending || loading || !invoice}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-primary text-white rounded-lg hover:brightness-105 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-105 disabled:opacity-50"
           >
             {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             Send to Client

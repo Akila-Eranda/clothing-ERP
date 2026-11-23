@@ -341,7 +341,7 @@ export default function StoreLocationsPage() {
               <button type="button" className="p-1 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openEdit(level, row); }}>
                 <Pencil className="h-3.5 w-3.5" />
               </button>
-              <button type="button" className="p-1 text-muted-foreground hover:text-red-500" onClick={(e) => { e.stopPropagation(); void deleteLoc(level, row); }}>
+              <button type="button" className="p-1 text-muted-foreground hover:text-destructive-text" onClick={(e) => { e.stopPropagation(); void deleteLoc(level, row); }}>
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>

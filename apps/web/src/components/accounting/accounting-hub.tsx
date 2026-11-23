@@ -67,11 +67,11 @@ const PAY_METHODS = ["CASH","CARD","UPI","BANK_TRANSFER","WALLET","CUSTOMER_CRED
 const CAT_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#06b6d4","#84cc16","#ec4899"];
 
 const ACCT_TYPE_CFG: Record<string, { label: string; color: string; bg: string; grad: string }> = {
-  ASSET:     { label: "Asset",     color: "text-emerald-600", bg: "bg-emerald-500/10", grad: "from-emerald-500 to-teal-500" },
-  LIABILITY: { label: "Liability", color: "text-red-600",     bg: "bg-red-500/10",     grad: "from-red-500 to-rose-500" },
-  EQUITY:    { label: "Equity",    color: "text-primary",    bg: "bg-primary/10",    grad: "from-primary to-primary/80" },
+  ASSET:     { label: "Asset",     color: "text-success-text", bg: "bg-success/10", grad: "from-emerald-500 to-teal-500" },
+  LIABILITY: { label: "Liability", color: "text-destructive-text",     bg: "bg-destructive/10",     grad: "from-red-500 to-rose-500" },
+  EQUITY:    { label: "Equity",    color: "text-primary-text",    bg: "bg-primary/10",    grad: "from-primary to-primary/80" },
   REVENUE:   { label: "Revenue",   color: "text-violet-600",  bg: "bg-violet-500/10", grad: "from-violet-500 to-purple-500" },
-  EXPENSE:   { label: "Expense",   color: "text-amber-600",   bg: "bg-amber-500/10",  grad: "from-amber-500 to-orange-500" },
+  EXPENSE:   { label: "Expense",   color: "text-warning-text",   bg: "bg-warning/10",  grad: "from-amber-500 to-orange-500" },
 };
 
 // ── Expense Modal ────────────────────────────────────────────────────────────
@@ -310,7 +310,7 @@ function JournalModal({ accounts, onClose, onSaved }: { accounts: Account[]; onC
                   </div>
                   <div className="col-span-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={line.amount} onChange={(e) => setLines((p) => p.map((l, j) => j === i ? { ...l, amount: e.target.value } : l))} /></div>
                   <div className="col-span-1"><Input className="h-7 text-xs" placeholder="…" value={line.description} onChange={(e) => setLines((p) => p.map((l, j) => j === i ? { ...l, description: e.target.value } : l))} /></div>
-                  <button className="col-span-1 flex justify-center hover:text-red-500" onClick={() => setLines((p) => p.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5" /></button>
+                  <button className="col-span-1 flex justify-center hover:text-destructive-text" onClick={() => setLines((p) => p.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5" /></button>
                 </div>
               ))}
             </div>
@@ -528,7 +528,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
     { accessorKey: "categoryId",   header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,   cell: ({ row }) => { const cat = normalizeExpenseCategory(row.original.categoryId); const idx = EXPENSE_CATEGORIES.indexOf(cat as (typeof EXPENSE_CATEGORIES)[number]); return <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-muted"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: CAT_COLORS[idx % CAT_COLORS.length] }} />{cat}</span>; } },
     { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.paymentMethod?.replace(/_/g," ")}</span> },
     { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,      cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK",{ day:"2-digit",month:"short",year:"numeric" })}</span> },
-    { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,    cell: ({ row }) => <span className="font-bold text-red-500 text-sm">LKR {formatNumber(row.original.amount)}</span> },
+    { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,    cell: ({ row }) => <span className="font-bold text-destructive-text text-sm">LKR {formatNumber(row.original.amount)}</span> },
     { id: "actions", cell: ({ row }) => <TableActionsRow dropMoreActions={[{ text: "Edit", function: () => setEditExpense(row.original) }, { text: "Delete", function: () => deleteExpense(row.original.id) }]} /> },
   ];
   const journalCols: ColumnDef<JournalEntry>[] = [
@@ -573,8 +573,8 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     </div>
                     <p className="text-xl font-bold text-foreground">LKR {formatNumber(Math.abs(kpi.value))}</p>
                     <div className="flex items-center gap-1 mt-1.5">
-                      {kpi.up ? <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <ArrowDownRight className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-                      <span className={`text-xs font-medium ${kpi.up ? "text-emerald-600" : "text-red-500"}`}>{kpi.change}</span>
+                      {kpi.up ? <ArrowUpRight className="h-3.5 w-3.5 text-success-text shrink-0" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive-text shrink-0" />}
+                      <span className={`text-xs font-medium ${kpi.up ? "text-success-text" : "text-destructive-text"}`}>{kpi.change}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -686,8 +686,8 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                             <td className="px-4 py-3 text-xs text-blue-600 font-medium whitespace-nowrap">{exp.reference || "—"}</td>
                             <td className="px-4 py-3 text-xs text-foreground max-w-[160px] truncate">{exp.description}</td>
                             <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{exp.categoryId || "General"}</td>
-                            <td className="px-4 py-3"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">Expense</span></td>
-                            <td className="px-4 py-3 text-xs font-semibold text-red-500 text-right whitespace-nowrap">−{formatNumber(exp.amount)}</td>
+                            <td className="px-4 py-3"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-destructive-text">Expense</span></td>
+                            <td className="px-4 py-3 text-xs font-semibold text-destructive-text text-right whitespace-nowrap">−{formatNumber(exp.amount)}</td>
                           </tr>
                         )) : (
                           <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No recent transactions</td></tr>
@@ -833,10 +833,10 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                           <span className="col-span-1 font-mono text-xs text-muted-foreground">{acct.code}</span>
                           <span className="col-span-4 text-sm font-medium">{acct.name}</span>
                           <span className="col-span-4 text-xs text-muted-foreground hidden lg:block truncate">{acct.description ?? "—"}</span>
-                          <span className={`col-span-2 font-bold text-sm text-right ${acct.balance < 0 ? "text-red-500" : acct.balance === 0 ? "text-muted-foreground" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</span>
+                          <span className={`col-span-2 font-bold text-sm text-right ${acct.balance < 0 ? "text-destructive-text" : acct.balance === 0 ? "text-muted-foreground" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</span>
                           <div className="col-span-1 flex items-center justify-end gap-1">
                             <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600 transition-colors"><Pencil className="h-3 w-3" /></button>
-                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3" /></button>
+                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-destructive-text transition-colors"><Trash2 className="h-3 w-3" /></button>
                           </div>
                         </div>
                       ))}
@@ -865,7 +865,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                 <Card className="lg:col-span-7 bg-card shadow-sm border">
                   <CardContent className="p-8">
                     <div className="text-center mb-8">
-                      <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-3">
+                      <div className="inline-flex items-center gap-2 bg-primary/10 text-primary-text px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-3">
                         <FileText className="h-3.5 w-3.5" /> PROFIT &amp; LOSS STATEMENT
                       </div>
                       <p className="text-sm font-medium">{pl.period.startDate} — {pl.period.endDate}</p>
@@ -873,11 +873,11 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     </div>
                     <div className="mb-5">
                       <div className="flex items-center gap-2 mb-3"><div className="h-px flex-1 bg-border" /><span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase px-2">Revenue</span><div className="h-px flex-1 bg-border" /></div>
-                      <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-4 space-y-2">
+                      <div className="bg-success/5 border border-success/15 rounded-xl p-4 space-y-2">
                         <div className="flex justify-between text-sm"><span className="text-muted-foreground">Gross Sales Revenue</span><span className="font-semibold">LKR {formatNumber(pl.revenue.gross)}</span></div>
-                        {pl.revenue.returns > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Less: Returns &amp; Refunds</span><span className="text-red-500">− LKR {formatNumber(pl.revenue.returns)}</span></div>}
-                        <div className="h-px bg-emerald-500/20" />
-                        <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-emerald-600">LKR {formatNumber(pl.revenue.net)}</span></div>
+                        {pl.revenue.returns > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Less: Returns &amp; Refunds</span><span className="text-destructive-text">− LKR {formatNumber(pl.revenue.returns)}</span></div>}
+                        <div className="h-px bg-success/20" />
+                        <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-success-text">LKR {formatNumber(pl.revenue.net)}</span></div>
                       </div>
                     </div>
                     {(pl.costOfGoodsSold != null || pl.grossProfit != null) && (
@@ -892,23 +892,23 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     )}
                     <div className="mb-5">
                       <div className="flex items-center gap-2 mb-3"><div className="h-px flex-1 bg-border" /><span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase px-2">Expenses</span><div className="h-px flex-1 bg-border" /></div>
-                      <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4 space-y-2">
-                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Operating Expenses <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded">{pl.expenses.count}</span></span><span className="text-red-500 font-semibold">LKR {formatNumber(pl.expenses.total)}</span></div>
+                      <div className="bg-destructive/5 border border-destructive/15 rounded-xl p-4 space-y-2">
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Operating Expenses <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded">{pl.expenses.count}</span></span><span className="text-destructive-text font-semibold">LKR {formatNumber(pl.expenses.total)}</span></div>
                         {(pl.expenses.byCategory ?? []).slice(0, 5).map((c) => (
                           <div key={c.name} className="flex justify-between text-xs text-muted-foreground pl-2">
                             <span>{c.name}</span><span>LKR {formatNumber(c.amount)}</span>
                           </div>
                         ))}
-                        <div className="h-px bg-red-500/20" />
-                        <div className="flex justify-between text-sm font-bold"><span>Total Expenses</span><span className="text-red-600">LKR {formatNumber(pl.expenses.total)}</span></div>
+                        <div className="h-px bg-destructive/20" />
+                        <div className="flex justify-between text-sm font-bold"><span>Total Expenses</span><span className="text-destructive-text">LKR {formatNumber(pl.expenses.total)}</span></div>
                       </div>
                     </div>
-                    <div className={`rounded-2xl p-5 ${pl.netProfit >= 0 ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20" : "bg-gradient-to-br from-red-500/10 to-rose-500/5 border border-red-500/20"}`}>
+                    <div className={`rounded-2xl p-5 ${pl.netProfit >= 0 ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-success/20" : "bg-gradient-to-br from-red-500/10 to-rose-500/5 border border-destructive/20"}`}>
                       <div className="flex justify-between items-start">
                         <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{pl.netProfit >= 0 ? "Net Profit" : "Net Loss"}</p>
-                          <p className={`text-3xl font-bold ${pl.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>LKR {formatNumber(Math.abs(pl.netProfit))}</p></div>
+                          <p className={`text-3xl font-bold ${pl.netProfit >= 0 ? "text-success-text" : "text-destructive-text"}`}>LKR {formatNumber(Math.abs(pl.netProfit))}</p></div>
                         <div className="text-right"><p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Profit Margin</p>
-                          <p className={`text-2xl font-bold ${pl.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{pl.profitMargin}%</p></div>
+                          <p className={`text-2xl font-bold ${pl.netProfit >= 0 ? "text-success-text" : "text-destructive-text"}`}>{pl.profitMargin}%</p></div>
                       </div>
                       {pl.revenue.net > 0 && (
                         <div className="mt-4">
@@ -939,7 +939,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     <Card className="bg-card shadow-sm border">
                       <CardHeader className="pb-2"><CardTitle className="text-sm">Cash Flow Summary</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
-                        {[{ label: "Total Inflow", value: cashFlow.totalInflow, color: "text-emerald-600" }, { label: "Total Outflow", value: cashFlow.totalOutflow, color: "text-red-500" }].map((row) => (
+                        {[{ label: "Total Inflow", value: cashFlow.totalInflow, color: "text-success-text" }, { label: "Total Outflow", value: cashFlow.totalOutflow, color: "text-destructive-text" }].map((row) => (
                           <div key={row.label} className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">{row.label}</span>
                             <span className={`font-bold ${row.color}`}>LKR {formatNumber(row.value)}</span>
@@ -964,7 +964,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                         <div className="h-px bg-border" />
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-semibold">{cashFlow.totalInflow - cashFlow.totalOutflow >= 0 ? "Net Surplus" : "Net Deficit"}</span>
-                          <span className={`font-bold text-base ${cashFlow.totalInflow - cashFlow.totalOutflow >= 0 ? "text-emerald-600" : "text-red-500"}`}>LKR {formatNumber(Math.abs(cashFlow.totalInflow - cashFlow.totalOutflow))}</span>
+                          <span className={`font-bold text-base ${cashFlow.totalInflow - cashFlow.totalOutflow >= 0 ? "text-success-text" : "text-destructive-text"}`}>LKR {formatNumber(Math.abs(cashFlow.totalInflow - cashFlow.totalOutflow))}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -1020,12 +1020,12 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                           </div>
                           <div className="flex gap-1">
                             <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600"><Pencil className="h-3 w-3" /></button>
-                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
+                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-destructive-text"><Trash2 className="h-3 w-3" /></button>
                           </div>
                         </div>
-                        <p className={`text-xl font-bold ${acct.balance < 0 ? "text-red-500" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</p>
+                        <p className={`text-xl font-bold ${acct.balance < 0 ? "text-destructive-text" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</p>
                         <p className="text-xs text-muted-foreground mt-1">{acct.description || "Asset Account"}</p>
-                        <div className={`mt-3 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${acct.balance >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
+                        <div className={`mt-3 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${acct.balance >= 0 ? "bg-emerald-50 text-success-text" : "bg-red-50 text-destructive-text"}`}>
                           {acct.balance >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                           {acct.balance >= 0 ? "Positive" : "Negative"} balance
                         </div>
@@ -1064,13 +1064,13 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     {(apData?.suppliers ?? []).slice(0, 4).map((s) => (
                       <div key={s.id} className="flex justify-between text-xs border-b pb-1.5">
                         <span className="truncate flex-1">{s.name}</span>
-                        <span className="font-semibold text-red-600 shrink-0 ml-2">LKR {formatNumber(s.balance)}</span>
+                        <span className="font-semibold text-destructive-text shrink-0 ml-2">LKR {formatNumber(s.balance)}</span>
                       </div>
                     ))}
                     {(apData?.unpaidPurchaseOrders ?? []).slice(0, 4).map((po) => (
                       <div key={po.poNumber} className="flex justify-between text-xs border-b pb-1.5">
                         <span className="truncate flex-1">{po.poNumber} · {po.supplier.name}</span>
-                        <span className="font-semibold text-red-600 shrink-0 ml-2">LKR {formatNumber(po.balanceDue)}</span>
+                        <span className="font-semibold text-destructive-text shrink-0 ml-2">LKR {formatNumber(po.balanceDue)}</span>
                       </div>
                     ))}
                     {!apData?.suppliers.length && !apData?.unpaidPurchaseOrders.length && (

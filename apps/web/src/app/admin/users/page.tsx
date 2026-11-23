@@ -152,7 +152,7 @@ function UsersPageContent() {
               variant="ghost"
               size="icon-sm"
               onClick={() => void toggleStatus(u)}
-              className={u.status === 'ACTIVE' ? 'text-amber-500 hover:bg-amber-500/10' : 'text-emerald-500 hover:bg-emerald-500/10'}
+              className={u.status === 'ACTIVE' ? 'text-warning-text hover:bg-warning/10' : 'text-success-text hover:bg-success/10'}
               title={u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
             >
               {u.status === 'ACTIVE' ? <UserX size={13} /> : <UserCheck size={13} />}
@@ -162,7 +162,7 @@ function UsersPageContent() {
               variant="ghost"
               size="icon-sm"
               onClick={() => setConfirmDelete(u)}
-              className="text-red-400 hover:bg-red-500/10"
+              className="text-red-400 hover:bg-destructive/10"
               title="Delete"
             >
               <Trash2 size={13} />
@@ -216,8 +216,8 @@ function UsersPageContent() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className={cn(ADMIN_MODAL_PANEL, 'max-w-sm')}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center">
-                <Trash2 size={16} className="text-red-600 dark:text-red-400" />
+              <div className="w-10 h-10 bg-destructive/10 rounded-xl flex items-center justify-center">
+                <Trash2 size={16} className="text-destructive-text" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-foreground">Delete User</h3>

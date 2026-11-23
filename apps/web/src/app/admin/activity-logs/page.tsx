@@ -33,9 +33,9 @@ const SEV_ICON: Record<string, React.ElementType> = {
   ERROR: AlertCircle,
 }
 const SEV_TEXT: Record<string, string> = {
-  INFO: 'text-primary bg-primary/10',
-  WARN: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
-  ERROR: 'text-red-600 dark:text-red-400 bg-red-500/10',
+  INFO: 'text-primary-text bg-primary/10',
+  WARN: 'text-warning-text bg-warning/10',
+  ERROR: 'text-destructive-text bg-destructive/10',
 }
 
 type LogRow = AuditLogRow & { _severity: 'INFO' | 'WARN' | 'ERROR'; _actor: string }
@@ -150,7 +150,7 @@ export default function ActivityLogsPage() {
       />
 
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>
+        <p className="text-xs text-destructive-text bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">{error}</p>
       )}
 
       <PageKpiGrid items={kpis} loading={loading} cols={4} />

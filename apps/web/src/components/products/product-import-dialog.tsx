@@ -110,9 +110,9 @@ export function ProductImportDialog({ file, onClose, onImported }: { file: File 
   const failed = results?.filter((r) => r.status === "ERROR").length ?? 0;
 
   const statusBadge = (s: PreviewRow["status"]) =>
-    s === "OK" ? <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />Valid</span>
-      : s === "DUPLICATE" ? <span className="inline-flex items-center gap-1 text-amber-600"><AlertTriangle className="h-3.5 w-3.5" />Duplicate</span>
-        : <span className="inline-flex items-center gap-1 text-rose-600"><XCircle className="h-3.5 w-3.5" />Error</span>;
+    s === "OK" ? <span className="inline-flex items-center gap-1 text-success-text"><CheckCircle2 className="h-3.5 w-3.5" />Valid</span>
+      : s === "DUPLICATE" ? <span className="inline-flex items-center gap-1 text-warning-text"><AlertTriangle className="h-3.5 w-3.5" />Duplicate</span>
+        : <span className="inline-flex items-center gap-1 text-destructive-text"><XCircle className="h-3.5 w-3.5" />Error</span>;
 
   return (
     <Dialog open={!!file} onOpenChange={(o) => { if (!o && !importing) onClose(); }}>
@@ -123,7 +123,7 @@ export function ProductImportDialog({ file, onClose, onImported }: { file: File 
         </DialogHeader>
 
         {loading && <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Checking every row…</div>}
-        {loadError && <p className="py-6 text-sm text-destructive" role="alert">{loadError}</p>}
+        {loadError && <p className="py-6 text-sm text-destructive-text" role="alert">{loadError}</p>}
 
         {preview && !results && (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -185,7 +185,7 @@ export function ProductImportDialog({ file, onClose, onImported }: { file: File 
                       <td className="px-2 py-1.5 font-mono">{r.barcode ?? "—"}</td>
                       <td className="px-2 py-1.5">{r.category ?? "—"}</td>
                       <td className="px-2 py-1.5">
-                        {r.errors.map((e) => <div key={e} className={r.status === "DUPLICATE" ? "text-amber-700 dark:text-amber-400" : "text-rose-600"}>{e}</div>)}
+                        {r.errors.map((e) => <div key={e} className={r.status === "DUPLICATE" ? "text-warning-text" : "text-destructive-text"}>{e}</div>)}
                         {r.warnings.map((w) => <div key={w} className="text-muted-foreground">{w}</div>)}
                       </td>
                     </tr>

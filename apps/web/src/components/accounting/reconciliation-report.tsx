@@ -25,10 +25,10 @@ type Report = {
 };
 
 const statusClass: Record<Status, string> = {
-  OK: "bg-emerald-500/10 text-emerald-700",
-  MISMATCH: "bg-red-500/10 text-red-700",
+  OK: "bg-success/10 text-success-text",
+  MISMATCH: "bg-destructive/10 text-destructive-text",
   NOT_CHECKED: "bg-slate-500/10 text-slate-700",
-  DECISION_REQUIRED: "bg-amber-500/10 text-amber-700",
+  DECISION_REQUIRED: "bg-warning/10 text-warning-text",
 };
 
 export function ReconciliationReport() {

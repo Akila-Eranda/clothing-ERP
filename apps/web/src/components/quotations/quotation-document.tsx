@@ -50,7 +50,7 @@ export function QuotationDocument({ quote }: Props) {
             <p className="inline-block mt-2 px-3 py-1.5 bg-teal-50 border border-teal-200 rounded-lg text-xs font-semibold font-mono text-teal-800">
               #{quote.quoteNumber}
             </p>
-            <p className="mt-2 inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700">
+            <p className="mt-2 inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-success-text">
               {quote.status.replace(/_/g, ' ')}
             </p>
           </div>

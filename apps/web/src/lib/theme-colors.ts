@@ -3,6 +3,9 @@
  * Values stored as hex; applied as HSL channels on :root CSS variables.
  */
 
+import { deriveAccentText, deriveOnColor, deriveControlBorder, deriveStatusTokens, toChannels, type StatusKind } from "./semantic-colors.ts";
+import { hslChannelsToRgb } from "./wcag.ts";
+import { resolveSidebarSkin } from "./sidebar-skin-palette.ts";
 import {
   ACCENT_PRESETS,
   ACCENT_STORAGE_KEY,
@@ -13,6 +16,8 @@ import {
 import {
   getSidebarSkinChromePatch,
   getTopbarSkinChromePatch,
+  SIDEBAR_SKIN_SWATCHES,
+  topbarSkinToSidebarSkin,
   type SidebarSkin,
   type TopbarSkin,
 } from "@/lib/theme-layout";
@@ -88,13 +93,13 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   lightCard: "#FFFFFF",
   lightForeground: "#1F2937",
   lightBorder: "#E5E7EB",
-  lightMutedForeground: "#64748B",
+  lightMutedForeground: "#5F6F85", // AA (4.77:1) on the #F5F7FA page background; the former #64748B was 4.43:1
 
   darkBackground: "#0D0D0D",
   darkCard: "#171717",
   darkForeground: "#D8DFEE",
   darkBorder: "#1F2228",
-  darkMutedForeground: "#6B7280",
+  darkMutedForeground: "#9AA3B2", // AA (≥7:1) on the dark card; the former #6B7280 was 3.7:1
 
   darkChromeBg: "#0D0D0D",
   darkChromeFg: "#D8DFEE",
@@ -129,6 +134,14 @@ export function normalizeThemeColorsState(
   const bg = merged.lightBackground?.trim().toLowerCase();
   if (!bg || LEGACY_LIGHT_CANVAS.has(bg)) {
     merged.lightBackground = DEFAULT_THEME_COLORS.lightBackground;
+  }
+  // Migrate the former dark default (3.7:1 on the dark card); any custom value is left untouched.
+  if (merged.darkMutedForeground?.trim().toLowerCase() === "#6b7280") {
+    merged.darkMutedForeground = DEFAULT_THEME_COLORS.darkMutedForeground;
+  }
+  // Migrate the former light default (failed AA on the page background); any custom value is left untouched.
+  if (merged.lightMutedForeground?.trim().toLowerCase() === "#64748b") {
+    merged.lightMutedForeground = DEFAULT_THEME_COLORS.lightMutedForeground;
   }
   merged.buttonSecondary ??= DEFAULT_THEME_COLORS.buttonSecondary;
   merged.buttonSecondaryHover ??= DEFAULT_THEME_COLORS.buttonSecondaryHover;
@@ -300,7 +313,14 @@ function resolveSidebarChrome(state: ThemeColorsState, isDark: boolean): ChromeT
 
 function resolveTopbarChrome(state: ThemeColorsState, isDark: boolean): ChromeTokens {
   const skin = (document.documentElement.dataset.topbar ?? "white") as TopbarSkin;
-  return chromeFromPatch(getTopbarSkinChromePatch(skin, isDark), state, isDark);
+  const chrome = chromeFromPatch(getTopbarSkinChromePatch(skin, isDark), state, isDark);
+  // Coloured topbar skins: foreground/muted/border come from the measured gradient (WCAG AA), not a fixed white.
+  const css = SIDEBAR_SKIN_SWATCHES.find((s) => s.id === topbarSkinToSidebarSkin(skin))?.css;
+  if (css && skin !== "white" && skin !== "topbarcolorone") {
+    const r = resolveSidebarSkin(css);
+    return { ...chrome, bg: r.css, fg: r.fg, muted: r.muted, border: r.border, active: r.activeFg, hover: r.hover, activeBg: r.activeBg };
+  }
+  return chrome;
 }
 
 /** Apply all customizable system colors to :root. */
@@ -349,7 +369,6 @@ export function applyThemeColors(state: ThemeColorsState) {
   root.style.setProperty("--secondary-foreground", fg);
   root.style.setProperty("--border", border);
   root.style.setProperty("--border-hsl", border);
-  root.style.setProperty("--input", input);
   root.style.setProperty("--divider", adjustHslLightness(border, isDark ? -1 : 3));
   root.style.setProperty("--line", border);
   root.style.setProperty("--header-background", bg);
@@ -398,6 +417,7 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
     root.style.setProperty("--retail-topbar-border", topbarChrome.border);
     root.style.setProperty("--retail-topbar-muted", topbarChrome.muted);
+    root.style.setProperty("--retail-topbar-hover", topbarChrome.hover);
 
     root.style.setProperty("--chrome-bg", sidebarChrome.bg);
     root.style.setProperty("--chrome-fg", sidebarChrome.fg);
@@ -430,6 +450,7 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
     root.style.setProperty("--retail-topbar-border", topbarChrome.border);
     root.style.setProperty("--retail-topbar-muted", topbarChrome.muted);
+    root.style.setProperty("--retail-topbar-hover", topbarChrome.hover);
 
     root.style.setProperty("--chrome-bg", sidebarChrome.bg);
     root.style.setProperty("--chrome-fg", sidebarChrome.fg);
@@ -470,10 +491,28 @@ export function applyThemeColors(state: ThemeColorsState) {
   root.style.setProperty("--btn-destructive", hexToHslChannels(state.buttonDestructive));
   root.style.setProperty("--btn-info", hexToHslChannels(state.buttonInfo));
 
-  root.style.setProperty("--success", hexToHslChannels(state.buttonSuccess));
-  root.style.setProperty("--destructive", hexToHslChannels(state.buttonDestructive));
-  root.style.setProperty("--warning", hexToHslChannels(state.buttonWarning));
-  root.style.setProperty("--info", hexToHslChannels(state.buttonInfo));
+  /* Status colours: the customizer value is the identity; AA-safe fill / foreground / text / hover are derived from it. */
+  const surfaceRgb = hslChannelsToRgb(card);
+  const statusSources: Array<[StatusKind, string]> = [
+    ["success", state.buttonSuccess],
+    ["destructive", state.buttonDestructive],
+    ["warning", state.buttonWarning],
+    ["info", state.buttonInfo],
+  ];
+  for (const [kind, hex] of statusSources) {
+    const t = deriveStatusTokens(hex, kind, isDark, surfaceRgb);
+    root.style.setProperty(`--${kind}`, toChannels(t.fill));
+    root.style.setProperty(`--${kind}-foreground`, toChannels(t.foreground));
+    root.style.setProperty(`--${kind}-hover`, toChannels(t.hover));
+    root.style.setProperty(`--${kind}-text`, toChannels(t.text));
+    root.style.setProperty(`--${kind}-border`, t.border);
+  }
+  /* Text on the accent fill (buttons): white when it passes AA, otherwise dark slate (custom yellow/cyan accents). */
+  root.style.setProperty("--primary-foreground", toChannels(deriveOnColor(hslChannelsToRgb(accentHsl))));
+  /* Brand accent used as text (links, active labels): AA on the card and on its own tint. */
+  root.style.setProperty("--primary-text", "--primary-foreground", toChannels(deriveAccentText(hslChannelsToRgb(accentHsl), isDark, surfaceRgb)));
+  /* Interactive-control boundary (>= 3:1 vs the card); --border stays soft for cards and dividers. */
+  root.style.setProperty("--input", toChannels(deriveControlBorder(surfaceRgb, isDark)));
 
   root.dataset.accent = resolveAccentId(state, isDark);
 }
@@ -521,7 +560,7 @@ export function clearThemeColorOverrides() {
     "--retail-sidebar-bg", "--retail-sidebar-fg", "--retail-sidebar-muted",
     "--retail-sidebar-border", "--retail-sidebar-hover",
     "--retail-sidebar-active-bg", "--retail-sidebar-active-fg",
-    "--retail-topbar-bg", "--retail-topbar-fg", "--retail-topbar-border",
+    "--retail-topbar-bg", "--retail-topbar-fg", "--retail-topbar-border", "--retail-topbar-muted", "--retail-topbar-hover",
     "--chrome-bg", "--chrome-fg", "--chrome-border", "--chrome-muted",
     "--chrome-active-fg", "--chrome-active-bg", "--chrome-hover", "--chrome-logo-bg",
     "--tc-background", "--tc-foreground", "--tc-card", "--tc-card-foreground",
@@ -530,6 +569,8 @@ export function clearThemeColorOverrides() {
     "--tc-accent-foreground", "--tc-border", "--tc-input", "--tc-ring",
     "--btn-primary", "--btn-primary-hover", "--btn-secondary", "--btn-secondary-hover",
     "--btn-success", "--btn-danger", "--btn-warning", "--btn-destructive", "--btn-info",
+    "--success", "--warning", "--destructive", "--info", "--primary-text",
+    ...(["success", "warning", "destructive", "info"] as const).flatMap((k) => [`--${k}-foreground`, `--${k}-hover`, `--${k}-text`, `--${k}-border`]),
   ];
   for (const prop of props) root.style.removeProperty(prop);
 }

@@ -456,7 +456,7 @@ export default function TenantDetailPage() {
               )}
             </div>
             {tenant.trialEndsAt && (
-              <div className={`p-3 rounded-lg text-sm ${new Date(tenant.trialEndsAt) < new Date() ? 'bg-red-500/10 text-red-700' : 'bg-primary/10 text-primary'}`}>
+              <div className={`p-3 rounded-lg text-sm ${new Date(tenant.trialEndsAt) < new Date() ? 'bg-destructive/10 text-destructive-text' : 'bg-primary/10 text-primary-text'}`}>
                 Trial ends: {fmtDate(tenant.trialEndsAt)}
               </div>
             )}
@@ -491,7 +491,7 @@ export default function TenantDetailPage() {
             <ul className="space-y-2">
               {(currentPlan?.features ?? []).map(f => (
                 <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle size={14} className="text-green-500 shrink-0" /> {f}
+                  <CheckCircle size={14} className="text-success-text shrink-0" /> {f}
                 </li>
               ))}
             </ul>
@@ -578,7 +578,7 @@ export default function TenantDetailPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-amber-700 dark:text-amber-400"
+                  className="gap-1.5 text-warning-text"
                   disabled={supportBusy === 'revoke'}
                   onClick={() => void handleRevokeSessions()}
                 >
@@ -631,7 +631,7 @@ export default function TenantDetailPage() {
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="text-red-500"
+                      className="text-destructive-text"
                       disabled={supportBusy === `note-${n.id}`}
                       onClick={() => void handleDeleteNote(n)}
                     >

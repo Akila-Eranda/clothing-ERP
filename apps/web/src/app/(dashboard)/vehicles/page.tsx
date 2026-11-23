@@ -82,8 +82,8 @@ function buildModelColumns(): ColumnDef<VehicleModel>[] {
         const m = row.original;
         return (
           <div className="flex items-center gap-2.5 min-w-[160px]">
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <Car className="h-4 w-4 text-emerald-600" />
+            <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+              <Car className="h-4 w-4 text-success-text" />
             </div>
             <div>
               <p className="text-sm font-semibold">{m.brand.name} {m.name}</p>
@@ -160,7 +160,7 @@ function buildPartColumns(
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+          className="h-8 text-destructive-text hover:text-destructive-text hover:bg-red-50"
           disabled={deleting === row.original.compatibilityId}
           onClick={() => onDelete(row.original.compatibilityId)}
         >
@@ -321,9 +321,9 @@ export default function VehiclesPage() {
 
   const STATS = [
     { label: "Vehicle Brands", value: brands.length, icon: Building2, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "Vehicle Models", value: models.length, icon: Car, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Vehicle Models", value: models.length, icon: Car, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
     { label: "Part Mappings", value: totalMappings, icon: Link2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
-    { label: "Models w/ Parts", value: modelsWithParts, icon: Package, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Models w/ Parts", value: modelsWithParts, icon: Package, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
   ];
 
   const brandColumns = useMemo(() => buildBrandColumns(), []);
@@ -453,8 +453,8 @@ export default function VehiclesPage() {
           ) : parts.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
-                <div className="p-4 rounded-2xl bg-amber-500/10">
-                  <Package className="h-10 w-10 text-amber-500" />
+                <div className="p-4 rounded-2xl bg-warning/10">
+                  <Package className="h-10 w-10 text-warning-text" />
                 </div>
                 <p className="text-base font-semibold">No matching parts</p>
                 <p className="text-sm text-muted-foreground text-center max-w-sm">
@@ -499,7 +499,7 @@ export default function VehiclesPage() {
             <Card>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Cog className="h-4 w-4 text-emerald-600" />
+                  <Cog className="h-4 w-4 text-success-text" />
                   <p className="text-sm font-semibold">Add Vehicle Model</p>
                 </div>
                 <Select value={modelForm.brandId} onValueChange={(v) => setModelForm((f) => ({ ...f, brandId: v }))}>
@@ -628,7 +628,7 @@ export default function VehiclesPage() {
             title={g.desc}
             className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium max-w-full"
           >
-            <Car className="h-3.5 w-3.5 text-emerald-600 shrink-0" strokeWidth={1.75} />
+            <Car className="h-3.5 w-3.5 text-success-text shrink-0" strokeWidth={1.75} />
             <span className="font-semibold text-foreground shrink-0">{g.title}</span>
             <span className="text-muted-foreground truncate hidden sm:inline">{g.desc}</span>
           </div>

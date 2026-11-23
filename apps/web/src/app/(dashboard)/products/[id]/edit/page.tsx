@@ -514,7 +514,7 @@ export default function EditProductPage() {
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-semibold">Product Name <span className="text-destructive">*</span></Label>
+                <Label className="text-xs font-semibold">Product Name <span className="text-destructive-text">*</span></Label>
                 <Input placeholder="e.g. Premium Cotton T-Shirt" value={form.name} maxLength={120}
                   onChange={(e) => set("name", e.target.value)} />
               </div>
@@ -624,21 +624,21 @@ export default function EditProductPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      Selling Price <span className="text-destructive">*</span>
+                      Selling Price <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
                       onChange={(e) => set("sellingPrice", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      Cost Price <span className="text-destructive">*</span>
+                      Cost Price <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
                       onChange={(e) => set("costPrice", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">
-                      MRP <span className="text-destructive">*</span>
+                      MRP <span className="text-destructive-text">*</span>
                     </Label>
                     <Input type="number" min="0" placeholder="0.00" value={form.mrp}
                       onChange={(e) => set("mrp", e.target.value)} />
@@ -655,8 +655,8 @@ export default function EditProductPage() {
                 </div>
                 {form.sellingPrice && form.costPrice && (
                   <div className="flex gap-6 pt-1 text-sm border-t mt-2">
-                    <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
-                    <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+                    <span className="text-muted-foreground">Gross Margin: <strong className="text-success-text">LKR {(sp - cp).toFixed(2)}</strong></span>
+                    <span className="text-muted-foreground">Margin %: <strong className="text-success-text">{margin}%</strong></span>
                   </div>
                 )}
               </>
@@ -827,7 +827,7 @@ export default function EditProductPage() {
                               <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} /></td>
                               <td className="px-2 py-2">
                                 <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive-text">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </td>
@@ -839,7 +839,7 @@ export default function EditProductPage() {
                   </div>
                   <div className="px-4 py-2.5 border-t bg-muted/10 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{variantRows.filter((r) => r.active).length} / {variantRows.length} active</span>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive hover:text-destructive gap-1"
+                    <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive-text hover:text-destructive-text gap-1"
                       onClick={() => setVariantRows([])}>
                       <Trash2 className="h-3 w-3" /> Clear All
                     </Button>
@@ -914,7 +914,7 @@ export default function EditProductPage() {
                           <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
                             {hex && <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: hex }} />}
                             {v}
-                            <button className="hover:text-destructive ml-0.5"
+                            <button className="hover:text-destructive-text ml-0.5"
                               onClick={(e) => { e.stopPropagation(); set("attributes", form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) })); }}>
                               <X className="h-3 w-3" />
                             </button>

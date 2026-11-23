@@ -1121,7 +1121,7 @@ export default function CreatePOPage() {
         {fromGrnId && fromGrnNumber && !grnPrefillLoading && (
           <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-success-text">
                 Stock already posted
               </p>
               <p className="mt-0.5 text-sm">
@@ -1462,7 +1462,7 @@ export default function CreatePOPage() {
                                     className={cn(
                                       "inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 font-semibold",
                                       FORM_ACCENT_TEXT,
-                                      stock !== null && stock < 0 && "text-rose-600 dark:text-rose-400",
+                                      stock !== null && stock < 0 && "text-destructive-text",
                                       "hover:bg-primary/10",
                                     )}
                                     title="Change stock balance"
@@ -1470,7 +1470,7 @@ export default function CreatePOPage() {
                                     <Scale className="h-3 w-3" /> Stock preview {stock ?? "—"}
                                   </button>
                                 ) : (
-                                  <span className={cn(stock !== null && stock < 0 && "font-semibold text-rose-600 dark:text-rose-400")}>
+                                  <span className={cn(stock !== null && stock < 0 && "font-semibold text-destructive-text")}>
                                     Stock preview {stock ?? "—"}
                                   </span>
                                 )}
@@ -1491,7 +1491,7 @@ export default function CreatePOPage() {
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); removeRow(idx); }}
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-text"
                                 aria-label="Remove row"
                                 disabled={saving}
                               >
@@ -1681,10 +1681,10 @@ export default function CreatePOPage() {
                       const status = v?.status ?? (stock !== null ? (stock <= 0 ? "out_of_stock" : stock < 5 ? "low_stock" : "in_stock") : "unknown");
                       const statusPill =
                         status === "in_stock"
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                          ? "bg-success/10 text-success-text border-success/20"
                           : status === "low_stock"
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
-                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
+                            ? "bg-warning/10 text-warning-text border-warning/20"
+                            : "bg-destructive/10 text-destructive-text border-destructive/20";
 
                       return (
                         <tr
@@ -1796,7 +1796,7 @@ export default function CreatePOPage() {
                           </td>
                           <td className={cn(
                             "px-3 py-3 text-right font-semibold tabular-nums",
-                            stock !== null && stock < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground",
+                            stock !== null && stock < 0 ? "text-destructive-text" : "text-foreground",
                           )} onClick={(e) => { if (canBalanceStock) e.stopPropagation(); }}>
                             {canBalanceStock && item.variantId ? (
                               <button
@@ -1805,7 +1805,7 @@ export default function CreatePOPage() {
                                 className={cn(
                                   "inline-flex items-center gap-1 rounded-md border border-primary/30 px-1.5 py-0.5 tabular-nums",
                                   FORM_ACCENT_TEXT,
-                                  stock !== null && stock < 0 && "text-rose-600 dark:text-rose-400",
+                                  stock !== null && stock < 0 && "text-destructive-text",
                                   "hover:bg-primary/10",
                                 )}
                                 title="Change stock balance"
@@ -1927,7 +1927,7 @@ export default function CreatePOPage() {
                               <button
                                 type="button"
                                 onClick={() => removeRow(idx)}
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-text"
                                 aria-label="Remove row"
                                 disabled={saving}
                               >
@@ -1978,7 +1978,7 @@ export default function CreatePOPage() {
                       Subtotal <strong className="text-foreground">LKR {fmt(subtotal)}</strong>
                     </span>
                     {totalDisc > 0 && (
-                      <span className="tabular-nums text-emerald-600">Discount −LKR {fmt(totalDisc)}</span>
+                      <span className="tabular-nums text-success-text">Discount −LKR {fmt(totalDisc)}</span>
                     )}
                     <span className={cn("text-base font-bold tabular-nums", FORM_ACCENT_TEXT)}>
                       Total LKR {fmt(grandTotal)}

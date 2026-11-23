@@ -118,8 +118,8 @@ const BUCKET_LABELS: Record<string, string> = {
 };
 
 export const FINANCE_SECTION_LINKS = [
-  { href: "/accounting/finance/payable", label: "Payable", description: "Supplier balances & AP aging", icon: Scale, color: "text-amber-500", bg: "bg-amber-500/10" },
-  { href: "/accounting/finance/receivable", label: "Receivable", description: "Customer credit & AR aging", icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  { href: "/accounting/finance/payable", label: "Payable", description: "Supplier balances & AP aging", icon: Scale, color: "text-warning-text", bg: "bg-warning/10" },
+  { href: "/accounting/finance/receivable", label: "Receivable", description: "Customer credit & AR aging", icon: Wallet, color: "text-success-text", bg: "bg-success/10" },
   { href: "/accounting/finance/cash-book", label: "Cash Book", description: "Daily cash movements", icon: BookOpen, color: "text-indigo-500", bg: "bg-indigo-500/10" },
   { href: "/accounting/finance/banks", label: "Banks", description: "Bank accounts & balances", icon: Landmark, color: "text-blue-500", bg: "bg-blue-500/10" },
   { href: "/accounting/finance/cheques", label: "Cheques", description: "Register & track cheques", icon: FileCheck, color: "text-violet-500", bg: "bg-violet-500/10" },
@@ -443,7 +443,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         accessorKey: "debit",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Debit" />,
         cell: ({ row }) => (
-          <span className="text-sm tabular-nums text-emerald-600">
+          <span className="text-sm tabular-nums text-success-text">
             {row.original.debit ? formatNumber(row.original.debit) : "—"}
           </span>
         ),
@@ -453,7 +453,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         accessorKey: "credit",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Credit" />,
         cell: ({ row }) => (
-          <span className="text-sm tabular-nums text-rose-600">
+          <span className="text-sm tabular-nums text-destructive-text">
             {row.original.credit ? formatNumber(row.original.credit) : "—"}
           </span>
         ),
@@ -560,7 +560,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
                 </Button>
               )}
               {c.status !== "BOUNCED" && c.status !== "CLEARED" && (
-                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => setChequeStatus(c.id, "BOUNCED")}>
+                <Button size="sm" variant="outline" className="h-7 text-xs text-destructive-text" onClick={() => setChequeStatus(c.id, "BOUNCED")}>
                   Bounce
                 </Button>
               )}
@@ -725,15 +725,15 @@ export function FinancePageShell({
       label: "Accounts Payable",
       value: `LKR ${formatNumber(ap?.total ?? 0)}`,
       icon: Scale,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
+      color: "text-warning-text",
+      bg: "bg-warning/10",
     },
     {
       label: "Accounts Receivable",
       value: `LKR ${formatNumber(ar?.total ?? 0)}`,
       icon: Wallet,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      color: "text-success-text",
+      bg: "bg-success/10",
     },
     {
       label: "Bank Balances",
@@ -792,8 +792,8 @@ export function FinanceOverviewContent() {
   const { ap, ar, banks, cashBook } = useFinanceHub();
 
   const stats = [
-    { label: "Accounts Payable", value: `LKR ${formatNumber(ap?.total ?? 0)}`, icon: Scale, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Accounts Receivable", value: `LKR ${formatNumber(ar?.total ?? 0)}`, icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Accounts Payable", value: `LKR ${formatNumber(ap?.total ?? 0)}`, icon: Scale, color: "text-warning-text", bg: "bg-warning/10" },
+    { label: "Accounts Receivable", value: `LKR ${formatNumber(ar?.total ?? 0)}`, icon: Wallet, color: "text-success-text", bg: "bg-success/10" },
     { label: "Bank Balances", value: `LKR ${formatNumber(banks.reduce((s, b) => s + b.currentBalance, 0))}`, icon: Landmark, color: "text-blue-500", bg: "bg-blue-500/10" },
     { label: "Cash Book Closing", value: `LKR ${formatNumber(cashBook?.closing ?? 0)}`, icon: CheckCircle2, color: "text-indigo-500", bg: "bg-indigo-500/10" },
   ];

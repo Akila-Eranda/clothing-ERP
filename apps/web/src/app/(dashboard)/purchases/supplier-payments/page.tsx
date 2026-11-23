@@ -466,7 +466,7 @@ export default function SupplierPaymentsPage() {
                 <strong data-testid="selected-due">LKR {formatNumber(selectedDue)}</strong>
               </div>
               {form.supplierId && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2 text-sm" data-testid="supplier-advance-panel">
+                <div className="rounded-xl border border-success/30 bg-success/5 p-3 space-y-2 text-sm" data-testid="supplier-advance-panel">
                   {advanceInfo && (
                     <div className="flex justify-between">
                       <span>Total payable (all bills)</span>
@@ -530,7 +530,7 @@ export default function SupplierPaymentsPage() {
               </div>
 
               {split.excess > 0.009 && (
-                <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2" data-testid="overpayment-box">
+                <div className="rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm space-y-2" data-testid="overpayment-box">
                   <p>
                     This is <strong>LKR {formatNumber(split.excess)}</strong> more than the selected bills owe
                     (LKR {formatNumber(split.toBills)} pays the bills).

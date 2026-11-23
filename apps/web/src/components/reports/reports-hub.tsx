@@ -82,10 +82,10 @@ interface CommSaleRow {
 const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#6366f1"];
 const TIER_CFG: Record<string, { color: string; bg: string }> = {
   DIAMOND:  { color: "text-violet-700", bg: "bg-violet-500/10" },
-  PLATINUM: { color: "text-yellow-700", bg: "bg-yellow-500/10" },
-  GOLD:     { color: "text-amber-600",  bg: "bg-amber-500/10" },
+  PLATINUM: { color: "text-warning-text", bg: "bg-warning/10" },
+  GOLD:     { color: "text-warning-text",  bg: "bg-warning/10" },
   SILVER:   { color: "text-slate-600",  bg: "bg-muted/50" },
-  BRONZE:   { color: "text-orange-700", bg: "bg-orange-500/10" },
+  BRONZE:   { color: "text-warning-text", bg: "bg-warning/10" },
 };
 
 function unwrapRows<T>(data: T[] | { rows?: T[] } | null | undefined): T[] {
@@ -486,8 +486,8 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                     className="block rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                        <Package className="h-5 w-5 text-amber-600" />
+                      <div className="h-10 w-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+                        <Package className="h-5 w-5 text-warning-text" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold">Fashion Reorder</p>
@@ -544,9 +544,9 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                       </ResponsiveContainer>
                       <div className="grid grid-cols-3 gap-2 pt-2 border-t mt-1 text-center">
                         {[
-                          { label: "Inflow",  val: cashFlow.totalInflow,  color: "text-emerald-600" },
-                          { label: "Outflow", val: cashFlow.totalOutflow, color: "text-red-500" },
-                          { label: "Net",     val: cashFlow.totalInflow - cashFlow.totalOutflow, color: cashFlow.totalInflow >= cashFlow.totalOutflow ? "text-emerald-600" : "text-red-500" },
+                          { label: "Inflow",  val: cashFlow.totalInflow,  color: "text-success-text" },
+                          { label: "Outflow", val: cashFlow.totalOutflow, color: "text-destructive-text" },
+                          { label: "Net",     val: cashFlow.totalInflow - cashFlow.totalOutflow, color: cashFlow.totalInflow >= cashFlow.totalOutflow ? "text-success-text" : "text-destructive-text" },
                         ].map((r) => (
                           <div key={r.label}>
                             <p className="text-[10px] text-muted-foreground">{r.label}</p>
@@ -600,7 +600,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         </div>
                       ))}
                       <div className="flex justify-between text-xs pt-1 border-t font-bold">
-                        <span>Total Expenses</span><span className="text-red-500">LKR {formatNumber(expSummary.total)}</span>
+                        <span>Total Expenses</span><span className="text-destructive-text">LKR {formatNumber(expSummary.total)}</span>
                       </div>
                     </>
                   ) : <div className="h-28 flex items-center justify-center text-muted-foreground text-sm">No expense data</div>}
@@ -683,13 +683,13 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                   <div className="space-y-2.5">
                     {[
                       { label: "Gross Revenue", val: `LKR ${formatNumber(pl?.revenue.gross ?? 0)}`, color: "text-foreground" },
-                      { label: "Less: Returns", val: `− LKR ${formatNumber(pl?.revenue.returns ?? 0)}`, color: "text-red-500" },
-                      { label: "Net Revenue", val: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`, color: "text-emerald-600", bold: true },
-                      { label: "Cost of Goods", val: `− LKR ${formatNumber(pl?.costOfGoodsSold ?? 0)}`, color: "text-orange-600", hide: !(pl?.costOfGoodsSold ?? 0) },
-                      { label: "Gross Profit", val: `LKR ${formatNumber(pl?.grossProfit ?? 0)}`, color: (pl?.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true, hide: !(pl?.costOfGoodsSold ?? 0) },
-                      { label: "Expenses", val: `− LKR ${formatNumber(pl?.expenses.total ?? 0)}`, color: "text-red-500" },
-                      { label: "Net Profit", val: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`, color: (pl?.netProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true },
-                      { label: "Profit Margin", val: `${pl?.profitMargin ?? 0}%`, color: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "text-emerald-600" : "text-red-600" },
+                      { label: "Less: Returns", val: `− LKR ${formatNumber(pl?.revenue.returns ?? 0)}`, color: "text-destructive-text" },
+                      { label: "Net Revenue", val: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`, color: "text-success-text", bold: true },
+                      { label: "Cost of Goods", val: `− LKR ${formatNumber(pl?.costOfGoodsSold ?? 0)}`, color: "text-warning-text", hide: !(pl?.costOfGoodsSold ?? 0) },
+                      { label: "Gross Profit", val: `LKR ${formatNumber(pl?.grossProfit ?? 0)}`, color: (pl?.grossProfit ?? 0) >= 0 ? "text-success-text" : "text-destructive-text", bold: true, hide: !(pl?.costOfGoodsSold ?? 0) },
+                      { label: "Expenses", val: `− LKR ${formatNumber(pl?.expenses.total ?? 0)}`, color: "text-destructive-text" },
+                      { label: "Net Profit", val: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`, color: (pl?.netProfit ?? 0) >= 0 ? "text-success-text" : "text-destructive-text", bold: true },
+                      { label: "Profit Margin", val: `${pl?.profitMargin ?? 0}%`, color: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "text-success-text" : "text-destructive-text" },
                       { label: "Avg Order Value", val: `LKR ${formatNumber(avgOrder)}`, color: "text-foreground" },
                       { label: "Total Orders", val: `${pl?.salesCount ?? 0} orders`, color: "text-foreground" },
                     ].filter((r) => !("hide" in r && r.hide)).map((r) => (
@@ -760,7 +760,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
                         <td className="px-4 py-2.5 text-xs text-right tabular-nums">{c.salesCount}</td>
                         <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.totalRevenue)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-warning-text tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
                         <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(c.totalTax)}</td>
                         <td className="px-4 py-2.5 text-right"><ShareCell value={c.totalRevenue} total={cashierTotalRev} /></td>
                       </tr>
@@ -875,7 +875,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
               <Card className="bg-card border shadow-sm">
                 <CardHeader className="pb-0">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Low Stock Alert (≤ 10 units)
+                    <AlertTriangle className="h-4 w-4 text-warning-text" /> Low Stock Alert (≤ 10 units)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 mt-3">
@@ -895,13 +895,13 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                             <td className="px-4 py-2.5 text-[10px] text-muted-foreground font-mono">{item.variant?.sku}</td>
                             <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.variant?.product?.category?.name ?? "—"}</td>
                             <td className="px-4 py-2.5 text-right">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${item.quantity <= 3 ? "bg-red-500/10 text-red-600" : "bg-amber-500/10 text-amber-600"}`}>{item.quantity}</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${item.quantity <= 3 ? "bg-destructive/10 text-destructive-text" : "bg-warning/10 text-warning-text"}`}>{item.quantity}</span>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  ) : <div className="h-32 flex items-center justify-center text-emerald-600 text-sm font-medium">All products well stocked ✓</div>}
+                  ) : <div className="h-32 flex items-center justify-center text-success-text text-sm font-medium">All products well stocked ✓</div>}
                 </CardContent>
               </Card>
 
@@ -1019,14 +1019,14 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{p.orderDate ? new Date(p.orderDate).toLocaleDateString("en-LK") : "—"}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            p.status === "RECEIVED" || p.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-600"
-                            : p.status === "CANCELLED" ? "bg-red-500/10 text-red-600"
-                            : "bg-amber-500/10 text-amber-600"
+                            p.status === "RECEIVED" || p.status === "COMPLETED" ? "bg-success/10 text-success-text"
+                            : p.status === "CANCELLED" ? "bg-destructive/10 text-destructive-text"
+                            : "bg-warning/10 text-warning-text"
                           }`}>{p.status}</span>
                         </td>
                         <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(p.total)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-emerald-600 tabular-nums">LKR {formatNumber(p.paidAmount)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(p.outstanding)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-success-text tabular-nums">LKR {formatNumber(p.paidAmount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-warning-text tabular-nums">LKR {formatNumber(p.outstanding)}</td>
                       </tr>
                     )) : (
                       <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No purchases in range</td></tr>
@@ -1152,7 +1152,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
                         <td className="px-4 py-2.5 text-xs text-right tabular-nums">{c.salesCount}</td>
                         <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.totalRevenue)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-warning-text tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
                         <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(c.totalTax)}</td>
                         <td className="px-4 py-2.5 text-right"><ShareCell value={c.totalRevenue} total={cashierTotalRev} /></td>
                       </tr>
@@ -1216,7 +1216,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs text-right tabular-nums">{b.salesCount}</td>
                         <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(b.totalRevenue)}</td>
                         <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(b.totalTax)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(b.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-warning-text tabular-nums">LKR {formatNumber(b.totalDiscount)}</td>
                         <td className="px-4 py-2.5 text-right"><ShareCell value={b.totalRevenue} total={branchTotalRev} /></td>
                       </tr>
                     )) : (
@@ -1312,16 +1312,16 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs font-mono">{c.chequeNumber}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            c.direction === "IN" ? "bg-emerald-500/10 text-emerald-600" : "bg-blue-500/10 text-blue-600"
+                            c.direction === "IN" ? "bg-success/10 text-success-text" : "bg-blue-500/10 text-blue-600"
                           }`}>{c.direction}</span>
                         </td>
                         <td className="px-4 py-2.5 text-xs">{c.partyName ?? "—"}</td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{c.dueDate ? new Date(c.dueDate).toLocaleDateString("en-LK") : "—"}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            c.status === "CLEARED" ? "bg-emerald-500/10 text-emerald-600"
-                            : c.status === "BOUNCED" || c.status === "CANCELLED" ? "bg-red-500/10 text-red-600"
-                            : "bg-amber-500/10 text-amber-600"
+                            c.status === "CLEARED" ? "bg-success/10 text-success-text"
+                            : c.status === "BOUNCED" || c.status === "CANCELLED" ? "bg-destructive/10 text-destructive-text"
+                            : "bg-warning/10 text-warning-text"
                           }`}>{c.status}</span>
                         </td>
                         <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.amount)}</td>
@@ -1451,7 +1451,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                           <td className="px-4 py-2.5 text-xs font-medium">{r.helperName}</td>
                           <td className="px-4 py-2.5 text-xs text-right tabular-nums">{r.salesCount}</td>
                           <td className="px-4 py-2.5 text-xs text-right font-semibold tabular-nums">LKR {formatNumber(r.salesTotal)}</td>
-                          <td className="px-4 py-2.5 text-xs text-right font-bold text-emerald-600 tabular-nums">LKR {formatNumber(r.commissionTotal)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-bold text-success-text tabular-nums">LKR {formatNumber(r.commissionTotal)}</td>
                           <td className="px-4 py-2.5 text-xs text-right text-muted-foreground tabular-nums">{rate.toFixed(2)}%</td>
                           <td className="px-4 py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -1504,7 +1504,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.cashierName ?? "—"}</td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.branchName ?? "—"}</td>
                         <td className="px-4 py-2.5 text-xs text-right tabular-nums">LKR {formatNumber(s.total)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right font-bold text-emerald-600 tabular-nums">LKR {formatNumber(s.helperCommission)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-bold text-success-text tabular-nums">LKR {formatNumber(s.helperCommission)}</td>
                       </tr>
                     )) : (
                       <tr>
@@ -1594,44 +1594,44 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                   {pl ? (
                     <>
                       <div className="text-center mb-7">
-                        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-2">
+                        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary-text px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-2">
                           <FileText className="h-3.5 w-3.5" /> PROFIT & LOSS STATEMENT
                         </div>
                         <p className="text-sm font-medium text-muted-foreground">{pl.period.startDate} — {pl.period.endDate}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{pl.salesCount} transactions included</p>
                       </div>
                       <div className="space-y-4">
-                        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-4 space-y-2">
+                        <div className="bg-success/5 border border-success/15 rounded-xl p-4 space-y-2">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Revenue</p>
                           <div className="flex justify-between text-sm"><span className="text-muted-foreground">Gross Sales</span><span className="font-semibold">LKR {formatNumber(pl.revenue.gross)}</span></div>
-                          {pl.revenue.returns > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Less: Returns & Refunds</span><span className="text-red-500">− LKR {formatNumber(pl.revenue.returns)}</span></div>}
-                          <div className="h-px bg-emerald-500/20 my-1" />
-                          <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-emerald-600">LKR {formatNumber(pl.revenue.net)}</span></div>
+                          {pl.revenue.returns > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Less: Returns & Refunds</span><span className="text-destructive-text">− LKR {formatNumber(pl.revenue.returns)}</span></div>}
+                          <div className="h-px bg-success/20 my-1" />
+                          <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-success-text">LKR {formatNumber(pl.revenue.net)}</span></div>
                         </div>
                         {(pl.costOfGoodsSold ?? 0) > 0 && (
-                          <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-4 space-y-2">
+                          <div className="bg-warning/5 border border-warning/15 rounded-xl p-4 space-y-2">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Cost of Goods Sold</p>
-                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Product Costs</span><span className="text-orange-600 font-semibold">LKR {formatNumber(pl.costOfGoodsSold ?? 0)}</span></div>
-                            <div className="h-px bg-orange-500/20 my-1" />
-                            <div className="flex justify-between text-sm font-bold"><span>Gross Profit</span><span className={(pl.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}>LKR {formatNumber(pl.grossProfit ?? 0)}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Product Costs</span><span className="text-warning-text font-semibold">LKR {formatNumber(pl.costOfGoodsSold ?? 0)}</span></div>
+                            <div className="h-px bg-warning/20 my-1" />
+                            <div className="flex justify-between text-sm font-bold"><span>Gross Profit</span><span className={(pl.grossProfit ?? 0) >= 0 ? "text-success-text" : "text-destructive-text"}>LKR {formatNumber(pl.grossProfit ?? 0)}</span></div>
                           </div>
                         )}
-                        <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4 space-y-2">
+                        <div className="bg-destructive/5 border border-destructive/15 rounded-xl p-4 space-y-2">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Expenses</p>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Operating Expenses <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{pl.expenses.count} records</span></span>
-                            <span className="text-red-500 font-semibold">LKR {formatNumber(pl.expenses.total)}</span>
+                            <span className="text-destructive-text font-semibold">LKR {formatNumber(pl.expenses.total)}</span>
                           </div>
                         </div>
-                        <div className={`rounded-2xl p-5 ${pl.netProfit >= 0 ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20" : "bg-gradient-to-br from-red-500/10 to-rose-500/5 border border-red-500/20"}`}>
+                        <div className={`rounded-2xl p-5 ${pl.netProfit >= 0 ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-success/20" : "bg-gradient-to-br from-red-500/10 to-rose-500/5 border border-destructive/20"}`}>
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{pl.netProfit >= 0 ? "Net Profit" : "Net Loss"}</p>
-                              <p className={`text-3xl font-black ${pl.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>LKR {formatNumber(Math.abs(pl.netProfit))}</p>
+                              <p className={`text-3xl font-black ${pl.netProfit >= 0 ? "text-success-text" : "text-destructive-text"}`}>LKR {formatNumber(Math.abs(pl.netProfit))}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Margin</p>
-                              <p className={`text-2xl font-black ${pl.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{pl.profitMargin}%</p>
+                              <p className={`text-2xl font-black ${pl.netProfit >= 0 ? "text-success-text" : "text-destructive-text"}`}>{pl.profitMargin}%</p>
                             </div>
                           </div>
                         </div>
@@ -1725,7 +1725,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                           return (
                             <tr key={row.taxRate} className="hover:bg-muted/50 transition-colors">
                               <td className="px-4 py-3 text-xs font-medium">
-                                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">{row.taxRate}%</span>
+                                <span className="bg-primary/10 text-primary-text px-2 py-0.5 rounded-full font-bold">{row.taxRate}%</span>
                               </td>
                               <td className="px-4 py-3 text-xs text-right">{row._sum.quantity ?? 0}</td>
                               <td className="px-4 py-3 text-xs font-semibold text-right">LKR {formatNumber(row._sum.total ?? 0)}</td>

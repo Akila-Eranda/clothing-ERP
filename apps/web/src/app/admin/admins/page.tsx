@@ -236,7 +236,7 @@ export default function AdminsPage() {
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs gap-1 text-amber-700 dark:text-amber-400"
+              className="h-7 px-2 text-xs gap-1 text-warning-text"
               disabled={isSelf || actionId === a.id}
               title={isSelf ? "Cannot deactivate yourself" : "Deactivate"}
               onClick={() => void handleDeactivate(a)}

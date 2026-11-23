@@ -345,7 +345,7 @@ export function ReloadSettingsTab() {
 
 function BadgeActive({ active }: { active: boolean }) {
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${active ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${active ? "bg-emerald-100 text-success-text" : "bg-muted text-muted-foreground"}`}>
       {active ? "Active" : "Off"}
     </span>
   );

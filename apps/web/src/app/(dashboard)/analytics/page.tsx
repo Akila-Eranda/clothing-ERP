@@ -127,11 +127,11 @@ export default function AnalyticsPage() {
   const maxRev = Math.max(...bestSelling.map(b=>b.totalRevenue), 1);
 
   const kpis = [
-    { label:"Total Revenue", value:`LKR ${formatNumber(profit?.totals.revenue??0)}`, sub:`${range.label}`, icon:DollarSign, color:"text-emerald-500", bg:"bg-emerald-500/10" },
-    { label:"Total Cost",    value:`LKR ${formatNumber(profit?.totals.cost??0)}`,    sub:"Cost of goods sold",  icon:Package,   color:"text-orange-500", bg:"bg-orange-500/10" },
+    { label:"Total Revenue", value:`LKR ${formatNumber(profit?.totals.revenue??0)}`, sub:`${range.label}`, icon:DollarSign, color:"text-success-text", bg:"bg-success/10" },
+    { label:"Total Cost",    value:`LKR ${formatNumber(profit?.totals.cost??0)}`,    sub:"Cost of goods sold",  icon:Package,   color:"text-warning-text", bg:"bg-warning/10" },
     { label:"Gross Profit",  value:`LKR ${formatNumber(profit?.totals.profit??0)}`,  sub:"Revenue minus cost",  icon:TrendingUp, color:"text-blue-500", bg:"bg-blue-500/10" },
     { label:"Profit Margin", value:`${profit?.margin??0}%`,  sub:"Overall gross margin",  icon:Percent, color:"text-violet-500", bg:"bg-violet-500/10" },
-    { label:"Top Sellers",   value:String(bestSelling.length), sub:"Unique products sold", icon:Award, color:"text-amber-500", bg:"bg-amber-500/10" },
+    { label:"Top Sellers",   value:String(bestSelling.length), sub:"Unique products sold", icon:Award, color:"text-warning-text", bg:"bg-warning/10" },
     { label:"Cashiers Active", value:String(cashier.length), sub:"Staff with sales", icon:User, color:"text-pink-500", bg:"bg-pink-500/10" },
   ];
 
@@ -311,8 +311,8 @@ export default function AnalyticsPage() {
                           <tr key={m.month} className="border-b hover:bg-muted/30 transition-colors">
                             <td className="py-2 pr-4 font-medium">{m.month}</td>
                             <td className="py-2 pr-4 text-right">LKR {formatNumber(m.revenue)}</td>
-                            <td className="py-2 pr-4 text-right text-red-500">LKR {formatNumber(m.expenses)}</td>
-                            <td className="py-2 pr-4 text-right font-bold text-emerald-500">LKR {formatNumber(m.profit)}</td>
+                            <td className="py-2 pr-4 text-right text-destructive-text">LKR {formatNumber(m.expenses)}</td>
+                            <td className="py-2 pr-4 text-right font-bold text-success-text">LKR {formatNumber(m.profit)}</td>
                             <td className="py-2 text-right">
                               <Badge variant={parseFloat(margin)>=20?"success":parseFloat(margin)>=10?"warning":"destructive"} className="text-[10px] h-4 px-1.5">{margin}%</Badge>
                             </td>
@@ -437,10 +437,10 @@ export default function AnalyticsPage() {
                           <td className="py-2.5 pr-3 text-muted-foreground font-mono text-xs">{r.sku}</td>
                           <td className="py-2.5 pr-3 text-right">{r.qty}</td>
                           <td className="py-2.5 pr-3 text-right">LKR {formatNumber(r.revenue)}</td>
-                          <td className="py-2.5 pr-3 text-right text-red-500">LKR {formatNumber(r.cost)}</td>
-                          <td className="py-2.5 pr-3 text-right font-bold text-emerald-500">LKR {formatNumber(r.profit)}</td>
+                          <td className="py-2.5 pr-3 text-right text-destructive-text">LKR {formatNumber(r.cost)}</td>
+                          <td className="py-2.5 pr-3 text-right font-bold text-success-text">LKR {formatNumber(r.profit)}</td>
                           <td className="py-2.5 text-right">
-                            <span className={`text-xs font-bold ${mf>=20?"text-emerald-500":mf>=10?"text-amber-500":"text-red-500"}`}>{m}%</span>
+                            <span className={`text-xs font-bold ${mf>=20?"text-success-text":mf>=10?"text-warning-text":"text-destructive-text"}`}>{m}%</span>
                           </td>
                         </tr>
                       );

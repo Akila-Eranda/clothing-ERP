@@ -316,10 +316,10 @@ export default function ProductsPage() {
   const inactive = products.filter((p) => p.status === "INACTIVE" || p.status === "OUT_OF_STOCK").length;
 
   const STATS = [
-    { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-primary", bg: "bg-primary/15", tint: "bg-card border-border" },
-    { label: "Active", value: active, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Drafts", value: drafts, icon: FileText, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "Inactive / OOS", value: inactive, icon: Archive, color: "text-rose-600", bg: "bg-rose-500/15", tint: "bg-card border-border" },
+    { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-primary-text", bg: "bg-primary/15", tint: "bg-card border-border" },
+    { label: "Active", value: active, icon: TrendingUp, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
+    { label: "Drafts", value: drafts, icon: FileText, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
+    { label: "Inactive / OOS", value: inactive, icon: Archive, color: "text-destructive-text", bg: "bg-destructive/15", tint: "bg-card border-border" },
   ];
 
   const columns = buildColumns(

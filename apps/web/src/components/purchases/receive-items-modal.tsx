@@ -207,10 +207,10 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     DRAFT: "bg-muted text-muted-foreground border-border",
     ORDERED: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     SENT: "bg-violet-500/10 text-violet-600 border-violet-500/30",
-    IN_TRANSIT: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    PARTIALLY_RECEIVED: "bg-orange-500/10 text-orange-600 border-orange-500/30",
-    RECEIVED: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-    CANCELLED: "bg-red-500/10 text-red-600 border-red-500/30",
+    IN_TRANSIT: "bg-warning/10 text-warning-text border-warning/30",
+    PARTIALLY_RECEIVED: "bg-warning/10 text-warning-text border-warning/30",
+    RECEIVED: "bg-success/10 text-success-text border-success/30",
+    CANCELLED: "bg-destructive/10 text-destructive-text border-destructive/30",
   };
 
   const headers = ["Product / SKU", "Ordered", "Free", "Already", "Receive", "Reject"];
@@ -225,8 +225,8 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     >
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-5xl border overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-start gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
-            <PackageCheck className="h-4 w-4 text-emerald-600" />
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0 mt-0.5">
+            <PackageCheck className="h-4 w-4 text-success-text" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -272,7 +272,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{item.freeQty ?? 0}</td>
                       <td className="px-3 py-2.5 text-xs">
                         {item.receivedQty > 0 ? (
-                          <span className="flex items-center gap-1 text-emerald-600">
+                          <span className="flex items-center gap-1 text-success-text">
                             <CheckCircle2 className="h-3 w-3" />{item.receivedQty}
                           </span>
                         ) : "—"}
@@ -337,7 +337,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           </div>
 
           {showExpiry && (
-            <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-success/5 border border-success/20 text-xs text-success-text flex items-start gap-2">
               <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               Expiry is optional. When set, stock posts to inventory lots and POS can sell by FEFO (earliest expiry first).
             </div>
@@ -352,7 +352,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                   onChange={(e) => setPayNow(e.target.checked)}
                   className="h-4 w-4 rounded border-border"
                 />
-                <Banknote className="h-4 w-4 text-emerald-600" />
+                <Banknote className="h-4 w-4 text-success-text" />
                 Pay supplier now
               </label>
               <div className="text-xs text-muted-foreground">

@@ -112,11 +112,11 @@ function StatCard({
 }) {
   const chip = {
     neutral: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-    primary: "bg-primary/10 text-primary",
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    danger: "bg-red-500/10 text-red-600 dark:text-red-400",
-    info: "bg-primary/10 text-primary",
+    primary: "bg-primary/10 text-primary-text",
+    success: "bg-success/10 text-success-text",
+    warning: "bg-warning/10 text-warning-text",
+    danger: "bg-destructive/10 text-destructive-text",
+    info: "bg-primary/10 text-primary-text",
   }[tone];
 
   return (
@@ -380,7 +380,7 @@ export function AdvancedAccountingHub() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 grid place-items-center text-primary">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 grid place-items-center text-primary-text">
               <Sparkles className="h-4.5 w-4.5" />
             </div>
             <div>
@@ -462,8 +462,8 @@ export function AdvancedAccountingHub() {
                       <p className="text-[11px] uppercase tracking-wide font-semibold text-muted-foreground">{row.month}</p>
                       <p className="text-base font-bold mt-2 tabular-nums">{money(row.profit)}</p>
                       <div className="mt-3 space-y-1 text-[11px]">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Revenue</span><span className="text-emerald-700 font-semibold">{money(row.revenue)}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Expense</span><span className="text-red-600 font-semibold">{money(row.expense)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Revenue</span><span className="text-success-text font-semibold">{money(row.revenue)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Expense</span><span className="text-destructive-text font-semibold">{money(row.expense)}</span></div>
                       </div>
                     </div>
                   ))}
@@ -495,7 +495,7 @@ export function AdvancedAccountingHub() {
                   ].map(([label, value]) => (
                     <div key={String(label)} className="rounded-lg bg-muted/50 p-2.5 flex justify-between">
                       <span className="text-muted-foreground">{label}</span>
-                      <span className={cn("font-bold tabular-nums", Number(value) > 0 && "text-amber-600")}>{value}</span>
+                      <span className={cn("font-bold tabular-nums", Number(value) > 0 && "text-warning-text")}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -510,7 +510,7 @@ export function AdvancedAccountingHub() {
                       Repair & Backfill Ledger
                     </Button>
                   ) : (
-                    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                    <div className="flex items-center gap-2 text-xs text-success-text bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
                       <CheckCircle2 className="h-4 w-4" /> All source transactions are posted
                     </div>
                   )}
@@ -645,7 +645,7 @@ export function AdvancedAccountingHub() {
                         <td className="p-3"><Badge variant="outline">{row.frequency}</Badge></td>
                         <td className="p-3 text-xs tabular-nums">{new Date(row.nextRunDate).toLocaleDateString()}</td>
                         <td className="p-3 text-xs">{row.autoPost ? "Auto-post" : "Draft"}</td>
-                        <td className="p-3">{row.isActive ? <span className="text-emerald-700 text-xs font-semibold">Active</span> : <span className="text-muted-foreground text-xs">Paused</span>}</td>
+                        <td className="p-3">{row.isActive ? <span className="text-success-text text-xs font-semibold">Active</span> : <span className="text-muted-foreground text-xs">Paused</span>}</td>
                         <td className="p-3 text-right"><Button variant="outline" size="sm" onClick={() => void runRecurring(row.id)} disabled={busy || !row.isActive}><Play className="h-3 w-3 mr-1" /> Run now</Button></td>
                       </tr>
                     ))}
@@ -709,7 +709,7 @@ export function AdvancedAccountingHub() {
                       <div key={`${row.month}-${index}`} className="flex-1 h-full flex flex-col justify-end">
                         <div className="flex items-end justify-center gap-1 h-[170px]">
                           <div title={`Revenue ${money(row.revenue)}`} className={cn("w-2/5 rounded-t", index >= 3 ? "bg-indigo-400/60" : "bg-indigo-500")} style={{ height: `${Math.max(3, row.revenue / max * 100)}%` }} />
-                          <div title={`Expense ${money(row.expense)}`} className={cn("w-2/5 rounded-t", index >= 3 ? "bg-amber-400/60" : "bg-amber-500")} style={{ height: `${Math.max(3, row.expense / max * 100)}%` }} />
+                          <div title={`Expense ${money(row.expense)}`} className={cn("w-2/5 rounded-t", index >= 3 ? "bg-warning/60" : "bg-amber-500")} style={{ height: `${Math.max(3, row.expense / max * 100)}%` }} />
                         </div>
                         <p className="text-[9px] text-muted-foreground text-center mt-2 truncate">{row.month.slice(5)}</p>
                       </div>
@@ -728,8 +728,8 @@ export function AdvancedAccountingHub() {
               <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Consolidated Total</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-                  <p className="text-xs text-emerald-700">Net operating result</p>
-                  <p className="text-2xl font-bold text-emerald-800 mt-1">{money(consolidation.total.net)}</p>
+                  <p className="text-xs text-success-text">Net operating result</p>
+                  <p className="text-2xl font-bold text-success-text mt-1">{money(consolidation.total.net)}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[11px] text-muted-foreground">Revenue</p><p className="font-bold mt-1">{money(consolidation.total.revenue)}</p></div>
@@ -747,7 +747,7 @@ export function AdvancedAccountingHub() {
                     <div><p className="font-bold">{branch.name}</p><p className="text-[11px] text-muted-foreground">{branch.code}</p></div>
                     <Badge variant="outline">{branch.transactions} sales</Badge>
                   </div>
-                  <p className={cn("text-xl font-bold mt-4", branch.net >= 0 ? "text-emerald-700" : "text-red-600")}>{money(branch.net)}</p>
+                  <p className={cn("text-xl font-bold mt-4", branch.net >= 0 ? "text-success-text" : "text-destructive-text")}>{money(branch.net)}</p>
                   <div className="flex justify-between text-[11px] text-muted-foreground mt-3"><span>{branch.postedJournals} journals</span><span>Revenue {money(branch.revenue)}</span></div>
                 </CardContent>
               </Card>

@@ -444,8 +444,8 @@ function AccountsOverviewPanel({
       value: `LKR ${formatNumber(cashTotal)}`,
       sub: `${cashAccounts.length} registers`,
       icon: Banknote,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
+      color: "text-success-text",
+      bg: "bg-success/10",
       tint: "bg-card border-border",
     },
     {
@@ -453,8 +453,8 @@ function AccountsOverviewPanel({
       value: `LKR ${formatNumber(walletTotal)}`,
       sub: wallets.length ? `${wallets.length} to clear at day end` : "All cleared",
       icon: Wallet,
-      color: "text-amber-600",
-      bg: "bg-amber-500/10",
+      color: "text-warning-text",
+      bg: "bg-warning/10",
       tint: "bg-card border-border",
     },
     {
@@ -483,7 +483,7 @@ function AccountsOverviewPanel({
     <div id="cashier-wallets" className="rounded-xl border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="h-8 w-8 rounded-[10px] flex items-center justify-center bg-amber-500/10 text-amber-600">
+          <div className="h-8 w-8 rounded-[10px] flex items-center justify-center bg-warning/10 text-warning-text">
             <Wallet className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -575,14 +575,14 @@ function AccountsOverviewPanel({
                 {typeLabel(b.type)}{b.bankName ? ` · ${b.bankName}` : ""} · <span className="font-mono">{b.code}</span>
               </p>
             </div>
-            <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${isCash ? "bg-emerald-500/10 text-emerald-600" : "bg-indigo-500/15 text-indigo-600"}`}>
+            <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${isCash ? "bg-success/10 text-success-text" : "bg-indigo-500/15 text-indigo-600"}`}>
               {isCash ? <Banknote className="h-[18px] w-[18px]" /> : <Landmark className="h-[18px] w-[18px]" />}
             </div>
           </div>
 
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Balance</p>
-            <p className={`text-xl font-bold tabular-nums leading-tight ${negative ? "text-red-600" : "text-foreground"}`}>
+            <p className={`text-xl font-bold tabular-nums leading-tight ${negative ? "text-destructive-text" : "text-foreground"}`}>
               LKR {formatNumber(b.currentBalance)}
             </p>
           </div>
@@ -660,7 +660,7 @@ function AccountsOverviewPanel({
       <PageKpiGrid items={summaryRows} />
 
       <div className="space-y-4">
-        {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/10 text-emerald-600", cashAccounts)}
+        {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-success/10 text-success-text", cashAccounts)}
         <BankAccountsCard
           accounts={bankAccounts as BankAccountRow[]}
           qrCodes={bankAccounts.flatMap((account) => account.paymentQrCodes ?? [])}
@@ -696,7 +696,7 @@ function AccountsOverviewPanel({
                   {(() => {
                     const diff = (parseFloat(clearCounted) || 0) - clearTarget.amountToClear;
                     return (
-                      <p className={`font-bold tabular-nums ${Math.abs(diff) < 0.01 ? "" : diff < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                      <p className={`font-bold tabular-nums ${Math.abs(diff) < 0.01 ? "" : diff < 0 ? "text-destructive-text" : "text-success-text"}`}>
                         {diff > 0 ? "+" : ""}{formatNumber(diff)}
                       </p>
                     );
@@ -976,7 +976,7 @@ function CashBookPanel() {
         accessorKey: "debit",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Debit" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-emerald-600">
+          <span className="tabular-nums text-success-text">
             {row.original.debit ? formatNumber(row.original.debit) : ""}
           </span>
         ),
@@ -986,7 +986,7 @@ function CashBookPanel() {
         accessorKey: "credit",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Credit" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-red-600">
+          <span className="tabular-nums text-destructive-text">
             {row.original.credit ? formatNumber(row.original.credit) : ""}
           </span>
         ),
@@ -1031,8 +1031,8 @@ function CashBookPanel() {
       <div className="grid grid-cols-2 gap-3">
         <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <CardContent className="h-[72px] p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <ArrowDownCircle className="h-[18px] w-[18px] text-emerald-600" />
+            <div className="h-9 w-9 rounded-[12px] bg-success/10 flex items-center justify-center shrink-0">
+              <ArrowDownCircle className="h-[18px] w-[18px] text-success-text" />
             </div>
             <div className="min-w-0">
               <p className="text-lg font-bold leading-none tabular-nums truncate">LKR {formatNumber(book?.opening ?? 0)}</p>
@@ -1362,7 +1362,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         accessorFn: (e) => (e.inflow ? e.amount : 0),
         header: ({ column }) => <DataTableColumnHeader column={column} title="In" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-emerald-600">
+          <span className="tabular-nums text-success-text">
             {row.original.inflow ? formatNumber(row.original.amount) : ""}
           </span>
         ),
@@ -1372,7 +1372,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         accessorFn: (e) => (!e.inflow ? e.amount : 0),
         header: ({ column }) => <DataTableColumnHeader column={column} title="Out" />,
         cell: ({ row }) => (
-          <span className="tabular-nums text-red-600">
+          <span className="tabular-nums text-destructive-text">
             {!row.original.inflow ? formatNumber(row.original.amount) : ""}
           </span>
         ),
@@ -1436,8 +1436,8 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
           <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <CardContent className="h-[72px] p-4 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <ArrowDownCircle className="h-[18px] w-[18px] text-emerald-600" />
+              <div className="h-9 w-9 rounded-[12px] bg-success/10 flex items-center justify-center shrink-0">
+                <ArrowDownCircle className="h-[18px] w-[18px] text-success-text" />
               </div>
               <div className="min-w-0">
                 <p className="text-lg font-bold leading-none tabular-nums truncate">LKR {formatNumber(book.opening)}</p>
@@ -1458,8 +1458,8 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
           </Card>
           <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] col-span-2 xl:col-span-1">
             <CardContent className="h-[72px] p-4 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-[12px] bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Landmark className="h-[18px] w-[18px] text-amber-600" />
+              <div className="h-9 w-9 rounded-[12px] bg-warning/10 flex items-center justify-center shrink-0">
+                <Landmark className="h-[18px] w-[18px] text-warning-text" />
               </div>
               <div className="min-w-0">
                 <p className="text-lg font-bold leading-none truncate">{book.account.name}</p>
@@ -1830,7 +1830,7 @@ function ReconciliationPanel() {
     <div className="space-y-4">
       <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-          <div className="h-8 w-8 rounded-[10px] bg-amber-500/10 text-amber-600 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-[10px] bg-warning/10 text-warning-text flex items-center justify-center">
             <Scale className="h-4 w-4" />
           </div>
           <h3 className="text-sm font-semibold">Start reconciliation</h3>
@@ -1877,7 +1877,7 @@ function ReconciliationPanel() {
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Statement {fmt(active.statementDate)} · Diff{" "}
-                  <span className={Math.abs(active.difference) < 0.01 ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"}>
+                  <span className={Math.abs(active.difference) < 0.01 ? "text-success-text font-semibold" : "text-warning-text font-semibold"}>
                     {formatNumber(active.difference)}
                   </span>
                   {" · "}

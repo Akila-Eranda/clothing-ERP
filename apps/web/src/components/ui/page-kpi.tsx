@@ -12,8 +12,8 @@ export const PAGE_KPI_CARD_CLASS = ERP_KPI_CARD_CLASS;
 
 /** Secondary header actions — match header toolbar (soft primary hover) */
 export const PAGE_HEADER_BTN_TONES = {
-  blue: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
-  secondary: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+  blue: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary-text",
+  secondary: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary-text",
 } as const;
 
 export type PageHeaderBtnTone = keyof typeof PAGE_HEADER_BTN_TONES;
@@ -31,23 +31,23 @@ export const PAGE_KPI_PRESETS = {
     tint: "bg-card border-border",
   },
   success: {
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-500/10",
+    color: "text-success-text",
+    bg: "bg-success/10",
     tint: "bg-card border-border",
   },
   warning: {
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/10",
+    color: "text-warning-text",
+    bg: "bg-warning/10",
     tint: "bg-card border-border",
   },
   danger: {
-    color: "text-red-600 dark:text-red-400",
-    bg: "bg-red-500/10",
+    color: "text-destructive-text",
+    bg: "bg-destructive/10",
     tint: "bg-card border-border",
   },
   red: {
-    color: "text-red-600 dark:text-red-400",
-    bg: "bg-red-500/10",
+    color: "text-destructive-text",
+    bg: "bg-destructive/10",
     tint: "bg-card border-border",
   },
   info: {
@@ -67,13 +67,13 @@ export const PAGE_KPI_PRESETS = {
     tint: "bg-card border-border",
   },
   emerald: {
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-500/10",
+    color: "text-success-text",
+    bg: "bg-success/10",
     tint: "bg-card border-border",
   },
   amber: {
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/10",
+    color: "text-warning-text",
+    bg: "bg-warning/10",
     tint: "bg-card border-border",
   },
   violet: {
@@ -92,8 +92,8 @@ export const PAGE_KPI_PRESETS = {
     tint: "bg-card border-border",
   },
   orange: {
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/10",
+    color: "text-warning-text",
+    bg: "bg-warning/10",
     tint: "bg-card border-border",
   },
 } as const;

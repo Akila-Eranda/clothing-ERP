@@ -34,7 +34,7 @@ export function EmployeeGridView({
             <div className="p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <Link href={`/hr/employees/${e.id}`} className="shrink-0">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary group-hover:scale-105 transition-transform">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-bold text-primary-text group-hover:scale-105 transition-transform">
                     {initials}
                   </div>
                 </Link>
@@ -68,7 +68,7 @@ export function EmployeeGridView({
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
                 {e.isActive ? (
-                  <Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-destructive" onClick={() => onDeactivate(e)}>
+                  <Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-destructive-text" onClick={() => onDeactivate(e)}>
                     Deactivate
                   </Button>
                 ) : null}

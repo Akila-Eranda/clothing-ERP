@@ -98,8 +98,8 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg border overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <Wallet className="h-4 w-4 text-emerald-600" />
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <Wallet className="h-4 w-4 text-success-text" />
           </div>
           <div>
             <h2 className="text-base font-bold">Pay Supplier Invoice</h2>
@@ -112,7 +112,7 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Invoice <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Invoice <span className="text-destructive-text">*</span></Label>
             <select
               className="w-full h-10 rounded-md border bg-background px-3 text-sm"
               value={invoiceId}
@@ -132,14 +132,14 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
             {selected && (
               <p className="text-[11px] text-muted-foreground">
                 Total LKR {formatNumber(selected.total)} · Paid LKR {formatNumber(selected.paidAmount)} ·{" "}
-                <span className="font-semibold text-amber-600">Due LKR {formatNumber(due)}</span>
+                <span className="font-semibold text-warning-text">Due LKR {formatNumber(due)}</span>
               </p>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Amount (LKR) <span className="text-destructive">*</span></Label>
+              <Label className="text-xs font-semibold">Amount (LKR) <span className="text-destructive-text">*</span></Label>
               <Input type="number" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -163,7 +163,7 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Balance Due</Label>
-              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-amber-600">
+              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-warning-text">
                 LKR {formatNumber(due)}
               </div>
             </div>
@@ -171,7 +171,7 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
-              {method === "CHEQUE" ? <>Cheque # <span className="text-destructive">*</span></> : "Reference"}
+              {method === "CHEQUE" ? <>Cheque # <span className="text-destructive-text">*</span></> : "Reference"}
             </Label>
             <Input value={reference} onChange={(e) => setReference(e.target.value)}
               placeholder={method === "CHEQUE" ? "Cheque number" : "Optional reference"} />

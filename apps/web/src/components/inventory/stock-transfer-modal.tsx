@@ -223,8 +223,8 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
     >
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl border overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <ArrowLeftRight className="h-4.5 w-4.5 text-emerald-600" />
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <ArrowLeftRight className="h-4.5 w-4.5 text-success-text" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold">New Stock Transfer</h2>
@@ -254,7 +254,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
               </SelectContent>
             </Select>
             {destinationBranches.length === 0 && (
-              <p className="text-[11px] text-amber-600">Add another branch in Settings → Branches to transfer stock.</p>
+              <p className="text-[11px] text-warning-text">Add another branch in Settings → Branches to transfer stock.</p>
             )}
           </div>
 
@@ -312,7 +312,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                         key={row.id}
                         className={cn(
                           "flex items-center gap-2 px-2.5 py-2 border-b last:border-0 hover:bg-muted/40",
-                          checked && "bg-emerald-500/5",
+                          checked && "bg-success/5",
                         )}
                       >
                         <button
@@ -340,7 +340,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                         <button
                           type="button"
                           onClick={() => addOne(row)}
-                          className="h-7 px-2 rounded-md text-[11px] font-semibold text-emerald-700 hover:bg-emerald-500/10 shrink-0"
+                          className="h-7 px-2 rounded-md text-[11px] font-semibold text-success-text hover:bg-success/10 shrink-0"
                           title="Add this product now"
                         >
                           + Add
@@ -364,7 +364,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                 <Label className="text-xs font-semibold">Transfer Items ({items.length})</Label>
                 <button
                   type="button"
-                  className="text-[11px] text-red-500 hover:underline"
+                  className="text-[11px] text-destructive-text hover:underline"
                   onClick={() => setItems([])}
                 >
                   Clear all
@@ -386,7 +386,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
                       className="w-20 h-8 text-center"
                     />
                     <button type="button" onClick={() => removeItem(idx)} className="p-1 rounded hover:bg-muted">
-                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      <Trash2 className="h-3.5 w-3.5 text-destructive-text" />
                     </button>
                   </div>
                 ))}

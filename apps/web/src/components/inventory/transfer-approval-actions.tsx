@@ -30,7 +30,7 @@ export function TransferApprovalActions({
   if (!instance || instance.status === "APPROVED") return null;
 
   if (instance.status === "REJECTED") {
-    return <span className="text-[10px] text-red-600 font-medium">Rejected</span>;
+    return <span className="text-[10px] text-destructive-text font-medium">Rejected</span>;
   }
 
   const isSubmitter = !!(userId && requestedBy && requestedBy === userId);
@@ -39,13 +39,13 @@ export function TransferApprovalActions({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] text-amber-700 leading-snug max-w-[220px]">{message || "Pending approval"}</p>
+      <p className="text-[10px] text-warning-text leading-snug max-w-[220px]">{message || "Pending approval"}</p>
       {canAct && pendingTaskId && (
         <div className="flex gap-1">
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-[9px] gap-0.5 px-2 border-red-200 text-red-700 hover:bg-red-50"
+            className="h-6 text-[9px] gap-0.5 px-2 border-red-200 text-destructive-text hover:bg-red-50"
             disabled={acting}
             onClick={() => onReject(pendingTaskId)}
           >

@@ -225,7 +225,7 @@ export default function WarehousePage() {
                   {w.name}
                 </OpenRecordButton>
                 {w.isDefault && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary-text">
                     <Star className="h-2 w-2" />Default
                   </span>
                 )}
@@ -272,7 +272,7 @@ export default function WarehousePage() {
       id: "available",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
       cell: ({ row }) => (
-        <span className="text-sm font-semibold text-emerald-600 tabular-nums">
+        <span className="text-sm font-semibold text-success-text tabular-nums">
           {formatNumber(row.original.summary?.availableQty ?? 0)}
         </span>
       ),
@@ -292,7 +292,7 @@ export default function WarehousePage() {
       cell: ({ row }) => {
         const n = row.original.summary?.lowStockSkus ?? 0;
         return n > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning-text">
             <AlertTriangle className="h-3 w-3" />{n}
           </span>
         ) : (
@@ -361,7 +361,7 @@ export default function WarehousePage() {
       accessorKey: "availableQty",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
       cell: ({ row }) => (
-        <span className="font-semibold text-emerald-600 tabular-nums">{row.original.availableQty}</span>
+        <span className="font-semibold text-success-text tabular-nums">{row.original.availableQty}</span>
       ),
     },
     {
@@ -409,7 +409,7 @@ export default function WarehousePage() {
           <div>
             <TableStatusBadge status={row.original.status} />
             {showPendingApproval && (
-              <p className="text-[10px] text-amber-600 mt-1 font-medium">Awaiting approval</p>
+              <p className="text-[10px] text-warning-text mt-1 font-medium">Awaiting approval</p>
             )}
           </div>
         );
@@ -436,10 +436,10 @@ export default function WarehousePage() {
           );
         }
         if (t.workflow?.status === "APPROVED" || (!t.workflow && t.status === "PENDING")) {
-          return <span className="text-xs font-medium text-emerald-600">Approved</span>;
+          return <span className="text-xs font-medium text-success-text">Approved</span>;
         }
         if (t.workflow?.status === "REJECTED") {
-          return <span className="text-xs font-medium text-red-600">Rejected</span>;
+          return <span className="text-xs font-medium text-destructive-text">Rejected</span>;
         }
         return <span className="text-xs text-muted-foreground">—</span>;
       },
@@ -478,9 +478,9 @@ export default function WarehousePage() {
 
   const STATS = [
     { label: "Warehouses", value: dash?.totals.warehouses ?? warehouses.length, icon: Warehouse, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
-    { label: "On Hand Qty", value: formatNumber(dash?.totals.onHandQty ?? 0), icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "On Hand Qty", value: formatNumber(dash?.totals.onHandQty ?? 0), icon: Package, color: "text-success-text", bg: "bg-success/10", tint: "bg-card border-border" },
     { label: "Stock Value", value: `LKR ${formatNumber(dash?.totals.stockValue ?? 0)}`, icon: CheckCircle2, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "bg-card border-border" },
-    { label: "Open Transfers", value: dash?.totals.openTransfers ?? 0, icon: ArrowRightLeft, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Open Transfers", value: dash?.totals.openTransfers ?? 0, icon: ArrowRightLeft, color: "text-warning-text", bg: "bg-warning/10", tint: "bg-card border-border" },
   ];
 
   return (
@@ -519,7 +519,7 @@ export default function WarehousePage() {
       <PageKpiGrid items={STATS} />
 
       {lowStockTotal > 0 && (
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+        <div className="rounded-xl border border-warning/25 bg-warning/10 px-4 py-3 flex items-center gap-2 text-sm text-warning-text">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {lowStockTotal} SKU(s) are below reorder level across warehouses
         </div>

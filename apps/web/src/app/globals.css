@@ -25,7 +25,7 @@
   --tc-secondary: 210 40% 98%;
   --tc-secondary-foreground: 222 47% 11%;
   --tc-muted: 210 40% 98%;
-  --tc-muted-foreground: 215 16% 47%;
+  --tc-muted-foreground: 215 16% 45%;
   --tc-accent: 214 100% 97%;
   --tc-accent-foreground: 224 76% 48%;
   --tc-destructive: 0 84% 60%;
@@ -78,19 +78,32 @@
     --primary-soft: 214 100% 97%;
     --primary-glow: rgba(22, 119, 255, 0.15);
     --secondary: 220 20% 98%;
-    --secondary-foreground: 215 16% 47%;         /* #64748B */
+    --secondary-foreground: 215 16% 45%;         /* #64748B */
     --muted: 220 20% 98%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 215 16% 45%;
     --accent: 214 100% 97%;
     --accent-foreground: 221 83% 53%;
-    --destructive: 0 84% 60%;                    /* #EF4444 */
-    --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;                      /* #10B981 */
+    --success: 160 84% 28%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;                       /* #F59E0B */
-    --warning-foreground: 0 0% 100%;
+    --success-hover: 160 84% 26%;
+    --success-text: 160 84% 25%;
+    --success-border: 160 84% 25% / 0.4;
+    --warning: 38 92% 50%;
+    --warning-foreground: 215 28% 17%;
+    --warning-hover: 38 92% 55%;
+    --warning-text: 38 91% 31%;
+    --warning-border: 38 91% 31% / 0.4;
+    --destructive: 0 64% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-hover: 0 56% 48%;
+    --destructive-text: 0 56% 47%;
+    --destructive-border: 0 56% 47% / 0.4;
     --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
+    --info-hover: 221 73% 48%;
+    --info-text: 221 73% 50%;
+    --info-border: 221 73% 50% / 0.4;
+    --primary-text: 221 75% 50%;
     --btn-primary: var(--primary);
     --btn-primary-hover: var(--primary-hover);
     --btn-secondary: 220 13% 18%;
@@ -102,7 +115,7 @@
     --btn-info: 221 83% 53%;
     --border: 220 13% 91%;                       /* #E5E7EB */
     --border-hsl: 220 13% 91%;
-    --input: 220 13% 88%;
+    --input: 0 0% 57%;                           /* control border >= 3:1 on card (WCAG 1.4.11) */
     --ring: 221 83% 53%;
     --divider: 220 13% 93%;
     --line: 220 13% 91%;
@@ -152,17 +165,30 @@
     --muted-foreground: 215 20% 65%;
     --accent: 220 13% 14%;
     --accent-foreground: 214 100% 65%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
+    --success: 160 84% 28%;
     --success-foreground: 0 0% 100%;
+    --success-hover: 160 84% 26%;
+    --success-text: 160 84% 39%;
+    --success-border: 160 84% 39% / 0.4;
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 215 28% 17%;
+    --warning-hover: 38 92% 55%;
+    --warning-text: 38 92% 50%;
+    --warning-border: 38 92% 50% / 0.4;
+    --destructive: 0 64% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-hover: 0 56% 48%;
+    --destructive-text: 0 84% 65%;
+    --destructive-border: 0 84% 65% / 0.4;
     --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
+    --info-hover: 221 73% 48%;
+    --info-text: 221 83% 65%;
+    --info-border: 221 83% 65% / 0.4;
+    --primary-text: 221 83% 65%;
     --border: 220 13% 18%;
     --border-hsl: 220 13% 18%;
-    --input: 220 13% 16%;
+    --input: 220 2% 41%;                         /* control border >= 3:1 on card (WCAG 1.4.11) */
     --ring: 221 83% 53%;
     --divider: 220 13% 15%;
     --line: 220 13% 18%;
@@ -392,7 +418,7 @@
   .admin-app-shell .hex-section-tabs button[type="button"].is-active {
     background: hsl(var(--primary) / 0.08) !important;
     border-color: hsl(var(--primary) / 0.35) !important;
-    color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-text)) !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"]:hover,
   .admin-app-shell .hex-section-tabs button[type="button"]:hover {
@@ -426,7 +452,7 @@
   .dashboard-shell .hex-segment-control button[type="button"].is-active,
   .admin-app-shell .hex-segment-control button[type="button"].is-active {
     background: hsl(var(--primary) / 0.1) !important;
-    color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-text)) !important;
   }
   .dashboard-shell .hex-segment-control button[type="button"]:hover,
   .admin-app-shell .hex-segment-control button[type="button"]:hover {
@@ -1719,4 +1745,62 @@ input[type="file"]::file-selector-button {
   font-size: 0.875rem;
   line-height: 1.25rem;
   font-weight: 500;
+}
+
+/* Accessible blue text on dark surfaces: brand #2563EB is only 3.3:1 on the dark card, so TEXT uses the lighter accent
+   foreground (6:1). Fills (bg-primary, buttons) are unchanged. Covers text-primary and hover:/focus:text-primary. */
+.dark .text-primary,
+.dark .hover\:text-primary:hover,
+.dark .focus\:text-primary:focus {
+  color: hsl(var(--primary-text));
+}
+
+/* Dark-mode coverage for the remaining text-primary variants in use (group-hover, data-state, opacity). */
+.dark .group:hover .group-hover\:text-primary,
+.dark .group:focus-within .group-hover\:text-primary,
+.dark .data-\[state\=active\]\:text-primary[data-state="active"] {
+  color: hsl(var(--primary-text));
+}
+.dark .text-primary\/80,
+.dark .hover\:text-primary\/80:hover {
+  color: hsl(var(--primary-text) / 0.9);
+}
+.dark .text-primary\/60 {
+  color: hsl(var(--primary-text) / 0.8);
+}
+
+/* Native checkbox / radio follow the brand accent in both themes. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: hsl(var(--primary));
+}
+
+/* ── Keyboard focus indicator (WCAG 1.4.11 / 2.4.7): a solid 2px outline in the ring colour (≥3:1 on card and page,
+      see color-guard tests). The soft ring-primary/20-30 box-shadows used by components stay as decoration only. ── */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible,
+[role="checkbox"]:focus-visible,
+[role="radio"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="combobox"]:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 2px !important;
+}
+
+/* On coloured chrome the ring colour may not contrast with the skin: use the resolved foreground there. */
+.hex-retail-sidebar a:focus-visible,
+.hex-retail-sidebar button:focus-visible,
+.hex-retail-sidebar [role="switch"]:focus-visible,
+.hex-retail-sidebar [role="combobox"]:focus-visible {
+  outline-color: var(--sb-fg) !important;
+}
+html[data-topbar^="topbarcolor"]:not([data-topbar="topbarcolorone"]) .hex-retail-header a:focus-visible,
+html[data-topbar^="topbarcolor"]:not([data-topbar="topbarcolorone"]) .hex-retail-header button:focus-visible {
+  outline-color: var(--retail-topbar-fg) !important;
 }

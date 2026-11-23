@@ -351,8 +351,8 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-4xl border overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <PackageCheck className="h-4 w-4 text-emerald-600" />
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <PackageCheck className="h-4 w-4 text-success-text" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold">Quick GRN (no PO)</h2>
@@ -378,7 +378,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">
-                  Supplier <span className="text-destructive">*</span>
+                  Supplier <span className="text-destructive-text">*</span>
                 </label>
                 <select
                   value={supplierId}
@@ -407,7 +407,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
 
             {openPos.length > 0 && (
               <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-4 py-3 text-sm space-y-2">
-                <p className="font-semibold text-amber-800 dark:text-amber-300 text-xs">
+                <p className="font-semibold text-warning-text text-xs">
                   Open purchase order(s) found for this supplier
                 </p>
                 <p className="text-xs text-amber-700/90 dark:text-amber-400/90">
@@ -548,7 +548,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                             <p
                               className={cn(
                                 "text-sm font-semibold tabular-nums",
-                                item.stock + item.quantity < 0 && "text-rose-600 dark:text-rose-400",
+                                item.stock + item.quantity < 0 && "text-destructive-text",
                               )}
                               aria-label={`Stock preview for ${item.productName}`}
                             >
@@ -600,7 +600,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                               />
                             </td>
                           )}
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">
+                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-success-text">
                             {(item.quantity * item.unitCost).toLocaleString("en-LK", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -610,7 +610,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                             <button
                               type="button"
                               onClick={() => removeLine(idx)}
-                              className="text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-destructive/10"
+                              className="text-muted-foreground hover:text-destructive-text p-1 rounded-md hover:bg-destructive/10"
                               aria-label="Remove"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -626,7 +626,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
               {items.length > 0 && (
                 <div className="px-4 py-3 border-t bg-muted/10 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Grand Total</span>
-                  <span className="font-bold text-emerald-700 tabular-nums">
+                  <span className="font-bold text-success-text tabular-nums">
                     LKR {grandTotal.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -642,7 +642,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                     onChange={(e) => setPayNow(e.target.checked)}
                     className="h-4 w-4 rounded border-border"
                   />
-                  <Banknote className="h-4 w-4 text-emerald-600" />
+                  <Banknote className="h-4 w-4 text-success-text" />
                   Pay supplier now
                 </label>
                 <span className="text-xs text-muted-foreground">
@@ -732,7 +732,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
               LKR {grandTotal.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {payNow && (
-              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success-text">
                 <Banknote className="h-3 w-3" /> Paying supplier
               </span>
             )}

@@ -21,9 +21,9 @@ import { ViewCustomerModal } from "@/components/customers/view-customer-modal";
 import { parseApiList } from "@/lib/parse-api-list";
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  BRONZE:   { label: "Bronze",   color: "text-amber-800 dark:text-amber-300",  bg: "bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",  icon: Star },
+  BRONZE:   { label: "Bronze",   color: "text-warning-text",  bg: "bg-amber-50 border border-amber-200 dark:bg-warning/10 dark:border-warning/30",  icon: Star },
   SILVER:   { label: "Silver",   color: "text-slate-700 dark:text-slate-300",  bg: "bg-slate-100 border border-slate-300 dark:bg-slate-500/10 dark:border-slate-500/30", icon: Star },
-  GOLD:     { label: "Gold",     color: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",  icon: Crown },
+  GOLD:     { label: "Gold",     color: "text-warning-text",  bg: "bg-amber-50 border border-amber-200 dark:bg-warning/10 dark:border-warning/30",  icon: Crown },
   PLATINUM: { label: "Platinum", color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 border border-violet-200 dark:bg-violet-500/10 dark:border-violet-500/30", icon: Crown },
   DIAMOND:  { label: "Diamond",  color: "text-cyan-700 dark:text-cyan-300",   bg: "bg-cyan-50 border border-cyan-200 dark:bg-cyan-500/10 dark:border-cyan-500/30",   icon: Diamond },
 };
@@ -56,7 +56,7 @@ function buildColumns(
         return (
           <div className="flex items-center gap-3 min-w-0" data-cell-wrap>
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+              <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary-text">
                 {getInitials(name)}
               </AvatarFallback>
             </Avatar>
@@ -105,7 +105,7 @@ function buildColumns(
       accessorKey: "loyaltyPoints",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Points" />,
       cell: ({ row }) => (
-        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+        <span className="text-sm font-semibold text-warning-text tabular-nums">
           {formatNumber(row.original.loyaltyPoints)}
         </span>
       ),
@@ -116,7 +116,7 @@ function buildColumns(
       accessorKey: "walletBalance",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Wallet" />,
       cell: ({ row }) => (
-        <span className={`text-sm font-semibold tabular-nums ${row.original.walletBalance > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+        <span className={`text-sm font-semibold tabular-nums ${row.original.walletBalance > 0 ? "text-success-text" : "text-muted-foreground"}`}>
           LKR {formatNumber(row.original.walletBalance)}
         </span>
       ),
@@ -206,7 +206,7 @@ export default function CustomersPage() {
             label: "Gold+ Members",
             value: premium,
             icon: Crown,
-            color: "text-amber-600",
+            color: "text-warning-text",
             bg: "bg-amber-50 border border-amber-200",
             tint: "bg-card border-border",
           },
@@ -224,7 +224,7 @@ export default function CustomersPage() {
       label: "Wallet Balance",
       value: `LKR ${formatNumber(totalWallet)}`,
       icon: Wallet,
-      color: "text-emerald-600",
+      color: "text-success-text",
       bg: "bg-emerald-50 border border-emerald-200",
       tint: "bg-card border-border",
     },

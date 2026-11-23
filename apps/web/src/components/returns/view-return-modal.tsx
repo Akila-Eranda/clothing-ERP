@@ -91,7 +91,7 @@ function InfoRow({ icon: Icon, label, value, valueClass }: {
 
 function SectionTableHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-t-xl">
+    <div className="flex items-center gap-2 bg-success text-success-foreground px-4 py-2.5 rounded-t-xl">
       <Icon className="h-4 w-4 shrink-0" />
       <span className="text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
@@ -237,7 +237,7 @@ export function ViewReturnModal({
       ? excDue > 0 ? "Collect from Customer" : netRef > 0 ? "Refund to Customer" : "Even Exchange"
       : "Refund to Customer";
     const balAmount = isExchange ? (excDue > 0 ? excDue : netRef) : data.refundAmount;
-    const balColor = isExchange && excDue > 0 ? "text-amber-600" : "text-emerald-600";
+    const balColor = isExchange && excDue > 0 ? "text-warning-text" : "text-success-text";
     return { excDue, netRef, balLabel, balAmount, balColor };
   }, [data, isExchange]);
 
@@ -307,7 +307,7 @@ export function ViewReturnModal({
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
                       tab === t.id
-                        ? "bg-primary/10 text-primary border border-primary/20"
+                        ? "bg-primary/10 text-primary-text border border-primary/20"
                         : "text-muted-foreground hover:bg-muted",
                     )}
                   >
@@ -335,7 +335,7 @@ export function ViewReturnModal({
                     icon={Package}
                     label="Restock"
                     value={data.restockItems ? "Items restocked on approval" : "Items not restocked"}
-                    valueClass={data.restockItems ? "text-emerald-600" : "text-muted-foreground"}
+                    valueClass={data.restockItems ? "text-success-text" : "text-muted-foreground"}
                   />
                 </div>
 
@@ -495,14 +495,14 @@ export function ViewReturnModal({
             <>
               <Button
                 variant="outline"
-                className="gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10"
+                className="gap-1.5 text-success-text border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-success/10"
                 onClick={() => { onStatusUpdate(data.id, "APPROVED", "Approved"); onClose(); }}
               >
                 <CheckCircle className="h-3.5 w-3.5" /> Approve
               </Button>
               <Button
                 variant="outline"
-                className="gap-1.5 text-red-700 border-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-500/10"
+                className="gap-1.5 text-destructive-text border-red-300 bg-red-50 hover:bg-red-100 dark:bg-destructive/10"
                 onClick={() => { onStatusUpdate(data.id, "REJECTED", "Rejected"); onClose(); }}
               >
                 <XCircle className="h-3.5 w-3.5" /> Reject

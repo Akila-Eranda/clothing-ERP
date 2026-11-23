@@ -219,7 +219,7 @@ export function BankAccountsCard({
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
         ) : accounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary-text">
               <Landmark className="h-6 w-6" />
             </div>
             <p className="font-semibold text-foreground">No bank accounts yet</p>
@@ -242,7 +242,7 @@ export function BankAccountsCard({
                 <div key={a.id} data-testid="bank-account-row" data-code={a.code} data-active={a.isActive ? "true" : "false"} className={`flex min-h-[245px] flex-col rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${a.isActive ? "bg-card" : "bg-muted/30"}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-text">
                         <Landmark className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
@@ -315,13 +315,13 @@ export function BankAccountsCard({
                   <Label htmlFor="bank-form-code">Code *</Label>
                   <Input id="bank-form-code" data-testid="bank-form-code" value={f.code} disabled={!!f.id || saving} maxLength={20} placeholder="e.g. BOC1" autoComplete="off"
                     onChange={(e) => setForm({ ...f, code: e.target.value })} aria-invalid={errors.code ? true : undefined} />
-                  {errors.code && <p className="text-xs text-red-600" role="alert">{errors.code}</p>}
+                  {errors.code && <p className="text-xs text-destructive-text" role="alert">{errors.code}</p>}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="bank-form-name">Display name *</Label>
                   <Input id="bank-form-name" data-testid="bank-form-name" value={f.name} disabled={saving} maxLength={80} placeholder="e.g. BOC Current" autoComplete="off"
                     onChange={(e) => setForm({ ...f, name: e.target.value })} aria-invalid={errors.name ? true : undefined} />
-                  {errors.name && <p className="text-xs text-red-600" role="alert">{errors.name}</p>}
+                  {errors.name && <p className="text-xs text-destructive-text" role="alert">{errors.name}</p>}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="bank-form-type">Account type</Label>
@@ -355,7 +355,7 @@ export function BankAccountsCard({
                     )}
                   </div>
                 )}
-                {removeQr && <p className="text-xs text-destructive">The current QR image will be removed when you save.</p>}
+                {removeQr && <p className="text-xs text-destructive-text">The current QR image will be removed when you save.</p>}
                 <label className="inline-flex">
                   <input
                     type="file"

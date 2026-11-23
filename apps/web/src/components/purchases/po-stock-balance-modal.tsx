@@ -128,8 +128,8 @@ export function PoStockBalanceModal({ open, target, onClose, onBalanced }: Props
             <div
               className={cn(
                 "rounded-xl border p-3 text-center",
-                diff > 0 && "border-emerald-500/30 bg-emerald-500/10",
-                diff < 0 && "border-rose-500/30 bg-rose-500/10",
+                diff > 0 && "border-success/30 bg-success/10",
+                diff < 0 && "border-destructive/30 bg-destructive/10",
                 diff === 0 && "bg-muted/30",
               )}
             >
@@ -137,8 +137,8 @@ export function PoStockBalanceModal({ open, target, onClose, onBalanced }: Props
               <p
                 className={cn(
                   "mt-0.5 text-xl font-black tabular-nums",
-                  diff > 0 && "text-emerald-600 dark:text-emerald-400",
-                  diff < 0 && "text-rose-600 dark:text-rose-400",
+                  diff > 0 && "text-success-text",
+                  diff < 0 && "text-destructive-text",
                 )}
               >
                 {diff > 0 ? `+${diff}` : diff}
@@ -160,7 +160,7 @@ export function PoStockBalanceModal({ open, target, onClose, onBalanced }: Props
             {target.systemStock < 0 && (
               <button
                 type="button"
-                className="text-[11px] font-semibold text-rose-600 underline"
+                className="text-[11px] font-semibold text-destructive-text underline"
                 onClick={() => setCounted("0")}
               >
                 Set to 0 (clear minus {target.systemStock})

@@ -20,31 +20,31 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+          "border-0 bg-primary text-primary-foreground shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
         secondary:
-          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary-text",
         outline:
-          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary-text",
         ghost:
-          "border-0 bg-transparent text-muted-foreground shadow-none hover:bg-primary/10 hover:text-primary",
+          "border-0 bg-transparent text-muted-foreground shadow-none hover:bg-primary/10 hover:text-primary-text",
         link:
           "border-0 bg-transparent text-primary underline-offset-4 shadow-none hover:underline",
         destructive:
-          "border-0 bg-destructive text-white shadow-none hover:bg-destructive/90 active:brightness-[0.96]",
+          "border-0 bg-destructive text-destructive-foreground shadow-none hover:bg-destructive-hover active:brightness-[0.96]",
         success:
-          "border-0 bg-[hsl(var(--success))] text-white shadow-none hover:opacity-90 active:brightness-[0.96]",
+          "border-0 bg-success text-success-foreground shadow-none hover:bg-success-hover active:brightness-[0.96]",
         /* aliases */
-        pos: "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+        pos: "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary-text",
         gradient:
-          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+          "border-0 bg-primary text-primary-foreground shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
         danger:
-          "border-0 bg-destructive text-white shadow-none hover:bg-destructive/90 active:brightness-[0.96]",
+          "border-0 bg-destructive text-destructive-foreground shadow-none hover:bg-destructive-hover active:brightness-[0.96]",
         warning:
-          "border-0 bg-[hsl(var(--warning))] text-white shadow-none hover:opacity-90 active:brightness-[0.96]",
+          "border-0 bg-warning text-warning-foreground shadow-none hover:bg-warning-hover active:brightness-[0.96]",
         info:
-          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+          "border-0 bg-primary text-primary-foreground shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
         violet:
-          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+          "border-0 bg-primary text-primary-foreground shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
         chip:
           "border-0 bg-muted text-muted-foreground shadow-none hover:bg-muted/80",
       },

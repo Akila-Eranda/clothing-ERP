@@ -222,13 +222,13 @@ function PaymentModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl border overflow-hidden max-h-[92vh] flex flex-col">
         <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <Banknote className="h-4 w-4 text-emerald-600" />
+          <div className="h-9 w-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <Banknote className="h-4 w-4 text-success-text" />
           </div>
           <div>
             <h2 className="text-base font-bold">{paymentTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              Outstanding: <span className="text-amber-500 font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
+              Outstanding: <span className="text-warning-text font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
               {balance > 0 ? ` · Supplier balance LKR ${balance.toLocaleString("en-LK")}` : ""}
             </p>
           </div>
@@ -259,7 +259,7 @@ function PaymentModal({
                   <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 text-left">PO #</th>
-                      <th className="px-3 py-2 text-right font-bold text-amber-600">Due</th>
+                      <th className="px-3 py-2 text-right font-bold text-warning-text">Due</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -279,7 +279,7 @@ function PaymentModal({
                               <span className="font-mono text-xs font-semibold text-primary">{p.poNumber}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-bold text-amber-600">
+                          <td className="px-3 py-2.5 text-right font-bold text-warning-text">
                             {p.dueAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
@@ -323,7 +323,7 @@ function PaymentModal({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Balance Due (selected)</Label>
-              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-amber-600">
+              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-warning-text">
                 LKR {selectedDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -331,7 +331,7 @@ function PaymentModal({
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
-              {method === "CHEQUE" ? <>Cheque No. <span className="text-destructive">*</span></> : "Reference"}
+              {method === "CHEQUE" ? <>Cheque No. <span className="text-destructive-text">*</span></> : "Reference"}
             </Label>
             <Input
               placeholder={method === "CHEQUE" ? "e.g. CHQ-001" : "Optional"}
@@ -343,7 +343,7 @@ function PaymentModal({
           {method === "CHEQUE" && (
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">
-                Cheque Date <span className="text-destructive">*</span>
+                Cheque Date <span className="text-destructive-text">*</span>
               </Label>
               <Input
                 type="date"
@@ -564,7 +564,7 @@ export default function SupplierDetailPage() {
           <div className="grid grid-cols-3 gap-5">
             {[
               { label: "Purchase Orders", value: totalPOs,               icon: Package,   color: "text-blue-600",    bg: "bg-blue-50" },
-              { label: "Total Value",     value: `LKR ${fmt(totalValue)}`, icon: TrendingUp, color: "text-emerald-700", bg: "bg-emerald-50" },
+              { label: "Total Value",     value: `LKR ${fmt(totalValue)}`, icon: TrendingUp, color: "text-success-text", bg: "bg-emerald-50" },
               { label: "Amount Paid",     value: `LKR ${fmt(totalPaid)}`,  icon: CreditCard, color: "text-violet-700", bg: "bg-violet-50" },
             ].map((stat) => (
               <div key={stat.label} className="bg-card dark:bg-background rounded-xl p-6 flex items-center gap-4  card-hover">
@@ -648,7 +648,7 @@ export default function SupplierDetailPage() {
                         <td className="px-5 py-3.5">
                           <Badge variant="secondary" className="text-[10px]">{pay.method}</Badge>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-semibold text-emerald-700 tabular-nums">LKR {fmt(pay.amount)}</td>
+                        <td className="px-5 py-3.5 text-right font-semibold text-success-text tabular-nums">LKR {fmt(pay.amount)}</td>
                         <td className="px-5 py-3.5 text-xs text-muted-foreground truncate max-w-[160px]">{pay.notes ?? "—"}</td>
                       </tr>
                     ))}
@@ -736,7 +736,7 @@ export default function SupplierDetailPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 text-destructive-text hover:text-destructive-text hover:bg-red-50"
                             disabled={assignBusyId === a.variantId}
                             onClick={() => unassignVariant(a.variantId)}
                           >
@@ -762,7 +762,7 @@ export default function SupplierDetailPage() {
             <h3 className="font-bold text-sm tracking-tight border-b border-border pb-3 mb-2">Financial Summary</h3>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold mb-3">Amounts in LKR</p>
             <InfoRow label="Outstanding Balance" value={
-              <span className={outstanding > 0 ? "text-amber-600 font-bold tabular-nums" : "text-emerald-700 font-bold"}>
+              <span className={outstanding > 0 ? "text-warning-text font-bold tabular-nums" : "text-success-text font-bold"}>
                 {outstanding > 0 ? `LKR ${fmt(outstanding)}` : "Clear"}
               </span>
             } />

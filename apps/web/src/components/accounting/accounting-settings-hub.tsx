@@ -434,7 +434,7 @@ function CurrencyPanel() {
   return (
     <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-        <div className="h-8 w-8 rounded-[5px] bg-amber-500/10 text-amber-600 flex items-center justify-center">
+        <div className="h-8 w-8 rounded-[5px] bg-warning/10 text-warning-text flex items-center justify-center">
           <Coins className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-semibold">Base currency</h3>
@@ -1119,7 +1119,7 @@ function PreferencesPanel() {
 
         <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-            <div className="h-8 w-8 rounded-[5px] bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-success/10 text-success-text flex items-center justify-center">
               <Settings2 className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Defaults</h3>

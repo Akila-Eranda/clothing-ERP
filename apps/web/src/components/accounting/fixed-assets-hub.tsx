@@ -609,7 +609,7 @@ function SchedulePanel() {
         cell: ({ row }) => (
           <Badge
             className={`text-[10px] ${
-              row.original.posted ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+              row.original.posted ? "bg-emerald-100 text-success-text" : "bg-slate-100 text-slate-600"
             }`}
           >
             {row.original.posted ? "Posted" : "Projected"}
