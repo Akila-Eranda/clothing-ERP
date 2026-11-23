@@ -45,7 +45,7 @@ export class SalesService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.sale.findMany({
         where, skip, take,
-        include: { customer: true, branch: true, cashier: true, _count: { select: { items: true } } },
+        include: { customer: true, branch: true, cashier: true, payments: { select: { method: true, amount: true } }, _count: { select: { items: true } } },
         orderBy: { invoiceDate: 'desc' },
       }),
       this.prisma.sale.count({ where }),

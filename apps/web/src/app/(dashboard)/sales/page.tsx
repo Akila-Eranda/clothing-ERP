@@ -104,7 +104,23 @@ function methodTone(method?: string | null) {
   return "bg-slate-600 text-white border-slate-700";
 }
 
+/** Part of the bill charged to the customer's credit account: money not received yet, even though the sale is completed. */
+function creditPortion(sale: Sale): number {
+  if (sale.payments?.length) {
+    return sale.payments.filter((p) => p.method === "CUSTOMER_CREDIT").reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  }
+  return /CUSTOMER_CREDIT/i.test(sale.paymentMethod ?? "") ? Math.max(0, sale.total ?? 0) : 0;
+}
+
 function paymentLabel(sale: Sale): { label: string; paid: boolean; className: string } {
+  const onCredit = creditPortion(sale);
+  if (onCredit > 0.009 && sale.status?.toUpperCase() !== "REFUNDED") {
+    return {
+      label: onCredit + 0.01 >= (sale.total ?? 0) ? "On credit" : "Part credit",
+      paid: false,
+      className: "bg-warning text-warning-foreground border-warning-hover",
+    };
+  }
   const remaining = Math.max(0, (sale.total ?? 0) - (sale.amountPaid ?? 0));
   const status = (sale.paymentStatus ?? "").toUpperCase();
   if (status === "PENDING" || remaining > 0.009) {
