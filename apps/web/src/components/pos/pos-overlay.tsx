@@ -3271,6 +3271,88 @@ ${rows}
                     Credit limit LKR {formatNumber(customerInsight?.creditLimit ?? 0)} · Available LKR {formatNumber(customerInsight?.creditAvailable ?? 0)}
                   </p>
                 </div>
+                {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
+                  <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Settle outstanding</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        value={creditPayAmount}
+                        onChange={(e) => setCreditPayAmount(e.target.value)}
+                        placeholder={`Max ${formatNumber(customerInsight!.creditBalance!)}`}
+                        className="flex-1 h-9 rounded-xl px-3 text-sm text-white outline-none"
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                      />
+                      <select
+                        value={creditPayMethod}
+                        onChange={(e) => setCreditPayMethod(e.target.value)}
+                        className="h-9 rounded-xl px-2 text-xs text-white outline-none"
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                        <option value="UPI">UPI</option>
+                        <option value="BANK_TRANSFER">Bank</option>
+                        <option value="CHEQUE">Cheque</option>
+                      </select>
+                    </div>
+                    {Number(creditPayAmount) > (customerInsight?.creditBalance ?? 0) + 0.01 && (
+                      <p className="text-xs font-semibold" style={{ color: "var(--pos-success)" }}>
+                        + LKR {formatNumber(Number(creditPayAmount) - (customerInsight?.creditBalance ?? 0))} will be saved to wallet
+                      </p>
+                    )}
+                    {creditPayMethod === "CARD" && (
+                      <input
+                        type="text"
+                        value={creditPayCardLast4}
+                        onChange={(e) => setCreditPayCardLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        inputMode="numeric"
+                        maxLength={4}
+                        required
+                        autoComplete="off"
+                        aria-label="Card last 4 digits"
+                        placeholder="Card last 4 digits"
+                        className="h-9 w-full rounded-xl px-3 text-sm text-white outline-none font-mono tracking-widest"
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                      />
+                    )}
+                    {creditPayMethod === "CHEQUE" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={creditPayChequeNumber}
+                          onChange={(e) => setCreditPayChequeNumber(e.target.value)}
+                          placeholder="Cheque #"
+                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
+                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                        />
+                        <input
+                          type="date"
+                          value={creditPayChequeDue}
+                          min="2000-01-01"
+                          max="2099-12-31"
+                          onChange={(e) => setCreditPayChequeDue(e.target.value)}
+                          title="Cheque Date — future dates allowed"
+                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
+                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",colorScheme:"dark"}}
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={creditPayBusy}
+                        className="w-full h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
+                        style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}
+                        onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
+                      >
+                        {creditPayBusy ? "Paying…" : "Receive payment"}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-xl border p-3 space-y-2" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-text)" }}>
@@ -3367,88 +3449,6 @@ ${rows}
                     </button>
                   )}
                 </div>
-                {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
-                  <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Settle outstanding</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min={0.01}
-                        step="0.01"
-                        value={creditPayAmount}
-                        onChange={(e) => setCreditPayAmount(e.target.value)}
-                        placeholder={`Max ${formatNumber(customerInsight!.creditBalance!)}`}
-                        className="flex-1 h-9 rounded-xl px-3 text-sm text-white outline-none"
-                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
-                      />
-                      <select
-                        value={creditPayMethod}
-                        onChange={(e) => setCreditPayMethod(e.target.value)}
-                        className="h-9 rounded-xl px-2 text-xs text-white outline-none"
-                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
-                      >
-                        <option value="CASH">Cash</option>
-                        <option value="CARD">Card</option>
-                        <option value="UPI">UPI</option>
-                        <option value="BANK_TRANSFER">Bank</option>
-                        <option value="CHEQUE">Cheque</option>
-                      </select>
-                    </div>
-                    {Number(creditPayAmount) > (customerInsight?.creditBalance ?? 0) + 0.01 && (
-                      <p className="text-xs font-semibold" style={{ color: "var(--pos-success)" }}>
-                        + LKR {formatNumber(Number(creditPayAmount) - (customerInsight?.creditBalance ?? 0))} will be saved to wallet
-                      </p>
-                    )}
-                    {creditPayMethod === "CARD" && (
-                      <input
-                        type="text"
-                        value={creditPayCardLast4}
-                        onChange={(e) => setCreditPayCardLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                        inputMode="numeric"
-                        maxLength={4}
-                        required
-                        autoComplete="off"
-                        aria-label="Card last 4 digits"
-                        placeholder="Card last 4 digits"
-                        className="h-9 w-full rounded-xl px-3 text-sm text-white outline-none font-mono tracking-widest"
-                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
-                      />
-                    )}
-                    {creditPayMethod === "CHEQUE" && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={creditPayChequeNumber}
-                          onChange={(e) => setCreditPayChequeNumber(e.target.value)}
-                          placeholder="Cheque #"
-                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
-                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
-                        />
-                        <input
-                          type="date"
-                          value={creditPayChequeDue}
-                          min="2000-01-01"
-                          max="2099-12-31"
-                          onChange={(e) => setCreditPayChequeDue(e.target.value)}
-                          title="Cheque Date — future dates allowed"
-                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
-                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",colorScheme:"dark"}}
-                        />
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={creditPayBusy}
-                        className="w-full h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
-                        style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}
-                        onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
-                      >
-                        {creditPayBusy ? "Paying…" : "Receive payment"}
-                      </button>
-                    </div>
-                  </div>
-                )}
                 <div className="space-y-2 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
                   <div className="flex items-center gap-2 pt-2">
                     <Receipt className="h-3.5 w-3.5" style={{color:"var(--pos-accent)"}}/>
