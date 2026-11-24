@@ -448,7 +448,7 @@ export class PosService {
       // Server is the price authority: cost comes from the catalog, and cashier-entered prices
       // must stay between cost and the highest known price (MRP / selling / PO) unless a
       // manager or admin is the acting cashier.
-      const purchasePrices = await this.attachPurchasePriceOptions(tenantId, catalogVariantIds);
+      const purchasePrices = await this.attachPurchasePriceOptions(tenantId, catalogVariantIds, Number.POSITIVE_INFINITY);
       const priceCtx = new Map<string, PosCatalogPriceContext>();
       for (const v of found) {
         const po = purchasePrices.get(v.id) ?? [];
@@ -2001,9 +2001,17 @@ export class PosService {
     );
   }
 
-  private async attachPurchasePriceOptions(
+  /**
+   * Purchase-order selling-price options per variant, newest first.
+   * `perVariant` caps what the POS screen offers (default 6). The price guard passes `Infinity`: every selling
+   * price a purchase order ever set is a legitimate price, whatever the screen happened to list.
+   * Distinct (variant, cost, price) rows are read without a shared row cap, so one busy variant in the cart can no
+   * longer push another variant's PO prices out of the result (the screen and the checkout used to disagree).
+   */
+  async attachPurchasePriceOptions(
     tenantId: string,
     variantIds: string[],
+    perVariant = 6,
   ) {
     type PriceOpt = {
       unitCost: number;
@@ -2033,7 +2041,8 @@ export class PosService {
         purchase: { select: { poNumber: true, orderDate: true } },
       },
       orderBy: { purchase: { orderDate: 'desc' } },
-      take: Math.min(unique.length * 12, 600),
+      distinct: ['variantId', 'unitCost', 'sellingPrice'],
+      take: Math.min(unique.length * 200, 5000),
     });
 
     for (const i of items) {
@@ -2042,7 +2051,7 @@ export class PosService {
       const list = out.get(i.variantId) ?? [];
       const key = `${Number(i.unitCost).toFixed(2)}:${selling.toFixed(2)}`;
       if (list.some((x) => `${x.unitCost.toFixed(2)}:${x.sellingPrice.toFixed(2)}` === key)) continue;
-      if (list.length >= 6) continue;
+      if (list.length >= perVariant) continue;
       list.push({
         unitCost: Number(i.unitCost),
         sellingPrice: selling,
