@@ -200,6 +200,8 @@ export class CreateSaleDto {
   /** Customer explicitly consented to saving change to their wallet. Must be true. */
   @ApiPropertyOptional({ description: 'Customer consent to save change to wallet' })
   @IsOptional() @IsBoolean() saveChangeConsent?: boolean;
+  /** Credit / Wallet tender with cash above the bill: the extra goes to the customer's wallet (no shop setting / consent step). */
+  @IsOptional() @IsBoolean() overpayToWallet?: boolean;
 }
 
 export class IssueGiftVoucherDto {
@@ -644,18 +646,20 @@ export class PosService {
     // Resolve settings eagerly (also used by QR fees below).
     const tenantRowForSettings = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
     const saveChangeSettings = resolveSaveChangeSettings(tenantRowForSettings?.settings);
-    if (round2(dto.saveChangeAmount ?? 0) > 0 && !unifiedAccountSelected) {
+    const overpayToWallet = dto.overpayToWallet === true && !!dto.customerId;
+    if (round2(dto.saveChangeAmount ?? 0) > 0 && !unifiedAccountSelected && !overpayToWallet) {
       throw new BadRequestException('Customer wallet changes require the Credit / Wallet payment method.');
     }
     const saveChangeDecision = decideSaveChange({
       requested: dto.saveChangeAmount,
-      consent: dto.saveChangeConsent,
+      consent: dto.saveChangeConsent || overpayToWallet,
       customerId: dto.customerId,
       changeDue,
       cashPaid: cashPaidTotal,
       isPartial,
       creditPayTotal,
-      settings: saveChangeSettings,
+      // Owner decision: paying more than the bill on Credit / Wallet puts the extra on the wallet, whatever the shop's save-change settings.
+      settings: overpayToWallet ? { enabled: true, min: 0, max: null } : saveChangeSettings,
     });
     if (!saveChangeDecision.ok) {
       // A positive request that was refused → reject the sale so the cashier knows.

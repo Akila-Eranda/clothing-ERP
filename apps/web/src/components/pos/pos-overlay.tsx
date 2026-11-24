@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { createNextSaleGuard } from "@/lib/pos-next-sale";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wallet, Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
+import { Wallet, PiggyBank, Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -57,6 +57,7 @@ import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
 import { PosTransferFundsModal } from "@/components/pos/pos-transfer-funds-modal";
 import { PosCashInModal } from "@/components/pos/pos-cash-in-modal";
+import { PosWalletDepositModal } from "@/components/pos/pos-wallet-deposit-modal";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import { newClientRequestId } from "@/lib/submit-key";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
@@ -368,6 +369,7 @@ const BASE_NAV_ITEMS = [
   { id:"reload", label:"Reload", icon: Smartphone },
   { id:"customers", label:"Customers", icon: Users },
   { id:"hold-bills", label:"Hold Bills", icon: PauseCircle },
+  { id:"wallet-deposit", label:"Wallet Deposit", icon: PiggyBank },
   { id:"orders", label:"Orders", icon: FileText },
   { id:"vouchers", label:"Vouchers", icon: Gift },
   { id:"quick-grn", label:"Quick GRN", icon: Package },
@@ -378,7 +380,7 @@ const BASE_NAV_ITEMS = [
   { id:"reports", label:"Reports", icon: BarChart2 },
   { id:"settings", label:"Settings", icon: Settings },
 ];
-const RETAIL_FEATURE_BAR_SKIP = new Set(["demo-product", "reload", "hold-bills"]);
+const RETAIL_FEATURE_BAR_SKIP = new Set(["demo-product", "reload", "hold-bills", "wallet-deposit"]);
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"#0f2a22",color:"var(--pos-success)"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn-soft)"}, CANCELLED:{bg:"#3f1515",color:"#f87171"}, REFUNDED:{bg:"#2e1a4a",color:"#c4b5fd"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#78716c", silver:"#94a3b8", gold:"#22d3ee", platinum:"#8b5cf6", diamond:"#c084fc" };
 const PAYMENT_METHOD_COLOR: Record<string, string> = {
@@ -569,6 +571,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [showCashClose, setShowCashClose] = React.useState(false);
   const [showTransferFunds, setShowTransferFunds] = React.useState(false);
   const [showCashIn, setShowCashIn] = React.useState(false);
+  const [showWalletDeposit, setShowWalletDeposit] = React.useState(false);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -2105,14 +2108,17 @@ ${receiptSoftwareCreditHtml()}
       }
     }
     const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount, cardLast4, payBankAccountId, payQrCodeId);
+    let walletOverpay = 0;
     if (payMethod === "CUSTOMER_CREDIT" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for Credit / Wallet payment"); return; }
       const availableWallet = Math.max(0, customer.walletBalance ?? 0);
       const availableCredit = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
       // Keypad amount = paid now in cash; the rest of the bill goes to the customer's Credit / Wallet account.
       const cashNow = parseFloat(tenderPad);
-      const paidNowCash = Number.isFinite(cashNow) && cashNow > 0 ? Math.min(cashNow, totalAmt) : 0;
-      const onAccount = Math.round((totalAmt - paidNowCash) * 100) / 100;
+      // More cash than the bill: the extra goes to the customer's wallet (sent as saveChangeAmount + overpayToWallet).
+      walletOverpay = Number.isFinite(cashNow) && cashNow > totalAmt + 0.009 ? Math.round((cashNow - totalAmt) * 100) / 100 : 0;
+      const paidNowCash = Number.isFinite(cashNow) && cashNow > 0 ? (walletOverpay > 0 ? cashNow : Math.min(cashNow, totalAmt)) : 0;
+      const onAccount = Math.max(0, Math.round((totalAmt - paidNowCash) * 100) / 100);
       if (availableWallet + availableCredit + 0.01 < onAccount) {
         toast.error(`Insufficient Credit / Wallet funds. Wallet: LKR ${formatNumber(availableWallet)} · Credit available: LKR ${formatNumber(availableCredit)}`);
         return;
@@ -2257,6 +2263,7 @@ ${receiptSoftwareCreditHtml()}
         // each QR line carries the fee the cashier saw; the API refuses the sale (409) if its own figure differs
         payments: payments.map((p) => (p.method === "QR" ? { ...p, expectedQrFee: computeQrFee(p.amount, qrFeeSettings).feeAmount } : p)),
         discountAmount:discountAmount(),
+        ...(walletOverpay > 0 ? { saveChangeAmount: walletOverpay, overpayToWallet: true } : {}),
         couponCode:couponCode??undefined,
         loyaltyPointsToRedeem:loyaltyPointsToRedeem>0?loyaltyPointsToRedeem:undefined,
         allowPartialPayment: payState.allowPartial || paidCheck + 0.01 < totalAmt,
@@ -2287,10 +2294,10 @@ ${receiptSoftwareCreditHtml()}
           ? Math.max(0, cashTendered - saleTotal)
           : 0;
       // Prefer the larger of API vs local — Partial-pay overpay can otherwise report changeDue=0.
-      const resolvedChangeDue = Math.max(
+      const resolvedChangeDue = Math.max(0, Math.max(
         Number.isFinite(apiChange) ? apiChange : 0,
         localChange,
-      );
+      ) - walletOverpay); // the part kept on the wallet is not handed back
       const saleSnapshot = {
         items: [...items],
         subtotal: subtotal(),
@@ -3077,6 +3084,15 @@ ${rows}
         openHeldBillsPopup();
         return;
       }
+      if (id === "wallet-deposit") {
+        if (!customer?.id) {
+          toast.error("Select a customer first, then deposit to their wallet");
+          setActiveNav("customers");
+          return;
+        }
+        setShowWalletDeposit(true);
+        return;
+      }
       if (id === "reload") {
         openReloadPopup();
         return;
@@ -3091,7 +3107,7 @@ ${rows}
       }
       setActiveNav(id);
     },
-    [openHeldBillsPopup, openReloadPopup, openQuickProductPopup, openDemoProductPopup],
+    [openHeldBillsPopup, openReloadPopup, openQuickProductPopup, openDemoProductPopup, customer?.id],
   );
 
   React.useEffect(() => {
@@ -4623,6 +4639,19 @@ ${rows}
         {showTransferFunds && (
           <PosTransferFundsModal
             onClose={() => setShowTransferFunds(false)}
+          />
+        )}
+
+        {showWalletDeposit && customer?.id && (
+          <PosWalletDepositModal
+            customerId={customer.id}
+            customerName={customer.name}
+            walletBalance={customer.walletBalance ?? 0}
+            onClose={() => setShowWalletDeposit(false)}
+            onDone={({ walletBalance }) => {
+              if (walletBalance != null) setCustomer({ ...customer, walletBalance });
+              void loadCustomerInsight(customer.id);
+            }}
           />
         )}
 

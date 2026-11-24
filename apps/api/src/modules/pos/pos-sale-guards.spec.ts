@@ -324,4 +324,16 @@ describe('PosController permission metadata (P-F9)', () => {
     (inventory.reserveStock as jest.Mock).mockRejectedValueOnce(new Error('db down'));
     await expect(svc.holdBill('t1', 'b1', 'c1', { label: 'x', data: { items: [{ variantId: 'v-milk', quantity: 1, unitPrice: 200 }] } } as any)).rejects.toThrow(/db down/);
   });
+
+  it('Credit / Wallet overpay: cash above the bill goes to the customer wallet without the shop save-change setting or consent', async () => {
+    const { svc, prisma } = makeService({ 'branch.findFirst': () => ({ id: 'b1' }) });
+    await svc.createSale('t1', 'b1', 'c1', dto({ customerId: 'cust-1', payments: [{ method: PaymentMethod.CASH, amount: 250 }] as any, saveChangeAmount: 50, overpayToWallet: true }));
+    const saved = (prisma.calls as Call[]).find((c) => c.model === 'walletTransaction' && c.method === 'create' && c.args.data.type === 'CHANGE_SAVED');
+    expect(saved?.args.data.amount).toBe(50);
+  });
+
+  it('without overpayToWallet the same request is still refused (setting off, no consent)', async () => {
+    const { svc } = makeService({ 'branch.findFirst': () => ({ id: 'b1' }) });
+    await expect(svc.createSale('t1', 'b1', 'c1', dto({ customerId: 'cust-1', payments: [{ method: PaymentMethod.CASH, amount: 250 }] as any, saveChangeAmount: 50 }))).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
