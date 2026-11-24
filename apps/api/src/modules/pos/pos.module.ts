@@ -390,19 +390,8 @@ export class PosService {
     const hasManualDiscount =
       (dto.discountAmount ?? 0) > 0 ||
       dto.items.some((item) => (item.discount ?? 0) > 0);
-    let manualDiscountApprovedBy: string | null = null;
-    if (hasManualDiscount) {
-      const roles = await this.prisma.userRole.findMany({
-        where: { userId: cashierId, user: { tenantId } },
-        select: { role: { select: { type: true } } },
-      });
-      if (!bypassesWorkflowApproval(roles.map((row) => row.role.type))) {
-        throw new ForbiddenException(
-          'Manual discounts require an approved manager workflow. The discount approval policy is not configured for direct checkout.',
-        );
-      }
-      manualDiscountApprovedBy = cashierId;
-    }
+    // Owner decision: no manager approval for POS discounts. The cashier who applies it is recorded on the sale.
+    const manualDiscountApprovedBy: string | null = hasManualDiscount ? cashierId : null;
     const priceOverrides: Array<{ variantId: string; unitPrice: number; limit: number; kind: string }> = [];
     if (catalogVariantIds.length > 0) {
       const found = await this.prisma.productVariant.findMany({
@@ -472,7 +461,9 @@ export class PosService {
         where: { userId: cashierId, user: { tenantId } },
         select: { role: { select: { type: true } } },
       });
-      const canOverride = canOverridePosPrice(cashierRoles.map((r) => r.role.type));
+      // Owner decision: no manager approval for POS prices. Above-MRP / below-cost lines are still recorded as audited overrides.
+      void canOverridePosPrice(cashierRoles.map((r) => r.role.type));
+      const canOverride = true;
       let scaleMode: ScaleBarcodeMode | null = null;
 
       for (const item of dto.items) {
@@ -1543,6 +1534,58 @@ export class PosService {
       {},
     );
 
+    // Managers / admins also get the whole shop day across EVERY counter and cashier (the figures above stay
+    // scoped to the open shift so the drawer / cash numbers remain exact).
+    let allCounters: {
+      totalSales: number;
+      totalRevenue: number;
+      totalItems: number;
+      byCounter: { name: string; code: string; orders: number; amount: number }[];
+    } | null = null;
+    if (opts?.scopeAll) {
+      const dayWhere = {
+        tenantId,
+        branchId: resolvedBranchId,
+        status: SaleStatus.COMPLETED,
+        invoiceDate: { gte: dayBounds.from, lte: dayBounds.to },
+      };
+      const [daySales, dayItems] = await Promise.all([
+        this.prisma.sale.findMany({ where: dayWhere, select: { total: true, cashRegisterId: true } }),
+        this.prisma.saleItem.aggregate({ where: { sale: dayWhere }, _sum: { quantity: true } }),
+      ]);
+      const dayRegisterIds = [
+        ...new Set(daySales.map((s) => s.cashRegisterId).filter((id): id is string => Boolean(id))),
+      ];
+      const dayRegisters = dayRegisterIds.length
+        ? await this.prisma.cashRegister.findMany({
+            where: { id: { in: dayRegisterIds }, tenantId, branchId: resolvedBranchId },
+            select: { id: true, counter: { select: { id: true, name: true, code: true } } },
+          })
+        : [];
+      const dayCounterByRegister = new Map(dayRegisters.map((r) => [r.id, r.counter]));
+      const dayByCounter: Record<string, { name: string; code: string; orders: number; amount: number }> = {};
+      let dayRevenue = 0;
+      for (const sale of daySales) {
+        const counter = sale.cashRegisterId ? dayCounterByRegister.get(sale.cashRegisterId) : null;
+        const key = counter?.id ?? 'unassigned';
+        const row = (dayByCounter[key] ??= {
+          name: counter?.name ?? 'Unassigned',
+          code: counter?.code ?? '-',
+          orders: 0,
+          amount: 0,
+        });
+        row.orders += 1;
+        row.amount += sale.total;
+        dayRevenue += sale.total;
+      }
+      allCounters = {
+        totalSales: daySales.length,
+        totalRevenue: Math.round(dayRevenue * 100) / 100,
+        totalItems: dayItems._sum.quantity ?? 0,
+        byCounter: Object.values(dayByCounter).map((c) => ({ ...c, amount: Math.round(c.amount * 100) / 100 })),
+      };
+    }
+
     const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
       for (const payment of sale.payments) {
         acc[payment.method] = (acc[payment.method] ?? 0) + payment.amount;
@@ -1597,6 +1640,7 @@ export class PosService {
         ...counter,
         amount: Math.round(counter.amount * 100) / 100,
       })),
+      allCounters,
       byPaymentMethod,
       openingBalance,
       income,

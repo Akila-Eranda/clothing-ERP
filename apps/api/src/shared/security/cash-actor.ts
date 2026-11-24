@@ -121,7 +121,10 @@ export async function resolveCashActor(
     if (roles && isCashManagerRole(roles)) approverId = approvalManagerId;
   }
 
-  return { actorId, actorRoles, actorIsManager, authorizerId: actorIsManager ? actorId : approverId };
+  // Owner decision: POS / cash actions no longer need a manager PIN approval. The person acting is recorded as the
+  // authoriser, so every approval gate (refund limit, cash out, transfers, expenses, supplier cash payments,
+  // variance on close) passes and the audit trail still names who did it. A manager token, when sent, still wins.
+  return { actorId, actorRoles, actorIsManager, authorizerId: actorIsManager ? actorId : (approverId ?? actorId) };
 }
 
 // Manager PIN brute-force protection lives in PinLockoutService (Redis, shared by all API instances).

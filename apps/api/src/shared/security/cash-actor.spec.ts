@@ -36,7 +36,7 @@ describe('cash actor (PIN identity vs terminal login)', () => {
     const a = await resolveCashActor(db(users) as never, {
       tenantId: T, user: { id: 'mgr', roles: [RoleType.BRANCH_MANAGER] }, unlockToken: signPosUnlockToken(T, 'cashier'),
     });
-    expect(a).toEqual({ actorId: 'cashier', actorRoles: [RoleType.CASHIER], actorIsManager: false, authorizerId: null });
+    expect(a).toEqual({ actorId: 'cashier', actorRoles: [RoleType.CASHIER], actorIsManager: false, authorizerId: 'cashier' }); // no approval needed (owner decision): the actor authorises
   });
 
   it('a manager acting themselves authorises their own action', async () => {
@@ -54,9 +54,9 @@ describe('cash actor (PIN identity vs terminal login)', () => {
   it('approval tokens of non-managers, other shops, expired or forged tokens give no authority', async () => {
     const d = db(users) as never;
     const cashierUser = { id: 'cashier', roles: [RoleType.CASHIER] };
-    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken(T, 'cashier') })).authorizerId).toBeNull();
-    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken('t2', 'otherShopMgr') })).authorizerId).toBeNull();
-    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken(T, 'mgr', Date.now() - 10 * 60_000) })).authorizerId).toBeNull();
+    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken(T, 'cashier') })).authorizerId).toBe('cashier');
+    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken('t2', 'otherShopMgr') })).authorizerId).toBe('cashier');
+    expect((await resolveCashActor(d, { tenantId: T, user: cashierUser, approvalToken: signCashApprovalToken(T, 'mgr', Date.now() - 10 * 60_000) })).authorizerId).toBe('cashier');
     const forged = signCashApprovalToken(T, 'mgr').replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'));
     expect(verifyCashApprovalToken(forged, T)).toBeNull();
     expect(verifyCashApprovalToken(signPosUnlockToken(T, 'mgr'), T)).toBeNull(); // a PIN unlock token is not an approval

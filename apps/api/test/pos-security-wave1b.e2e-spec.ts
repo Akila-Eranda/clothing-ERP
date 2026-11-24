@@ -206,14 +206,13 @@ describe('POS security wave 1B (HTTP + DB + WebSocket)', () => {
       const plain = await sale(A, A.manager, [line(A, 1, 200)], [{ method: 'CASH', amount: 200 }]);
       expect(plain.status).toBe(201);
     });
-    it('a Branch Manager still gets NO direct manual discount (policy not configured): 403, nothing written', async () => {
+    it('a Branch Manager may apply a manual discount directly (no approval workflow, owner decision)', async () => {
       const count = await saleCount(A);
-      const r = await sale(A, A.manager, [line(A, 1, 200, { discount: 10, discountType: 'FIXED' })], [{ method: 'CASH', amount: 200 }]);
-      expect(r.status).toBe(403);
-      expect(String(r.body.message)).toMatch(/Manual discounts require an approved manager workflow/);
-      const bill = await sale(A, A.manager, [line(A, 1, 200)], [{ method: 'CASH', amount: 200 }], { discountAmount: 10 });
-      expect(bill.status).toBe(403);
-      expect(await saleCount(A)).toBe(count);
+      const r = await sale(A, A.manager, [line(A, 1, 200, { discount: 10, discountType: 'FIXED' })], [{ method: 'CASH', amount: 190 }]);
+      expect(r.status).toBe(201);
+      const bill = await sale(A, A.manager, [line(A, 1, 200)], [{ method: 'CASH', amount: 190 }], { discountAmount: 10 });
+      expect(bill.status).toBe(201);
+      expect(await saleCount(A)).toBe(count + 2);
     });
   });
 

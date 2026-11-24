@@ -772,7 +772,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
     const discAmt = type === "percentage" ? sub * (v / 100) : v;
     const equivalentPct = sub > 0 ? (discAmt / sub) * 100 : (type === "percentage" ? v : 100);
-    const needsApproval = !adminBypass && equivalentPct > DISCOUNT_APPROVAL_THRESHOLD_PCT;
+    // Owner decision: no manager approval for POS discounts.
+    const needsApproval = false as boolean;
 
     if (needsApproval) {
       const label = type === "percentage" ? `${v}%` : `LKR ${formatNumber(v)}`;
@@ -859,16 +860,30 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           totalRevenue: number;
           totalItems?: number;
           byCounter?: { name: string; code: string; orders: number; amount: number }[];
+          /** Managers / admins: the whole shop day across every counter and cashier. */
+          allCounters?: {
+            totalSales: number;
+            totalRevenue: number;
+            totalItems: number;
+            byCounter: { name: string; code: string; orders: number; amount: number }[];
+          } | null;
           cash?: { expectedInDrawer?: number };
         }>("/pos/summary"),
         shiftReady ? api.get<{ status?: string; summary?: { expectedCash: number } } | null>("/cash/active").catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       ]);
       const d = sumR.data;
-      setTodayStats({
-        sales: d.totalRevenue ?? 0,
-        orders: d.totalSales ?? 0,
-        items: d.totalItems ?? 0,
+      // Managers / admins see every counter for the whole day; cashiers see their own shift.
+      const view = d.allCounters ?? {
+        totalRevenue: d.totalRevenue ?? 0,
+        totalSales: d.totalSales ?? 0,
+        totalItems: d.totalItems ?? 0,
         byCounter: d.byCounter ?? [],
+      };
+      setTodayStats({
+        sales: view.totalRevenue ?? 0,
+        orders: view.totalSales ?? 0,
+        items: view.totalItems ?? 0,
+        byCounter: view.byCounter ?? [],
       });
       const active = activeR.data;
       if (active?.status === "OPEN" && active.summary?.expectedCash != null) {

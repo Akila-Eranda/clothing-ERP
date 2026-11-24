@@ -219,17 +219,23 @@ describe('POS price guard & decimal quantities (integration)', () => {
       expect(await saleCount()).toBe(count);
     });
 
-    it('a Cashier cannot apply a manual line discount at all while the approval policy is not configured (so none can push the net price below cost)', async () => {
+    it('a Cashier may apply a manual line discount without a manager approval (owner decision) as long as the net price stays above cost', async () => {
       const stock = await onHand(milk);
       const count = await saleCount();
+      await pos.createSale(
+        tenantId, branchId, cashierId,
+        saleDto([line(milk, 2, 100, { discount: 10, discountType: 'FIXED' })]),
+      );
+      expect(await onHand(milk)).toBe(stock - 2);
+      expect(await saleCount()).toBe(count + 1);
+      // ...but a discount that pushes the net price below cost is still refused by the price guard
       await expect(
         pos.createSale(
           tenantId, branchId, cashierId,
           saleDto([line(milk, 2, 100, { discount: 50, discountType: 'FIXED' })]),
         ),
-      ).rejects.toThrow(/Manual discounts require an approved manager workflow/);
-      expect(await onHand(milk)).toBe(stock);   // nothing sold, nothing deducted
-      expect(await saleCount()).toBe(count);
+      ).rejects.toThrow(/below cost/);
+      expect(await saleCount()).toBe(count + 1);
     });
 
     it('rejects a price above MRP', async () => {

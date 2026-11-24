@@ -350,7 +350,7 @@ export class CashManagementService {
     if (counter && (await this.hasCashToHandOver(tenantId, resolvedBranchId, counter.id, cashierId))) {
       const actor = auth
         ? await resolveCashActor(this.prisma, { tenantId, ...auth })
-        : { actorId: cashierId, actorRoles: [], actorIsManager: false, authorizerId: null };
+        : { actorId: cashierId, actorRoles: [], actorIsManager: false, authorizerId: cashierId };
       return this.handOverCounter(tenantId, resolvedBranchId, counter, cashierId, dto, actor);
     }
 
