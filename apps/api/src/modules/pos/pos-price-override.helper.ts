@@ -15,11 +15,14 @@ export function mrpOverrides(overrides: readonly PriceOverrideLine[]): PriceOver
   return overrides.filter((o) => o.kind === ABOVE_MAX_PRICE);
 }
 
-/** Message when an above-MRP override has no usable reason, else null. */
+/**
+ * Message when an above-MRP override carries an unusable reason, else null. A reason is OPTIONAL (owner decision):
+ * an authorised manager/admin may sell above MRP without being asked why; the override is still audited (user, lines,
+ * totals) and a reason is stored when one is sent.
+ */
 export function priceOverrideReasonError(overrides: readonly PriceOverrideLine[], reason: string | null | undefined): string | null {
   if (!mrpOverrides(overrides).length) return null;
   const text = (reason ?? '').trim();
-  if (!text) return 'Selling above the maximum price needs a reason. Enter why the price is above MRP.';
   if (text.length > PRICE_OVERRIDE_REASON_MAX) return `The price override reason is too long (max ${PRICE_OVERRIDE_REASON_MAX} characters).`;
   return null;
 }

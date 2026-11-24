@@ -43,7 +43,31 @@ type SessionState = {
   startPromise?: Promise<void>;
   /** This process currently owns the tenant's session (cross-instance lock). */
   lockHeld?: boolean;
+  /**
+   * Recently sent messages by id. Baileys asks for these (getMessage) when the recipient's phone could not decrypt
+   * one and requests a retry; without them the recipient is stuck on "Waiting for this message".
+   */
+  sentMessages?: Map<string, unknown>;
 };
+
+/** How many sent messages are kept per tenant for retry requests (oldest are dropped first). */
+const SENT_MESSAGE_CACHE_MAX = 500;
+
+/** Minimal in-memory cache with the shape Baileys expects for msgRetryCounterCache. */
+function createRetryCounterCache() {
+  const store = new Map<string, number>();
+  return {
+    get: <T>(key: string) => store.get(key) as T | undefined,
+    set: <T>(key: string, value: T) => {
+      if (store.size > 5000) store.clear();
+      store.set(key, value as unknown as number);
+    },
+    del: (key: string) => {
+      store.delete(key);
+    },
+    flushAll: () => store.clear(),
+  };
+}
 
 @Injectable()
 export class WhatsappService implements OnModuleDestroy, OnApplicationBootstrap {
@@ -457,9 +481,21 @@ export class WhatsappService implements OnModuleDestroy, OnApplicationBootstrap 
       quietLogger = undefined;
     }
 
+    // Cache signal keys in memory (fewer disk reads/races while encrypting) when Baileys + a logger are available.
+    const keys =
+      baileys.makeCacheableSignalKeyStore && quietLogger
+        ? baileys.makeCacheableSignalKeyStore(state.keys, quietLogger)
+        : state.keys;
+
+    session.sentMessages ??= new Map();
+    const sentMessages = session.sentMessages;
     const sock = makeWASocket({
       version,
-      auth: state,
+      auth: { creds: state.creds, keys },
+      msgRetryCounterCache: createRetryCounterCache(),
+      // Lets Baileys re-send a message when the recipient asks for a retry (fixes "Waiting for this message").
+      getMessage: async (key: { id?: string | null }) =>
+        (key?.id ? (sentMessages.get(key.id) as any) : undefined) ?? undefined,
       browser,
       printQRInTerminal: false,
       syncFullHistory: false,
@@ -682,7 +718,15 @@ export class WhatsappService implements OnModuleDestroy, OnApplicationBootstrap 
       );
     }
     const jid = toWhatsappJid(dto.phone);
-    await session.sock.sendMessage(jid, { text: dto.message });
+    const sent = await session.sock.sendMessage(jid, { text: dto.message });
+    if (sent?.key?.id && sent.message) {
+      const cache = (session.sentMessages ??= new Map());
+      cache.set(sent.key.id, sent.message);
+      if (cache.size > SENT_MESSAGE_CACHE_MAX) {
+        const oldest = cache.keys().next().value;
+        if (oldest !== undefined) cache.delete(oldest);
+      }
+    }
     if (options.recordNotification !== false) {
       await this.prisma.notification.create({
         data: {

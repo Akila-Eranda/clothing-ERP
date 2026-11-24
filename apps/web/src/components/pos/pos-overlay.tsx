@@ -2421,10 +2421,7 @@ ${receiptSoftwareCreditHtml()}
       const msg=(e as Error).message??"Checkout failed";
       toast.error(msg);
       if (/QR fee changed/i.test(msg)) void reloadPosTenantSettings(); // an admin changed the fee: show the new figure
-      if (/needs a reason|price is above MRP/i.test(msg)) {
-        setPriceReasonDraft(priceOverrideReasonRef.current);
-        setPriceReasonOpen(true); // ask for the reason, then retry the same checkout
-      }
+      // Selling above MRP no longer asks for a reason (owner decision): an authorised manager/admin just sells.
       if (/no longer in catalog|variant that no longer exists/i.test(msg)) {
         clearCart();
         setSelectedCartIdx(-1);

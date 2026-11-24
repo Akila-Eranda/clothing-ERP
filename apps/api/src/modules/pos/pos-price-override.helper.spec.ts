@@ -4,11 +4,11 @@ const above = { variantId: 'v1', unitPrice: 130, limit: 120, kind: 'ABOVE_MAX_PR
 const below = { variantId: 'v2', unitPrice: 50, limit: 80, kind: 'BELOW_COST' };
 
 describe('pos-price-override.helper (MRP override audit)', () => {
-  it('only above-maximum overrides need a reason; below-cost overrides keep their existing behaviour', () => {
+  it('a reason is optional for above-maximum overrides (only an over-long one is refused)', () => {
     expect(priceOverrideReasonError([below], undefined)).toBeNull();
     expect(priceOverrideReasonError([], '')).toBeNull();
-    expect(priceOverrideReasonError([above], undefined)).toMatch(/needs a reason/);
-    expect(priceOverrideReasonError([above, below], '   ')).toMatch(/needs a reason/);
+    expect(priceOverrideReasonError([above], undefined)).toBeNull();
+    expect(priceOverrideReasonError([above, below], '   ')).toBeNull();
     expect(priceOverrideReasonError([above], 'x'.repeat(301))).toMatch(/too long/);
     expect(priceOverrideReasonError([above], ' Customer asked for gift wrap ')).toBeNull();
   });

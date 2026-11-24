@@ -256,17 +256,16 @@ describe('POS price guard & decimal quantities (integration)', () => {
       expect(item.costPrice).toBe(80);
     });
 
-    it('an authorised manager may sell above MRP only WITH a reason; the sale and an audit record carry user, reason and details', async () => {
+    it('an authorised manager may sell above MRP with or without a reason; the sale and an audit record carry user, reason (when sent) and details', async () => {
       const count = await saleCount();
       const stock = await onHand(milk);
-      // no reason -> refused, nothing written
-      await expect(pos.createSale(tenantId, branchId, managerId, saleDto([line(milk, 1, 130)]))).rejects.toThrow(/needs a reason/);
-      await expect(
-        pos.createSale(tenantId, branchId, managerId, { ...saleDto([line(milk, 1, 130)]), priceOverrideReason: '   ' } as CreateSaleDto),
-      ).rejects.toThrow(/needs a reason/);
-      expect(await saleCount()).toBe(count);
-      expect(await onHand(milk)).toBe(stock);
-      expect(await prisma.auditLog.count({ where: { tenantId, resource: 'SalePriceOverride' } })).toBe(0);
+      // no reason asked for: the sale goes through and is still audited (reason empty)
+      const noReason = await pos.createSale(tenantId, branchId, managerId, saleDto([line(milk, 1, 130)]));
+      expect(await saleCount()).toBe(count + 1);
+      expect(await onHand(milk)).toBe(stock - 1);
+      const noReasonAudit = await prisma.auditLog.findMany({ where: { tenantId, resource: 'SalePriceOverride', resourceId: noReason.id } });
+      expect(noReasonAudit).toHaveLength(1);
+      expect(noReasonAudit[0].newData).toMatchObject({ kind: 'ABOVE_MAX_PRICE', reason: '' });
 
       const sale = await pos.createSale(tenantId, branchId, managerId, { ...saleDto([line(milk, 1, 130)]), priceOverrideReason: ' price tag misprinted ' } as CreateSaleDto);
       const row = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } });

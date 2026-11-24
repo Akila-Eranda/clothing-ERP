@@ -310,12 +310,13 @@ describe('POS security wave 1C (HTTP + DB)', () => {
       expect(String(r.body.message)).toMatch(/above the allowed maximum/);
       expect(await saleCount(A)).toBe(count);
     });
-    it('a Tenant Admin needs a reason; with one the sale carries it and an audit row is written', async () => {
+    it('a Tenant Admin may sell above MRP without a reason (still audited); a reason, when sent, is stored on the audit row', async () => {
       const count = await saleCount(A);
       const none = await above(A.admin);
-      expect(none.status).toBe(400);
-      expect(String(none.body.message)).toMatch(/needs a reason/);
-      expect(await saleCount(A)).toBe(count);
+      expect(none.status).toBe(201);
+      expect(await saleCount(A)).toBe(count + 1);
+      const noneAudit = await prisma.auditLog.findMany({ where: { tenantId: A.id, resource: 'SalePriceOverride', resourceId: none.body.data.id } });
+      expect(noneAudit).toHaveLength(1);
       const ok = await above(A.admin, { priceOverrideReason: 'Shelf label misprinted, price confirmed with supplier' });
       expect(ok.status).toBe(201);
       const audit = await prisma.auditLog.findMany({ where: { tenantId: A.id, resource: 'SalePriceOverride', resourceId: ok.body.data.id } });
