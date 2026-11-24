@@ -78,6 +78,7 @@ import {
   type PosProductCardSizeId,
   type PosTenantSettings,
 } from "@/lib/pos-settings";
+import { businessDay } from "@/lib/business-day";
 import { playPosSound } from "@/lib/pos-sound";
 import {
   cartQtyToGrams,
@@ -1084,7 +1085,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const loadOrders = React.useCallback(async () => {
     setOrdersLoading(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = businessDay();
       const r = await api.get<{ data?: SaleRow[] }>(`/pos/sales?limit=50&date=${today}`);
       setOrders(parseApiList(r.data));
     } catch { toast.error("Failed to load sales"); } finally { setOrdersLoading(false); }

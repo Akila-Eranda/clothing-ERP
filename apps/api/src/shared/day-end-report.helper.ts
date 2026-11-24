@@ -17,21 +17,29 @@ function resolveShopTimezone(tz: string | null | undefined): string {
   }
 }
 
+/**
+ * A shop's business day does not roll over at midnight: shops that trade past 00:00 want those sales on the day
+ * they opened. The day runs from this hour (shop time) until the same hour the next morning.
+ */
+export const BUSINESS_DAY_START_HOUR = 3;
+
+/** The business date (YYYY-MM-DD) that `at` belongs to in the shop's timezone (00:00-02:59 still counts as the previous day). */
 export function shopDateString(at: Date, tz: string | null | undefined): string {
-  return dayjs(at).tz(resolveShopTimezone(tz)).format('YYYY-MM-DD');
+  return dayjs(at).tz(resolveShopTimezone(tz)).subtract(BUSINESS_DAY_START_HOUR, 'hour').format('YYYY-MM-DD');
 }
 
 /**
- * Start / end of a calendar day in the shop's timezone (servers run on UTC; a Colombo shop's day
- * runs 00:00–23:59 Asia/Colombo). Invalid / missing timezones fall back to Asia/Colombo.
+ * Start / end of a business day in the shop's timezone (servers run on UTC): 03:00 on `date` until 02:59:59.999 the next
+ * morning. Without a date it is the business day that is current now. Invalid / missing timezones fall back to Asia/Colombo.
  */
 export function shopDayBounds(date: string | undefined, tz: string | null | undefined): { from: Date; to: Date } {
   const zone = resolveShopTimezone(tz);
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid date');
-  const day = date ? dayjs.tz(date, 'YYYY-MM-DD', zone) : dayjs().tz(zone);
+  const day = date ? dayjs.tz(date, 'YYYY-MM-DD', zone) : dayjs().tz(zone).subtract(BUSINESS_DAY_START_HOUR, 'hour');
   // Reject impossible dates (2026-13-45) instead of letting them roll over.
   if (!day.isValid() || (date && day.format('YYYY-MM-DD') !== date)) throw new Error('Invalid date');
-  return { from: day.startOf('day').toDate(), to: day.endOf('day').toDate() };
+  const from = day.startOf('day').add(BUSINESS_DAY_START_HOUR, 'hour');
+  return { from: from.toDate(), to: from.add(1, 'day').subtract(1, 'millisecond').toDate() };
 }
 
 /** Sales that took money (cancelled / held / pending bills are not collections). */

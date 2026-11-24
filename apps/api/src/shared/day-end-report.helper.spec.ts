@@ -116,17 +116,24 @@ describe('buildDayEndTotals', () => {
     expect(closed).toMatchObject({ actualClosingCash: 3500, difference: 0 });
   });
 
-  it('day boundaries follow the shop timezone, not the server (UTC)', () => {
+  it('business day runs 03:00 to 02:59 next morning in the shop timezone, not the server (UTC)', () => {
     const c = shopDayBounds('2026-11-09', 'Asia/Colombo');
-    expect(c.from.toISOString()).toBe('2026-11-08T18:30:00.000Z');
-    expect(c.to.toISOString()).toBe('2026-11-09T18:29:59.999Z');
-    expect(shopDayBounds('2026-11-09', 'Not/AZone').from.toISOString()).toBe('2026-11-08T18:30:00.000Z');
+    expect(c.from.toISOString()).toBe('2026-11-08T21:30:00.000Z'); // 03:00 Colombo
+    expect(c.to.toISOString()).toBe('2026-11-09T21:29:59.999Z'); // 02:59:59.999 next day Colombo
+    expect(shopDayBounds('2026-11-09', 'Not/AZone').from.toISOString()).toBe('2026-11-08T21:30:00.000Z');
     expect(() => shopDayBounds('2026-13-45', 'Asia/Colombo')).toThrow();
   });
 
-  it('formats the current shop date in the shop timezone', () => {
-    const justAfterColomboMidnight = new Date('2026-11-08T19:00:00.000Z');
-    expect(shopDateString(justAfterColomboMidnight, 'Asia/Colombo')).toBe('2026-11-09');
-    expect(shopDateString(justAfterColomboMidnight, 'Not/AZone')).toBe('2026-11-09');
+  it('a sale at 01:15 still belongs to the previous business day; 03:00 starts the next one', () => {
+    expect(shopDateString(new Date('2026-11-08T19:45:00.000Z'), 'Asia/Colombo')).toBe('2026-11-08'); // 01:15 on the 9th
+    expect(shopDateString(new Date('2026-11-08T21:29:00.000Z'), 'Asia/Colombo')).toBe('2026-11-08'); // 02:59
+    expect(shopDateString(new Date('2026-11-08T21:30:00.000Z'), 'Asia/Colombo')).toBe('2026-11-09'); // 03:00
+    expect(shopDateString(new Date('2026-11-08T21:30:00.000Z'), 'Not/AZone')).toBe('2026-11-09');
+  });
+
+  it('consecutive business days tile the timeline with no gap or overlap', () => {
+    const d1 = shopDayBounds('2026-11-09', 'Asia/Colombo');
+    const d2 = shopDayBounds('2026-11-10', 'Asia/Colombo');
+    expect(d2.from.getTime() - d1.to.getTime()).toBe(1);
   });
 });

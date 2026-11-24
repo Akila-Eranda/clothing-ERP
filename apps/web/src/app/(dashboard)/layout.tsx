@@ -155,7 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <BranchProvider>
       <ThemeLayoutApplier />
-      <div className="dashboard-shell flex h-screen overflow-hidden bg-background">
+      <div className="dashboard-shell flex h-screen max-h-screen min-h-0 overflow-hidden bg-background">
         {/* Desktop sidebar (expanded / collapsed) */}
         <div className="hidden lg:flex">
           <Sidebar />
@@ -181,13 +181,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+        <div className="flex flex-1 flex-col overflow-hidden min-w-0 min-h-0">
           <Header />
           <MaintenanceBanner />
           <div className="px-4 pt-3 lg:px-6">
             <PlatformAnnouncementsBanner />
           </div>
-            <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <div className="min-h-full" key={`${activeBranchId ?? "none"}-${branchRevision}`}>
               {children}
             </div>

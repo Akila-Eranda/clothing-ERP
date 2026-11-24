@@ -32,13 +32,16 @@ describe('physical cash flow (cash basis)', () => {
     expect(f.inflowTotal).toBe(100);
   });
 
-  it('groups by SHOP-timezone day, not the server (UTC) day: 20:00Z on the 10th is already the 11th in Colombo', () => {
-    const late = shift({ id: 's2', openingTime: new Date('2026-11-10T20:00:00.000Z'), movements: [{ type: 'SALE', amount: 50 }] });
+  it('groups by SHOP-timezone business day (starts 03:00), not the server (UTC) day: 22:00Z on the 10th is 03:30 on the 11th in Colombo', () => {
+    const late = shift({ id: 's2', openingTime: new Date('2026-11-10T22:00:00.000Z'), movements: [{ type: 'SALE', amount: 50 }] });
     const early = shift({ id: 's3', openingTime: new Date('2026-11-10T04:00:00.000Z'), movements: [{ type: 'SALE', amount: 70 }] });
     const colombo = buildPhysicalCashFlow([late, early], 'Asia/Colombo');
     expect(colombo.days.map((d) => d.date)).toEqual(['2026-11-10', '2026-11-11']);
     const utc = buildPhysicalCashFlow([late, early], 'UTC');
     expect(utc.days.map((d) => d.date)).toEqual(['2026-11-10']);
+    // 20:00Z = 01:30 on the 11th in Colombo, still the 10th's business day
+    const lateNight = shift({ id: 's4', openingTime: new Date('2026-11-10T20:00:00.000Z'), movements: [{ type: 'SALE', amount: 5 }] });
+    expect(buildPhysicalCashFlow([lateNight], 'Asia/Colombo').days.map((d) => d.date)).toEqual(['2026-11-10']);
     expect(colombo.timezone).toBe('Asia/Colombo');
     expect(buildPhysicalCashFlow([], undefined).timezone).toBe('Asia/Colombo'); // explicit default
   });

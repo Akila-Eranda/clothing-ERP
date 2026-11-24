@@ -23,6 +23,7 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { parseApiList } from "@/lib/parse-api-list";
 import { paymentReferenceText } from "@/lib/card-last4";
 import { copyText, whatsappShareUrl } from "@/lib/bill-message";
+import { businessDay } from "@/lib/business-day";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
@@ -473,7 +474,7 @@ export default function SalesPage() {
     if (v) setUrlSearch(v);
   }, []);
   const router = useRouter();
-  const today = isoDay(new Date());
+  const today = businessDay();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<Summary | null>(null);

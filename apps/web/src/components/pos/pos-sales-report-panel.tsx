@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
+import { businessDay } from "@/lib/business-day";
 
 type Summary = {
   date: string;
@@ -82,7 +83,7 @@ export function PosSalesReportPanel({
   onOpenSale?: (saleId: string) => void;
 }) {
   const { profile } = useShopWorkspace();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessDay();
   const [date, setDate] = React.useState(today);
   const [loading, setLoading] = React.useState(true);
   const [summary, setSummary] = React.useState<Summary | null>(null);
