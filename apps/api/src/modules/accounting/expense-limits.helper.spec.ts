@@ -12,12 +12,11 @@ describe('expense limits (F-04)', () => {
     }
   });
 
-  it('lets a cashier record up to LKR 5,000 and refuses more', () => {
+  it('does not cap cashiers either (owner decision: no manager approval for expenses); only the hard maximum applies', () => {
     expect(DEFAULT_CASHIER_EXPENSE_LIMIT).toBe(5000);
-    expect(expenseAuthorityError(1500, cashier, {})).toBeNull();
-    expect(expenseAuthorityError(5000, cashier, {})).toBeNull();
-    expect(expenseAuthorityError(5000.01, cashier, {})).toMatch(/need a manager/);
-    expect(expenseAuthorityError(9_999_999, cashier, {})).toMatch(/need a manager/);
+    expect(expenseAuthorityError(5000.01, cashier, {})).toBeNull();
+    expect(expenseAuthorityError(250_000, cashier, {})).toBeNull();
+    expect(expenseAuthorityError(MAX_EXPENSE_AMOUNT + 1, cashier, {})).toMatch(/too large/);
   });
 
   it('does not cap managers, accountants or shop admins (below the hard maximum)', () => {
@@ -27,21 +26,16 @@ describe('expense limits (F-04)', () => {
     expect(expenseAuthorityError(MAX_EXPENSE_AMOUNT + 1, manager, {})).toMatch(/too large/);
   });
 
-  it('honours a shop-specific cashier limit', () => {
+  it('the shop-specific cashier limit setting is still readable but no longer enforced', () => {
     expect(cashierExpenseLimit({ pos: { cashierExpenseLimit: 2000 } })).toBe(2000);
-    expect(expenseAuthorityError(2500, cashier, { pos: { cashierExpenseLimit: 2000 } })).toMatch(/LKR 2,000/);
+    expect(expenseAuthorityError(2500, cashier, { pos: { cashierExpenseLimit: 2000 } })).toBeNull();
     expect(cashierExpenseLimit({ pos: { cashierExpenseLimit: 'x' } })).toBe(5000);
   });
 
-  it('treats a user with no roles like a cashier', () => {
-    expect(expenseAuthorityError(6000, [], {})).toMatch(/need a manager/);
-    expect(expenseAuthorityError(6000, undefined, {})).toMatch(/need a manager/);
-  });
-
-  it('reports the HTTP status explicitly (400 invalid amount, 403 needs a manager)', () => {
+  it('reports 400 for an invalid amount and null (allowed) otherwise', () => {
     expect(expenseRefusal(0, cashier, {})?.status).toBe(400);
     expect(expenseRefusal(MAX_EXPENSE_AMOUNT + 1, manager, {})?.status).toBe(400);
-    expect(expenseRefusal(6000, cashier, {})?.status).toBe(403);
+    expect(expenseRefusal(6000, cashier, {})).toBeNull();
     expect(expenseRefusal(6000, manager, {})).toBeNull();
   });
 });

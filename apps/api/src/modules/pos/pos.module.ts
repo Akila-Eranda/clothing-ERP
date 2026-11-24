@@ -1317,16 +1317,23 @@ export class PosService {
       });
       for (const item of data.items ?? []) {
         if (!item.variantId || item.variantId.startsWith('custom-')) continue;
-        await this.inventoryService.reserveStock(
-          tenantId,
-          resolvedBranchId,
-          item.variantId,
-          item.quantity,
-          'HELD_BILL',
-          bill.id,
-          cashierId,
-          tx,
-        );
+        try {
+          await this.inventoryService.reserveStock(
+            tenantId,
+            resolvedBranchId,
+            item.variantId,
+            item.quantity,
+            'HELD_BILL',
+            bill.id,
+            cashierId,
+            tx,
+          );
+        } catch (e) {
+          // The shop sells stock it has not booked in yet (negative on-hand), so a hold must never be refused for lack of
+          // stock: the line is held without a reservation (the check happens before any write, so the transaction is intact).
+          if (e instanceof BadRequestException && /Insufficient available stock/.test(e.message)) continue;
+          throw e;
+        }
       }
       return bill;
     });

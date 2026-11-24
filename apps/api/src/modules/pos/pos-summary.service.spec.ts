@@ -67,8 +67,8 @@ describe('PosService daily summary', () => {
 
     const summary = await service.getDailySummary('tenant-1', 'branch-1', '2026-11-15');
 
-    const from = new Date('2026-11-14T18:30:00.000Z');
-    const to = new Date('2026-11-15T18:29:59.999Z');
+    const from = new Date('2026-11-14T21:30:00.000Z') // business day starts 03:00 Colombo;
+    const to = new Date('2026-11-15T21:29:59.999Z');
     expect(summary).toMatchObject({
       date: '2026-11-15',
       totalSales: 2,

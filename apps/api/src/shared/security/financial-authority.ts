@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { RoleType } from '@prisma/client';
 
 /**
@@ -12,14 +11,17 @@ export const FINANCIAL_AUTHORITY_ROLES: RoleType[] = [
   RoleType.ACCOUNTANT,
 ];
 
-export function hasFinancialAuthority(roles: string[] | null | undefined): boolean {
-  return !!roles?.some((r) => FINANCIAL_AUTHORITY_ROLES.includes(r as RoleType));
+/**
+ * Owner decision: no role restriction on manual money actions (wallet top-ups, loyalty adjustments, credit limits,
+ * credit notes, expense limits, refund limits). Everyone who can reach the action may do it; the audit trail still
+ * records who acted. FINANCIAL_AUTHORITY_ROLES is kept for reporting.
+ */
+export function hasFinancialAuthority(_roles: string[] | null | undefined): boolean {
+  return true;
 }
 
-export function assertFinancialAuthority(roles: string[] | null | undefined, action: string): void {
-  if (!hasFinancialAuthority(roles)) {
-    throw new ForbiddenException(`${action} requires a manager, accountant or shop admin`);
-  }
+export function assertFinancialAuthority(_roles: string[] | null | undefined, _action: string): void {
+  /* intentionally no check (see hasFinancialAuthority) */
 }
 
 /** Upper bounds for manual adjustments — stops fat-finger and scripted abuse. */

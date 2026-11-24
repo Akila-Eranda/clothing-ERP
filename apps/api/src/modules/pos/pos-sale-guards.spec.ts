@@ -71,6 +71,7 @@ function makeService(handlers: Record<string, (args: any) => any> = {}) {
     releaseReservations: jest.fn(async () => ({ released: 0 })),
     expandSaleStockItems: jest.fn(async () => []),
     adjustStock: jest.fn(async () => undefined),
+    reserveStock: jest.fn(async () => undefined),
   };
   const numbering = { isEngineEnabled: () => true, allocate: jest.fn(async () => 'INV-0001') };
   const pricing = {
@@ -99,9 +100,9 @@ describe('createSale security guards', () => {
       expect(writes(prisma)).toEqual([]);
       expect(events.emit).not.toHaveBeenCalled();
     });
-    it('CONTROL: the same LKR 1 line without reloadType is refused by the price guard', async () => {
+    it('CONTROL: the same LKR 1 line without reloadType is no longer refused (owner decision: no price approval); it is recorded as an override', async () => {
       const { svc } = makeService();
-      await expect(svc.createSale('t1', 'b1', 'c1', dto({ items: [milkLine(1)] as any }))).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.createSale('t1', 'b1', 'c1', dto({ items: [milkLine(1)] as any }))).resolves.toBeDefined();
     });
   });
 
@@ -109,7 +110,7 @@ describe('createSale security guards', () => {
     it('refuses discountAmount 100 000 on a 200 bill with 400 before any write', async () => {
       const { svc, prisma } = makeService();
       await expect(svc.createSale('t1', 'b1', 'c1', dto({ discountAmount: 100_000, payments: [{ method: PaymentMethod.CASH, amount: 0 }] as any })))
-        .rejects.toThrow(/discount approval policy/);
+        .rejects.toThrow(/more than the bill/);
       expect(writes(prisma)).toEqual([]);
     });
 
@@ -142,11 +143,10 @@ describe('createSale security guards', () => {
       });
     });
 
-    it('blocks a normal cashier discount before pricing or any write', async () => {
-      const { svc, prisma } = makeService();
-      await expect(svc.createSale('t1', 'b1', 'c1', dto({ discountAmount: 10 })))
-        .rejects.toThrow(/discount approval policy/);
-      expect(writes(prisma)).toEqual([]);
+    it('lets a cashier apply a bill discount without a manager approval (owner decision)', async () => {
+      const { svc } = makeService();
+      await expect(svc.createSale('t1', 'b1', 'c1', dto({ discountAmount: 10, payments: [{ method: PaymentMethod.CASH, amount: 190 }] as any })))
+        .resolves.toBeDefined();
     });
 
     it('keeps the approved owner bypass subject to the existing bill cap', async () => {
@@ -159,13 +159,12 @@ describe('createSale security guards', () => {
       }))).rejects.toThrow(/more than the bill/);
     });
 
-    it('blocks line discounts and held-bill resume cannot bypass authorization', async () => {
-      const { svc, prisma } = makeService();
+    it('line discounts no longer need a manager approval (owner decision); a held bill still has to belong to this cashier', async () => {
+      const { svc } = makeService();
       await expect(svc.createSale('t1', 'b1', 'c1', dto({
-        heldBillId: 'held-1',
         items: [milkLine(200, { discount: 10 })] as any,
-      }))).rejects.toThrow(/discount approval policy/);
-      expect(writes(prisma)).toEqual([]);
+        payments: [{ method: PaymentMethod.CASH, amount: 190 }] as any,
+      }))).resolves.toBeDefined();
     });
   });
 
@@ -311,5 +310,18 @@ describe('PosController permission metadata (P-F9)', () => {
     const { svc, prisma } = makeService();
     await expect(svc.holdBill('t1', 'b1', 'c1', { data: { items: [{ variantId: 'v-milk', quantity: 0 }] } } as any)).rejects.toBeInstanceOf(BadRequestException);
     expect(writes(prisma)).toEqual([]);
+  });
+
+  it('holdBill is not refused when stock is short or negative (the shop sells ahead of booking stock in): the line is held without a reservation', async () => {
+    const { svc, inventory } = makeService({ 'branch.findFirst': () => ({ id: 'b1' }) });
+    (inventory.reserveStock as jest.Mock).mockRejectedValueOnce(new BadRequestException('Insufficient available stock (-4445 available, 1 requested)'));
+    await expect(svc.holdBill('t1', 'b1', 'c1', { label: 'x', data: { items: [{ variantId: 'v-milk', quantity: 1, unitPrice: 200 }] } } as any)).resolves.toBeDefined();
+    expect(inventory.reserveStock).toHaveBeenCalledTimes(1);
+  });
+
+  it('holdBill still surfaces unrelated reservation errors', async () => {
+    const { svc, inventory } = makeService({ 'branch.findFirst': () => ({ id: 'b1' }) });
+    (inventory.reserveStock as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    await expect(svc.holdBill('t1', 'b1', 'c1', { label: 'x', data: { items: [{ variantId: 'v-milk', quantity: 1, unitPrice: 200 }] } } as any)).rejects.toThrow(/db down/);
   });
 });

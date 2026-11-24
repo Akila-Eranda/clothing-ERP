@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { createNextSaleGuard } from "@/lib/pos-next-sale";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
+import { Wallet, Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,6 +56,7 @@ import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
 import { PosTransferFundsModal } from "@/components/pos/pos-transfer-funds-modal";
+import { PosCashInModal } from "@/components/pos/pos-cash-in-modal";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import { newClientRequestId } from "@/lib/submit-key";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
@@ -567,6 +568,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [shiftReady, setShiftReady] = React.useState(false);
   const [showCashClose, setShowCashClose] = React.useState(false);
   const [showTransferFunds, setShowTransferFunds] = React.useState(false);
+  const [showCashIn, setShowCashIn] = React.useState(false);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -1058,6 +1060,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return;
     }
     loadFromHeldBill(bill.data, bill.id);
+    // A held bill keeps the prices of the moment it was held. Bring catalog lines up to today's selling price (the page of
+    // products on screen is the source) and tell the cashier, so a price changed meanwhile is not sold at the old figure.
+    {
+      const current = new Map(products.map((p) => [p.variantId, p.unitPrice]));
+      const changed: string[] = [];
+      useCartStore.setState((st) => ({
+        items: st.items.map((it) => {
+          const now = it.isCustom ? undefined : current.get(it.variantId);
+          if (now == null || !(now > 0) || Math.abs(now - it.unitPrice) < 0.005) return it;
+          changed.push(`${it.productName}: ${formatNumber(it.unitPrice)} → ${formatNumber(now)}`);
+          return { ...it, unitPrice: now };
+        }),
+      }));
+      if (changed.length) toast.info(`Prices updated to today's: ${changed.slice(0, 3).join("; ")}${changed.length > 3 ? ` (+${changed.length - 3} more)` : ""}`, { duration: 7000 });
+    }
     setCartNotes(bill.data.notes ?? "");
     setDiscountInput(bill.data.discount > 0 ? String(bill.data.discount) : "");
     setDiscountEditType(bill.data.discountType === "fixed" ? "fixed" : "percentage");
@@ -1083,7 +1100,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       patchPayState({ couponCode: "", couponDiscount: 0 });
     }
     toast.success("Bill restored");
-  }, [items.length, activeHeldBillId, loadFromHeldBill, onCouponChange, setCoupon, patchPayState]);
+  }, [items.length, activeHeldBillId, loadFromHeldBill, onCouponChange, setCoupon, patchPayState, products]);
 
   const handleDeleteHeldBill = React.useCallback(async (id: string) => {
     try {
@@ -2092,12 +2109,17 @@ ${receiptSoftwareCreditHtml()}
       if (!customer) { toast.error("Select a customer for Credit / Wallet payment"); return; }
       const availableWallet = Math.max(0, customer.walletBalance ?? 0);
       const availableCredit = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
-      if (availableWallet + availableCredit + 0.01 < totalAmt) {
+      // Keypad amount = paid now in cash; the rest of the bill goes to the customer's Credit / Wallet account.
+      const cashNow = parseFloat(tenderPad);
+      const paidNowCash = Number.isFinite(cashNow) && cashNow > 0 ? Math.min(cashNow, totalAmt) : 0;
+      const onAccount = Math.round((totalAmt - paidNowCash) * 100) / 100;
+      if (availableWallet + availableCredit + 0.01 < onAccount) {
         toast.error(`Insufficient Credit / Wallet funds. Wallet: LKR ${formatNumber(availableWallet)} · Credit available: LKR ${formatNumber(availableCredit)}`);
         return;
       }
       payments.length = 0;
-      payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
+      if (paidNowCash > 0) payments.push({ method: "CASH", amount: paidNowCash });
+      if (onAccount > 0.009) payments.push({ method: "CUSTOMER_CREDIT", amount: onAccount });
     }
     if (payMethod === "CARD" && !payState.splitMode) {
       const last4 = cardLast4.trim();
@@ -2299,12 +2321,16 @@ ${receiptSoftwareCreditHtml()}
             branchScope: { walletAndCreditEntriesOmitted: boolean; balancesAreAllBranches: boolean };
           }>(`/customers/${customer.id}/transaction-history?limit=5&recent=true`),
         ]).then(([{ data }, historyResponse]) => {
-          setCustomer({
-            ...customer,
-            walletBalance: data.walletBalance ?? 0,
-            outstandingBalance: data.creditBalance ?? 0,
-            creditLimit: data.creditLimit ?? customer.creditLimit,
-          });
+          // The bill was cleared right after the sale; this refresh arrives later and must not put the customer back
+          // on the next bill. Only refresh the balances when the cart still holds this same customer.
+          if (useCartStore.getState().customer?.id === customer.id) {
+            setCustomer({
+              ...customer,
+              walletBalance: data.walletBalance ?? 0,
+              outstandingBalance: data.creditBalance ?? 0,
+              creditLimit: data.creditLimit ?? customer.creditLimit,
+            });
+          }
           setInlineCustomers((current) => current.map((entry) => entry.id === customer.id
             ? { ...entry, walletBalance: data.walletBalance ?? 0, creditBalance: data.creditBalance ?? 0, creditLimit: data.creditLimit ?? entry.creditLimit }
             : entry));
@@ -2442,7 +2468,7 @@ ${receiptSoftwareCreditHtml()}
         setSelectedCartIdx(-1);
       }
     } finally{setCheckoutLoading(false);checkoutLatchRef.current.leave();}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast4,payBankAccountId,payQrCodeId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled,qrFeeSettings,reloadPosTenantSettings,changeAmt,operatorCanSellBillOnly]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast4,payBankAccountId,payQrCodeId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled,qrFeeSettings,reloadPosTenantSettings,changeAmt,operatorCanSellBillOnly,taxRate,discount,discountType,partialPayAmount]);
 
   /** Quick Pay reload: post as its own cash sale immediately — current cart is untouched. */
   const recordQuickReloadSale = React.useCallback(async (item: CartItem): Promise<boolean> => {
@@ -2700,8 +2726,7 @@ ${rows}
   const payCustomerOutstanding = React.useCallback(async (customerId: string, customerName: string) => {
     const amt = parseFloat(creditPayAmount);
     if (!(amt > 0)) { toast.error("Enter payment amount"); return; }
-    const owed = customerInsight?.creditBalance ?? 0;
-    if (owed <= 0) { toast.error("No outstanding balance"); return; }
+    // No outstanding is fine: the whole amount is then saved to the customer's wallet (advance).
     if (creditPayMethod === "CHEQUE" && !creditPayChequeNumber.trim()) {
       toast.error("Enter cheque number");
       return;
@@ -2820,7 +2845,7 @@ ${rows}
     }
     setNewCustSaving(true);
     try {
-      const res = await api.post<any>("/customers", {
+      const res = await api.post<ApiCustomerRow>("/customers", {
         firstName: newCustFirst.trim(),
         lastName: newCustLast.trim() || undefined,
         phone: newCustPhone.trim(),
@@ -3033,7 +3058,7 @@ ${rows}
     openQuickProductPopup,
     openDemoProductPopup,
   }), [
-    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showReload, showQuickProduct, showDemoProduct, showDayEnd, showCashClose, showTransferFunds,
+    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, showHeldBills, showReload, showQuickProduct, showDemoProduct, showDayEnd, showCashClose, showTransferFunds,
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
@@ -3284,7 +3309,7 @@ ${rows}
                     Credit limit LKR {formatNumber(customerInsight?.creditLimit ?? 0)} · Available LKR {formatNumber(customerInsight?.creditAvailable ?? 0)}
                   </p>
                 </div>
-                {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
+                {previewCustomerId && (
                   <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                     <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Settle outstanding</p>
                     <div className="flex gap-2">
@@ -3294,7 +3319,9 @@ ${rows}
                         step="0.01"
                         value={creditPayAmount}
                         onChange={(e) => setCreditPayAmount(e.target.value)}
-                        placeholder={`Max ${formatNumber(customerInsight!.creditBalance!)}`}
+                        placeholder={(customerInsight?.creditBalance ?? 0) > 0
+                          ? `Owed ${formatNumber(customerInsight?.creditBalance ?? 0)} · extra goes to wallet`
+                          : "Amount (saved to wallet)"}
                         className="flex-1 h-9 rounded-xl px-3 text-sm text-white outline-none"
                         style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       />
@@ -3311,7 +3338,7 @@ ${rows}
                         <option value="CHEQUE">Cheque</option>
                       </select>
                     </div>
-                    {Number(creditPayAmount) > (customerInsight?.creditBalance ?? 0) + 0.01 && (
+                    {Number(creditPayAmount) > 0 && Number(creditPayAmount) > (customerInsight?.creditBalance ?? 0) + 0.01 && (
                       <p className="text-xs font-semibold" style={{ color: "var(--pos-success)" }}>
                         + LKR {formatNumber(Number(creditPayAmount) - (customerInsight?.creditBalance ?? 0))} will be saved to wallet
                       </p>
@@ -3356,7 +3383,7 @@ ${rows}
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        disabled={creditPayBusy}
+                        disabled={creditPayBusy || !(Number(creditPayAmount) > 0)}
                         className="w-full h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
                         style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}
                         onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
@@ -4599,6 +4626,13 @@ ${rows}
           />
         )}
 
+        {showCashIn && (
+          <PosCashInModal
+            onClose={() => setShowCashIn(false)}
+            onDone={() => void loadTodayStats()}
+          />
+        )}
+
         {/* PIN LOCK SCREEN */}
         {pinLocked&&(
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"var(--pos-pin-bg)"}}>
@@ -5525,7 +5559,7 @@ ${rows}
                   </div>
                 )}
                 {activePayment === "CUSTOMER_CREDIT" && (
-                  <div className="flex-1 px-4 py-6 flex flex-col justify-center gap-3">
+                  <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-3">
                     <p className="text-sm font-bold text-center" style={{ color: "var(--pos-text)" }}>Customer Credit / Wallet</p>
                     {customer ? (
                       <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}>
@@ -5545,9 +5579,64 @@ ${rows}
                     ) : (
                       <p className="text-xs text-center" style={{ color: "var(--pos-warn-soft)" }}>Select a customer to use Credit / Wallet.</p>
                     )}
-                    <p className="text-xs text-center" style={{ color: "var(--pos-muted)" }}>
-                      Charge LKR {formatNumber(totalAmt)} to this account
-                    </p>
+                    {(() => {
+                      const paidNow = Math.min(Math.max(parseFloat(numpad) || 0, 0), totalAmt);
+                      const onAccount = Math.max(0, totalAmt - paidNow);
+                      return (
+                        <p className="text-xs text-center" style={{ color: "var(--pos-muted)" }}>
+                          {paidNow > 0
+                            ? <>Cash now LKR {formatNumber(paidNow)} · Charge <span className="font-bold">LKR {formatNumber(onAccount)}</span> to this account</>
+                            : <>Charge LKR {formatNumber(totalAmt)} to this account</>}
+                        </p>
+                      );
+                    })()}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold" style={{ color: "var(--pos-text)" }}>Paid now in cash (optional)</span>
+                      <button type="button" onClick={() => { setNumpad(""); setPartialPayAmount(""); }} className="p-1 rounded-lg hover:bg-white/10" aria-label="Clear amount"><X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} /></button>
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={numpad}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^\d.]/g, "");
+                        const parts = v.split(".");
+                        const clean = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : v;
+                        setNumpad(clean);
+                        setPartialPayAmount(clean);
+                      }}
+                      placeholder="0.00 — whole bill on account"
+                      className="h-11 rounded-xl px-4 font-bold text-xl font-mono outline-none w-full"
+                      style={{ background: "rgba(16,185,129,0.12)", color: "var(--pos-success-soft)", border: "1px solid var(--pos-border)" }}
+                    />
+                    <div className="pos-checkout-keypad grid gap-1.5" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+                      {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row, ri) => row.map((k, ki) => {
+                        const isQuick = ki === 3;
+                        const isDel = k === "DEL";
+                        return (
+                          <button
+                            key={`cr-${ri}-${ki}`}
+                            type="button"
+                            onClick={() => isQuick ? setQuickCash(parseInt(k, 10)) : handleNumpad(k)}
+                            className={cn(
+                              "pos-checkout-key h-10 rounded-lg text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center",
+                              isDel && "pos-checkout-key-del",
+                              isQuick && "pos-checkout-key-quick",
+                            )}
+                            style={{
+                              background: isQuick
+                                ? (isPosLight ? "#475569" : "var(--pos-border)")
+                                : isDel
+                                  ? (isPosLight ? "#dc2626" : "rgba(239,68,68,0.18)")
+                                  : (isPosLight ? "#334155" : "var(--pos-input)"),
+                              color: isDel && !isPosLight ? "#f87171" : "#ffffff",
+                            }}
+                          >
+                            {isDel ? <Delete className="h-4 w-4" strokeWidth={2.25} /> : k}
+                          </button>
+                        );
+                      }))}
+                    </div>
                   </div>
                 )}
                 {activePayment!=="CASH"&&activePayment!=="CUSTOMER_CREDIT"&&(
@@ -5814,6 +5903,19 @@ ${rows}
               >
                 {dayEndLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
                 <span className="hidden sm:inline">Day End</span>
+              </button>
+              <button
+                onClick={() => setShowCashIn(true)}
+                title="Cash In: add money to the drawer"
+                className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: isPosLight ? "#059669" : "rgba(16,185,129,0.15)",
+                  color: isPosLight ? "#ffffff" : "#6ee7b7",
+                  border: `1px solid ${isPosLight ? "#047857" : "rgba(16,185,129,0.35)"}`,
+                }}
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Cash In</span>
               </button>
               <button
                 onClick={() => setShowTransferFunds(true)}
